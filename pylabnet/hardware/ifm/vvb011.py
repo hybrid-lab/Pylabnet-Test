@@ -58,7 +58,7 @@ class Driver:
         device_status = int(words[19][0], 16)
         out1, out2 = int(int(words[19][1], 16) / 2), int(words[19][1], 16) % 2
 
-        if(display):
+        if (display):
             self.log.info('v_rms: ', v_rms, '\nscaled_v_rms: ', scaled_v_rms, '\na_peak: ', a_peak, '\nscaled_a_peak: ', scaled_a_peak)
             self.log.info("a_rms: ", a_rms, '\na_rms_scaled: ', a_rms_scaled, '\ntemperature: ', temperature, '\nscaled_temperature: ', scaled_temperature)
             self.log.info('crest: ', crest, "\nscaled: ", scaled_crest, '\ndevice status: ', device_status, "\nout1, 2: ", out1, out2)

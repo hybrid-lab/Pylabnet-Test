@@ -237,6 +237,8 @@ class DataTaker:
     def configure(self):
         """ Configures the currently selected experiment + dataset """
 
+        self.log.info("THE EXPERIMENT IS CONFIURING")
+
         # If the experiment is running, do nothing
         try:
             if self.experiment_thread.isRunning():

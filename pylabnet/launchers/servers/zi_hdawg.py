@@ -11,7 +11,7 @@ def launch(**kwargs):
 
     config_dict = load_device_config('zi_hdawg', kwargs['config'], logger=kwargs['logger'])
 
-    if('device_id' in config_dict):
+    if ('device_id' in config_dict):
         device_id = config_dict['device_id']
     else:
         zi_logger.error(
@@ -19,7 +19,7 @@ def launch(**kwargs):
         )
         device_id = None
 
-    if('interface' in config_dict):
+    if ('interface' in config_dict):
         interface = config_dict['interface'] #1GbE, USB etc.
     else:
         zi_logger.error(
@@ -27,7 +27,7 @@ def launch(**kwargs):
         )
         interface = None
 
-    if(interface is None or device_id is None):
+    if (interface is None or device_id is None):
         zi_logger.error(
             f"Missing required parameters in the config file. Failed to launch the zi_hdawg server."
         )

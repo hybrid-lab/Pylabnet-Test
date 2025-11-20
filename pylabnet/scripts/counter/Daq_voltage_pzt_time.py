@@ -257,17 +257,17 @@ class CountMonitor:
         filename_f = save_path + "\\" + "Daq_monitoring_data_f_" + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".txt"
         filename = save_path + "\\" + "Daq_monitoring_data_" + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".txt"
         try:
-            if(self.data is not None):
+            if (self.data is not None):
                 np.savetxt(filename, self.data)
             else:
                 self.log.info("data is None")
 
-            if(self.x is not None):
+            if (self.x is not None):
                 np.savetxt(filename_x, self.x)
             else:
                 self.log.info("data'x is None")
 
-            if(self.f_ary is not None):
+            if (self.f_ary is not None):
                 np.savetxt(filename_f, self.f_ary)
             else:
                 self.log.info("data'f is None")
@@ -334,7 +334,7 @@ class CountMonitor:
         self.iter += 1
 
         # do fft and std if iter is n_bin
-        if(self.iter == self._n_bins):
+        if (self.iter == self._n_bins):
             self.iter = 0
             self.f_ary = 1 / (self.x[-1] - self.x[0]) * np.arange(self._n_bins)
             self.data[3] = np.fft.fft(self.data[0, :]) / self._n_bins
@@ -347,10 +347,10 @@ class CountMonitor:
         for index, channel in enumerate(self._ch_list):
 
             # Figure out which plot to assign to
-            if(index != 3):
+            if (index != 3):
                 self.widgets[f'curve_{channel}'].setData(self.x - self.x[0], self.data[index])
 
-            if(index == 0):
+            if (index == 0):
                 self.widgets[f'number_label'][channel - 1].setText(str(format(self.data[index][-1], ".8f")))
             else:
                 self.widgets[f'number_label'][channel - 1].setText(str(format(self.data[index][-1], ".4f")))
@@ -364,9 +364,9 @@ class CountMonitor:
         self.output += self.pid.cv * self.gain
 
         # protection
-        if(self.output > 9.):
+        if (self.output > 9.):
             self.output = self.default
-        if(self.output < 0):
+        if (self.output < 0):
             self.output = self.default
 
         # scan

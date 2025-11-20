@@ -228,13 +228,37 @@ class Launcher:
         :param host: (str) host of server
         :param port: (int) port number of server
         """
+#########DEBUG CODE
+        debug_message = f"DEBUG: OPX add client info: Module '{module}', Device ID: {device_id}, host: {host}, port{port}\n "
+        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            log_file.write(debug_message)
+        ###############
+#########DEBUG CODE
+        debug_message = f"DEBUG: Clients before{self.clients}\n "
+        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            log_file.write(debug_message)
+        ###############
+
         server = module
         try:
             full_module_name = 'pylabnet.network.client_server.' + module
             client_class = getattr(importlib.import_module(full_module_name), "Client")
 
             self.clients[(server, device_id)] = client_class(host=host, port=port)
+
+            #########DEBUG CODE
+            debug_message = f"DEBUG: Clients during{self.clients}\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+        ###############
         except:
+
+            #########DEBUG CODE
+            debug_message = f"DEBUG: CODE REACHES SPOT 1\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+            ###############
+
             spec = importlib.util.spec_from_file_location(
                 module,
                 os.path.join(
@@ -243,9 +267,49 @@ class Launcher:
                     module + '.py'
                 )
             )
+
+            #########DEBUG CODE
+            debug_message = f"DEBUG: CODE REACHES INTERMEDIATE SPOT 1\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+            ###############
+
             mod = importlib.util.module_from_spec(spec)
+
+            #########DEBUG CODE
+            debug_message = f"DEBUG: CODE REACHES INTERMEDIATE SPOT 2\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+            ###############
+            ##########DEBUG
             spec.loader.exec_module(mod)
+
+            # Add a final debug spot to confirm success
+            debug_message = f"DEBUG: Successfully executed {module}\n"
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+
+                #########DEBUG CODE
+            debug_message = f"DEBUG: CODE REACHES SPOT 2. WHAT IT SHOULD BE: {mod.Client(host=host, port=port)}\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+            ###############
+
             self.clients[(server, device_id)] = mod.Client(host=host, port=port)
+
+            #########DEBUG CODE
+            debug_message = f"DEBUG: CODE REACHES SPOT 3\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+            ###############
+
+        ######OPX NEVER REACHES THIS:
+
+            #########DEBUG CODE
+        debug_message = f"DEBUG: Clients after: {self.clients}\n "
+        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            log_file.write(debug_message)
+        ###############
 
     def _launch_servers(self):
         """ Searches through active servers and connects/launches them """
@@ -409,6 +473,7 @@ class Launcher:
     def _launch_scripts(self):
         """ Launch the scripts to be run sequentially in this thread """
 
+######Loads staticline.py basically (loads whatever script you click on)
         spec = importlib.util.spec_from_file_location(
             self.name,
             self.config_dict['script']
@@ -417,6 +482,7 @@ class Launcher:
         spec.loader.exec_module(mod)
 
         self.logger.info(f'Launching script {self.name}')
+######mod.launch is staticline launch and inputs are **kwargs
 
         mod.launch(
             logger=self.logger,

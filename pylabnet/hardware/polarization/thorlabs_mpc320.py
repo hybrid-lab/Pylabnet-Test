@@ -59,7 +59,7 @@ class TLI_DeviceInfo(Structure):
     _fields_ = [("typeID", ctypes.c_ulong),
                 ("description", (65 * ctypes.c_char)), #changed from 65* _char
                 ("serialNo", (9 * ctypes.c_char)), #changed from 9* _char
-                ("PID", ctypes.c_ulong),# wintypes.DWORD
+                ("PID", ctypes.c_ulong), # wintypes.DWORD
                 ("isKnownType", ctypes.c_bool),
                 ("motorType", MOT_MotorTypes),
                 ("isPiezoDevice", ctypes.c_bool),

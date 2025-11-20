@@ -6,8 +6,8 @@ from pylabnet.utils.helper_methods import GenericServer, get_ip, load_device_con
 def launch(**kwargs):
     config_dict = load_device_config('superK', kwargs['config'], kwargs['logger'])
     nkt = Driver(com_port=config_dict['com_port'],
-                    devID=config_dict['devID'], 
-                     logger=kwargs['logger'])
+                 devID=config_dict['devID'],
+                 logger=kwargs['logger'])
 
     nkt_service = Service()
     nkt_service.assign_module(module=nkt)

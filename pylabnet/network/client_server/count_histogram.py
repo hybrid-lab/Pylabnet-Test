@@ -17,9 +17,9 @@ class Service(ServiceBase):
 class Client(ClientBase):
 
     def pause(self):
-        """ Pauses the go/run loop. 
+        """ Pauses the go/run loop.
 
-        NOTE: does not actually stop counter acquisition! 
+        NOTE: does not actually stop counter acquisition!
         There does not seem to be a way to do that from SI-TT API
         """
 

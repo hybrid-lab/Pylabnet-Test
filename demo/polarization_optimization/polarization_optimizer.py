@@ -1,11 +1,9 @@
-import ctypes
 import pyvisa
 from pylabnet.utils.logging.logger import LogClient
 from pylabnet.network.core.generic_server import GenericServer
 #from pylabnet.network.client_server.pol_paddles import Client
 from pylabnet.hardware.power_meter.thorlabs_pm320e import Driver
-from pylabnet.hardware.polarization.polarization_control import Driver as MPC320 , paddle1, paddle2, paddle3
-import time
+from pylabnet.hardware.polarization.polarization_control import Driver as MPC320, paddle1, paddle2, paddle3
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -21,15 +19,15 @@ logger = LogClient(
     module_tag='Polarization Optimizer'
 )
 power_meter = Driver(
-    gpib_address=gpib_addres, 
+    gpib_address=gpib_addres,
     logger=logger
 )
 
 pol_paddle = MPC320(
-    device_num=device_num, 
-    logger=logger) 
+    device_num=device_num,
+    logger=logger)
 
-power_meter.set_range(2,'R100NW')
+power_meter.set_range(2, 'R100NW')
 
 # Output of pol. paddle is connected to output 2 of powermeter
 channel = 2
@@ -53,27 +51,27 @@ Posf = pol_paddle.get_angle(paddle2)
 #def optimize(angle_center_1,angle_center_2,angle_center_3 deviate, stepnum)
 count = 0
 itercount = 0
-ang = [] 
+ang = []
 angle = []
 power = []
 pos = []
 iterationnum = 40
 stepnum = 20 #number of step angles within range Cannot go below 2 in full range to have enough time for paddle to repond (defined in move function in driver)
 ang_paddles = []
-power_paddles = [] 
+power_paddles = []
 
 for paddle in paddles:
     deviate = 170 #range of angle to scan
-    stepsize = deviate/stepnum
-    move_in = pol_paddle.move_rel(paddle, -deviate/2)
+    stepsize = deviate / stepnum
+    move_in = pol_paddle.move_rel(paddle, -deviate / 2)
     while itercount < iterationnum:
         if itercount >= 1:
-            move = pol_paddle.move(paddle, ang[itercount-1]-deviate/2)
+            move = pol_paddle.move(paddle, ang[itercount - 1] - deviate / 2)
         while count < stepnum:
             mover = pol_paddle.move_rel(paddle, stepsize)
             PosF = pol_paddle.get_angle(paddle)
             print(f"itercount = {itercount} count = {count}")
-            print(f"Position after move relative is {PosF}") 
+            print(f"Position after move relative is {PosF}")
             current_power = power_meter.get_power(channel)
             print(f"Current power is {current_power} W.")
             power.extend([current_power])
@@ -85,9 +83,9 @@ for paddle in paddles:
         #plt.title(f"paddle # {paddle.value} , iteration # {itercount}.")
         #plt.plot(angle, power, "or")
         maxindex = np.argmax(power)
-        ang.extend([angle[maxindex]]) 
+        ang.extend([angle[maxindex]])
         if itercount >= 1:
-            if abs(ang[itercount] - ang[itercount-1]) < 0.05:
+            if abs(ang[itercount] - ang[itercount - 1]) < 0.05:
                 print(f"converged to max power.")
                 move = pol_paddle.move(paddle, angle[maxindex])
                 count = 0
@@ -96,8 +94,8 @@ for paddle in paddles:
                 angle = []
                 break
 
-        deviate = deviate/2
-        stepsize = deviate/stepnum
+        deviate = deviate / 2
+        stepsize = deviate / stepnum
         itercount += 1
         count = 0
 
@@ -105,7 +103,7 @@ for paddle in paddles:
     power_paddles.extend(power)
     ang = []
     itercount = 0
-    
+
 PosF1 = pol_paddle.get_angle(paddles[0])
 print(f"paddle = {paddles[0]} final_angle = {PosF1}")
 PosF2 = pol_paddle.get_angle(paddles[1])
@@ -114,7 +112,3 @@ PosF3 = pol_paddle.get_angle(paddles[2])
 print(f"paddle = {paddles[2]} final_angle = {PosF3}")
 
 pol_paddle.close()
-
-
-
-

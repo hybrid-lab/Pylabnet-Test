@@ -51,7 +51,6 @@ class CountMonitor:
         self._plots_assigned = []  # List of plots on the GUI that have been assigned
         self.data = None
 
-
         # Instantiate GUI window
         self.gui = Window(
             gui_template=ui,
@@ -220,7 +219,6 @@ class CountMonitor:
         for plot_index, clear_button in enumerate(self.widgets['event_button']):
             clear_button.clicked.connect(partial(lambda plot_index: self._clear_plot(plot_index), plot_index=plot_index))
 
-
     def _clear_plot(self, plot_index):
         """ Clears the curves on a particular plot
 
@@ -244,7 +242,7 @@ class CountMonitor:
         # Update all active channels
         # x_axis = self._ctr.get_x_axis()/1e12
 
-        voltage = np.array( [ np.mean(self._ctr.get_ai_voltage('ai0', 10, 10) ) ])
+        voltage = np.array([np.mean(self._ctr.get_ai_voltage('ai0', 10, 10))])
         # dt_timestamp = time.time()
         # counts = self._ctr.get_counts(name=self.config['name'])
         # counts_per_sec = counts * (1e12 / self._bin_width)
@@ -278,8 +276,7 @@ class CountMonitor:
             v = np.array([v])
             self.data = np.concatenate((self.data[1:], v))
             self.widgets[f'curve_{channel}'].setData(self.data)
-            self.widgets[f'number_label'][channel - 1].setText(str(  format(self.data[-1], ".8f")   ))
-
+            self.widgets[f'number_label'][channel - 1].setText(str(format(self.data[-1], ".8f")))
 
 
 def launch(**kwargs):

@@ -18,7 +18,7 @@ class Driver():
 
     def set_resistance_range(self, res_range):
         """ Setting resistance measurment range
-        
+
         0: 200 Ohm
         1: 2 kOhm
         2: 20 kOhhm
@@ -29,18 +29,17 @@ class Driver():
         """
 
         setting_dict = {
-            0 : "200 Ohm",
-            1 : "2 kOhm",
-            2 : "20 kOhm",
-            3 : "200 kOhm",
-            4 : "1 MOhm",
-            5 : "10 MOhm",
-            6 : "100 MOhm"
+            0: "200 Ohm",
+            1: "2 kOhm",
+            2: "20 kOhm",
+            3: "200 kOhm",
+            4: "1 MOhm",
+            5: "10 MOhm",
+            6: "100 MOhm"
         }
 
         self.device.write(f":MEASure:RESistance {res_range}")
         self.log.info(f"Successfully set resistance range to {setting_dict[res_range]}.")
-
 
     def get_resistance(self):
         """ Return measured resistance"""
@@ -80,12 +79,11 @@ if __name__ == "__main__":
     logger = LogClient(
         host='192.168.50.111',
         port=38967,
-    module_tag='Rigol MM'
+        module_tag='Rigol MM'
     )
 
-
     gpib_address = 'USB0::0x1AB1::0x09C4::DM3R242902020::INSTR'
-    mm = Driver(gpib_address = gpib_address, logger = logger)
+    mm = Driver(gpib_address=gpib_address, logger=logger)
 
     mm.set_resistance_measurement()
     time.sleep(1)

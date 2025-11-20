@@ -512,6 +512,7 @@ def load_device_config(device, config, logger=None):
     """
 
     filepath = os.path.join(get_config_directory(), 'devices', device, f'{config}.json')
+
     try:
         f = open(filepath)
         # returns JSON object as
@@ -541,6 +542,7 @@ def load_script_config(script, config, logger=None):
     """
 
     filepath = os.path.join(get_config_directory(), 'scripts', script, f'{config}.json')
+
     try:
         f = open(filepath)
         # returns JSON object as
@@ -704,6 +706,8 @@ def find_keys(input_dict, key_name):
     """
 
     found = []
+    # FOR BUGGY NIDAQ STATICLINE: input_dcit: {('nidaqmx', 'NI_1'): <pylabnet.network.client_server.nidaqmx_card.Client object at 0x0000018538731520>}
+    # key_name: ni_daqs
     for k, v in input_dict.items():
         if type(k) in [list, tuple, dict] and key_name in k:
             found.append(v)

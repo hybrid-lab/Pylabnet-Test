@@ -36,7 +36,7 @@ class Driver:
         try:
             ni_daq_device = nidaqmx.system.device.Device(name=device_name)
             self.log.info(
-                "Successfully connected to NI DAQ '{device_name}' (type: {product_type}) \n"
+                "Successfully connected to NI DAQ '{device_name}' (type: {product_type})\n"
                 "".format(
                     device_name=ni_daq_device.name,
                     product_type=ni_daq_device.product_type

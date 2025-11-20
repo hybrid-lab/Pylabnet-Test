@@ -515,7 +515,7 @@ class AWGPulseBlockHandler():
         if not len(codeword_times) == len(codeword_times_force_value):
             self.log.error(codeword_times)
             self.log.error(codeword_times_force_value)
-            assert(len(codeword_times) == len(codeword_times_force_value))
+            assert (len(codeword_times) == len(codeword_times_force_value))
 
         return codewords, codeword_times
 

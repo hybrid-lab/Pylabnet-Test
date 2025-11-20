@@ -1,8 +1,8 @@
-import time
 import serial
 import io
 
 from pylabnet.utils.logging.logger import LogHandler
+
 
 class AGC_100:
 
@@ -23,7 +23,7 @@ class AGC_100:
 
         self.sio = io.TextIOWrapper(io.BufferedRWPair(ser, ser))
 
-        # Log initial pressure. 
+        # Log initial pressure.
         init_pressure = self.get_pressure()
         self.log.info(f"Successfully reading {init_pressure} mBar.")
 

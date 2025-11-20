@@ -31,12 +31,16 @@ class GUIWindowFromConfig(QMainWindow):
         # Add IP info
         self.host = host
         self.port = port
+        self.random_random = "Hello"
         self.blockgridLayout.append(QHBoxLayout(self))
         self.gridLayout.addLayout(self.blockgridLayout[0], 0, 1)
         self.ip_label = QtWidgets.QLabel(f"IP Address: {host}")
         self.port_label = QtWidgets.QLabel(f"Port: {port}")
+        self.random1 = QtWidgets.QLabel(f"Random: {self.random_random}")
         self.blockgridLayout[0].addWidget(self.ip_label)
         self.blockgridLayout[0].addWidget(self.port_label)
+        self.blockgridLayout[0].addWidget(self.random1)
+
         self.staticlines = staticlines
 
         self.unpack_config_file()
@@ -64,6 +68,19 @@ class GUIWindowFromConfig(QMainWindow):
 
             #Device wasn't found, so don't add to GUI
             #Not a huge fan of this implementation, but its good enough for now
+
+        ###DEBUG lines:
+        # ---- START: REPLACE YOUR PRINT STATEMENT WITH THIS ----
+            try:
+                debug_message = f"DEBUG: Staticlines: '{self.staticlines}, Device Dict: {device}'\n "
+                with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                    log_file.write(debug_message)
+            except Exception as e:
+                # This will write any error from the logging itself to a different file
+                with open("c:/users/hybri/pylabnet/debug_error.txt", "a") as error_file:
+                    error_file.write(str(e))
+            # ---- END: REPLACEMENT CODE ----
+
             if (self.staticlines != None and not device_name in self.staticlines):
                 continue
 

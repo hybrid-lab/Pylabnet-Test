@@ -17,6 +17,7 @@ from pylabnet.utils.helper_methods import (get_gui_widgets, load_script_config,
 from pylabnet.scripts.sweeper.scan_fit import FitPopup
 from scipy.signal import find_peaks
 
+
 class Controller(MultiChSweep1D):
 
     def __init__(self, logger=None, channels=['Channel 1'], clients={}, config=None, fast=True):
@@ -85,7 +86,7 @@ class Controller(MultiChSweep1D):
         self.p0_bwd = None
         self.x_fwd = self._generate_x_axis()
 
-        self.num_avg  = None
+        self.num_avg = None
         self.fft_fwd, self.fft_fwd_avg = None, None
         self.fft_bwd, self.fft_bwd_avg = None, None
         self.pk, self.dip = None, None
@@ -178,7 +179,6 @@ class Controller(MultiChSweep1D):
 
         # Setup stylesheet.
         self.gui.apply_stylesheet()
-
 
     def display_experiment(self, index):
         """ Displays the currently clicked experiment in the text browser
@@ -507,7 +507,6 @@ class Controller(MultiChSweep1D):
                     self.data_bwd[-1]
                 )
 
-
                 # Update average and plot
                 try:
                     cur_rep = len(self.data_bwd)
@@ -553,7 +552,6 @@ class Controller(MultiChSweep1D):
                         self.avg_fwd
                     )
 
-
                 # If it is the first run, just add the data
                 except IndexError:
                     self.avg_fwd.append(self.data_fwd[-1][-1])
@@ -577,7 +575,6 @@ class Controller(MultiChSweep1D):
                     self.x_fwd[:cur_ind],
                     self.data_fwd[-1]
                 )
-
 
                 # Update average and plot
                 try:
@@ -616,7 +613,6 @@ class Controller(MultiChSweep1D):
                     self.x_bwd[:cur_ind],
                     self.data_bwd[-1]
                 )
-
 
                 # Update average and plot
                 try:
@@ -695,22 +691,22 @@ class Controller(MultiChSweep1D):
                 autoRange=False
             )
 
-        # find forward peak number, and use a sliding-window-like way to find numbers 
+        # find forward peak number, and use a sliding-window-like way to find numbers
         # peaks, _ = find_peaks(self.data_fwd[-1], height=[0.1,0.16], distance=80, width=10)
 
         height_pk = self.pk
-        height_dip = [-1*self.dip[1], -1*self.dip[0]]
+        height_dip = [-1 * self.dip[1], -1 * self.dip[0]]
 
-        peaks, _ = find_peaks(self.data_fwd[-1], height=height_pk, distance=self.pts/(self.max-self.min)*2E-5, width=self.pts/(self.max-self.min)*5E-7)
-        dips, _ = find_peaks(-1*np.array(self.data_fwd[-1]), height=height_dip, distance=self.pts/(self.max-self.min)*2E-5, width=self.pts/(self.max-self.min)*5E-7)
+        peaks, _ = find_peaks(self.data_fwd[-1], height=height_pk, distance=self.pts / (self.max - self.min) * 2E-5, width=self.pts / (self.max - self.min) * 5E-7)
+        dips, _ = find_peaks(-1 * np.array(self.data_fwd[-1]), height=height_dip, distance=self.pts / (self.max - self.min) * 2E-5, width=self.pts / (self.max - self.min) * 5E-7)
         num_fwd = 0
-        if(len(peaks) > 0 and len(dips) > 0):
+        if (len(peaks) > 0 and len(dips) > 0):
             ptr_dips, ptr_peaks, ptr_ispeak, ans_q = 0, 0, (peaks[0] <= dips[0]), []
-            cur_idx = min(peaks[0] , dips[0])
-            while((ptr_dips < len(dips)) and (ptr_peaks < len(peaks))):
-                if(ptr_ispeak):
-                    # add a dip if it's index is larger than the current index 
-                    if(dips[ptr_dips] < cur_idx):
+            cur_idx = min(peaks[0], dips[0])
+            while ((ptr_dips < len(dips)) and (ptr_peaks < len(peaks))):
+                if (ptr_ispeak):
+                    # add a dip if it's index is larger than the current index
+                    if (dips[ptr_dips] < cur_idx):
                         ptr_dips += 1
                     else:
                         ans_q += [dips[ptr_dips]]
@@ -718,8 +714,8 @@ class Controller(MultiChSweep1D):
                         ptr_dips += 1
                         ptr_ispeak = False
                 else:
-                    # add a peak if it's index is larger than the current index 
-                    if(peaks[ptr_peaks] < cur_idx):
+                    # add a peak if it's index is larger than the current index
+                    if (peaks[ptr_peaks] < cur_idx):
                         ptr_peaks += 1
                     else:
                         ans_q += [peaks[ptr_peaks]]
@@ -727,23 +723,23 @@ class Controller(MultiChSweep1D):
                         ptr_peaks += 1
                         ptr_ispeak = True
 
-            num_fwd = len(ans_q )/2
+            num_fwd = len(ans_q) / 2
 
         self.log.info('fwd peaks =' + str(self.x_fwd[peaks]))
         self.log.info('num_fwd=' + str(num_fwd))
 
-        # find backward peak number, and use a sliding-window-like way to find numbers 
-        peaks, _ = find_peaks(self.data_fwd[-1], height=height_pk, distance=self.pts/(self.max-self.min)*2E-5, width=self.pts/(self.max-self.min)*5E-7)
-        dips, _ = find_peaks(-1*np.array(self.data_fwd[-1]), height=height_dip, distance=self.pts/(self.max-self.min)*2E-5, width=self.pts/(self.max-self.min)*5E-7)
-        
+        # find backward peak number, and use a sliding-window-like way to find numbers
+        peaks, _ = find_peaks(self.data_fwd[-1], height=height_pk, distance=self.pts / (self.max - self.min) * 2E-5, width=self.pts / (self.max - self.min) * 5E-7)
+        dips, _ = find_peaks(-1 * np.array(self.data_fwd[-1]), height=height_dip, distance=self.pts / (self.max - self.min) * 2E-5, width=self.pts / (self.max - self.min) * 5E-7)
+
         num_bwd = 0
-        if(len(peaks) > 0 and len(dips) > 0):
+        if (len(peaks) > 0 and len(dips) > 0):
             ptr_dips, ptr_peaks, ptr_ispeak, ans_q = 0, 0, (peaks[0] <= dips[0]), []
-            cur_idx = min(peaks[0] , dips[0])
-            while((ptr_dips < len(dips)) and (ptr_peaks < len(peaks))):
-                if(ptr_ispeak):
-                    # add a dip if it's index is larger than the current index 
-                    if(dips[ptr_dips] < cur_idx):
+            cur_idx = min(peaks[0], dips[0])
+            while ((ptr_dips < len(dips)) and (ptr_peaks < len(peaks))):
+                if (ptr_ispeak):
+                    # add a dip if it's index is larger than the current index
+                    if (dips[ptr_dips] < cur_idx):
                         ptr_dips += 1
                     else:
                         ans_q += [dips[ptr_dips]]
@@ -751,22 +747,21 @@ class Controller(MultiChSweep1D):
                         ptr_dips += 1
                         ptr_ispeak = False
                 else:
-                    # add a peak if it's index is larger than the current index 
-                    if(peaks[ptr_peaks] < cur_idx):
+                    # add a peak if it's index is larger than the current index
+                    if (peaks[ptr_peaks] < cur_idx):
                         ptr_peaks += 1
                     else:
                         ans_q += [peaks[ptr_peaks]]
                         cur_idx = peaks[ptr_peaks]
                         ptr_peaks += 1
                         ptr_ispeak = True
-            num_bwd = len(ans_q)/2
+            num_bwd = len(ans_q) / 2
 
-        
         self.log.info('bwd peaks =' + str(self.x_bwd[peaks]))
         self.log.info('num_bwd=' + str(num_bwd))
 
-        self.log.info('num_avg=' + str( (num_fwd + num_bwd)/2.   ))
-        self.num_avg = (num_fwd + num_bwd)/2.
+        self.log.info('num_avg=' + str((num_fwd + num_bwd) / 2.))
+        self.num_avg = (num_fwd + num_bwd) / 2.
 
         # FFT
         self.fft_fwd = np.fft.fft(self.data_fwd[-1])
@@ -776,15 +771,6 @@ class Controller(MultiChSweep1D):
         self._update_output_1()
         # self.gui.force_update()
         return
-
-
-
-
-
-
-
-
-
 
     def _update_integrated(self, reps_done):
         """ Update repetition counter """
@@ -840,7 +826,6 @@ class Controller(MultiChSweep1D):
         except KeyError:
             pass
 
-
     def _initialize_display_1(self):
         """ Initializes the display (configures all plots) """
 
@@ -881,7 +866,6 @@ class Controller(MultiChSweep1D):
         for plot_index, clear_button in enumerate(self.widgets_1['event_button']):
             clear_button.clicked.connect(partial(lambda plot_index: self._clear_plot_1(plot_index), plot_index=plot_index))
 
-
     def set_params(self, pk=[0.75, 1], dip=[0.25, 0.55], bin_width_1=1e9, n_bins_1=1e3, ch_list_1=[1], plot_list_1=[[1]]):
         """ Sets counter parameters
 
@@ -891,7 +875,6 @@ class Controller(MultiChSweep1D):
         :param plot_list: list of channels to assign to each plot (e.g. [[1,2], [3,4]])
         """
 
-
         # Save params to internal variables
         self.pk = pk
         self.dip = dip
@@ -900,7 +883,6 @@ class Controller(MultiChSweep1D):
         self._ch_list_1 = ch_list_1
         self._plot_list_1 = plot_list_1
         self.data_1 = np.zeros(self._n_bins_1)
-
 
     def _clear_plot_1(self, plot_index):
         """ Clears the curves on a particular plot
@@ -914,46 +896,46 @@ class Controller(MultiChSweep1D):
             # Set the curve to constant with last point for all entries
             self.data_1 = np.ones(self._n_bins_1) * self.widgets_1[f'curve_{channel}'].yData[-1]
 
-
             self.widgets_1[f'curve_{channel}'].setData(
                 self.data_1
             )
+
     def _update_output_1(self):
         """ Updates the output to all current values"""
 
         # 1, Figure out which plot to assign to
         channel = self._ch_list_1[0]
-        self.data_1 = np.concatenate((self.data_1[1:], np.array([self.num_avg ])))
-        self.widgets_1[f'curve_{channel}'].setData( self.data_1)
-        self.widgets_1[f'number_label'][channel - 1].setText(str(  format(self.data_1[-1], ".5f")   ))
+        self.data_1 = np.concatenate((self.data_1[1:], np.array([self.num_avg])))
+        self.widgets_1[f'curve_{channel}'].setData(self.data_1)
+        self.widgets_1[f'number_label'][channel - 1].setText(str(format(self.data_1[-1], ".5f")))
 
         # 2, FFT
         channel = self._ch_list_1[1]
-        self.widgets_1[f'curve_{channel}'].setData( np.absolute(self.fft_fwd) )
-        self.widgets_1[f'number_label'][channel - 1].setText(str(  format(np.absolute(self.fft_fwd)[-1], ".5f")   ))
+        self.widgets_1[f'curve_{channel}'].setData(np.absolute(self.fft_fwd))
+        self.widgets_1[f'number_label'][channel - 1].setText(str(format(np.absolute(self.fft_fwd)[-1], ".5f")))
 
         channel = self._ch_list_1[2]
-        self.widgets_1[f'curve_{channel}'].setData( np.absolute(self.fft_bwd) )
-        self.widgets_1[f'number_label'][channel - 1].setText(str(  format(np.absolute(self.fft_bwd)[-1], ".5f")   ))
+        self.widgets_1[f'curve_{channel}'].setData(np.absolute(self.fft_bwd))
+        self.widgets_1[f'number_label'][channel - 1].setText(str(format(np.absolute(self.fft_bwd)[-1], ".5f")))
 
         # 2, FFT-avg
-        if(self.fft_fwd_avg is None):
+        if (self.fft_fwd_avg is None):
             self.fft_fwd_avg = np.array(self.fft_fwd)
         else:
             self.fft_fwd_avg += np.array(self.fft_fwd)
 
-        if(self.fft_bwd_avg is None):
+        if (self.fft_bwd_avg is None):
             self.fft_bwd_avg = np.array(self.fft_bwd)
         else:
             self.fft_bwd_avg += np.array(self.fft_bwd)
 
         channel = self._ch_list_1[3]
-        self.widgets_1[f'curve_{channel}'].setData( np.absolute(self.fft_fwd_avg) )
-        self.widgets_1[f'number_label'][channel - 1].setText(str(  format(np.absolute(self.fft_fwd_avg)[-1], ".5f")   ))
+        self.widgets_1[f'curve_{channel}'].setData(np.absolute(self.fft_fwd_avg))
+        self.widgets_1[f'number_label'][channel - 1].setText(str(format(np.absolute(self.fft_fwd_avg)[-1], ".5f")))
 
         channel = self._ch_list_1[4]
-        self.widgets_1[f'curve_{channel}'].setData( np.absolute(self.fft_bwd_avg) )
-        self.widgets_1[f'number_label'][channel - 1].setText(str(  format(np.absolute(self.fft_bwd_avg)[-1], ".5f")   ))
+        self.widgets_1[f'curve_{channel}'].setData(np.absolute(self.fft_bwd_avg))
+        self.widgets_1[f'number_label'][channel - 1].setText(str(format(np.absolute(self.fft_bwd_avg)[-1], ".5f")))
 
         # for index, d in enumerate(data):
 
@@ -964,7 +946,6 @@ class Controller(MultiChSweep1D):
         #     self.data_1 = np.concatenate((self.data_1[1:], d))
         #     self.widgets_1[f'curve_{channel}'].setData( self.data_1)
         #     self.widgets_1[f'number_label'][channel - 1].setText(str(  format(self.data_1[-1], ".5f")   ))
-
 
 
 def main():

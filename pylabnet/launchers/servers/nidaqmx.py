@@ -18,12 +18,22 @@ def launch(**kwargs):
     # Instantiate driver
     ni_daqmx_logger = kwargs['logger']
     try:
+        #########DEBUG CODE
+        debug_message = f"DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n "
+        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            log_file.write(debug_message)
+        ###############
         ni_driver = nidaqmx_card.Driver(
             device_name=kwargs['device_id'],
             logger=ni_daqmx_logger
         )
     except AttributeError:
         try:
+            #########DEBUG CODE
+            debug_message = f"DEBUG:IT ACUTALLY GOES THROUGH!!!!!!!!!!!!!!!!!!!!!\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+            ###############
             config = load_config(kwargs['config'])
             ni_driver = nidaqmx_card.Driver(
                 device_name=config['device'],

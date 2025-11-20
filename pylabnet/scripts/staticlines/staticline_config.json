@@ -1,0 +1,30 @@
+{
+  "staticline": {
+    "lines": {
+      "My_DAQ_Card": {
+        "hardware_type": "OPX",
+        "config_name": "OPX",
+        "staticline_names": [
+          "Gate 1 Voltage",
+          "Laser Trigger",
+          "RF Switch"
+        ],
+        "staticline_configs": [
+          {
+            "type": "analog",
+            "num": 0,
+            "default": 0.1
+          },
+          {
+            "type": "digital",
+            "num": 0
+          },
+          {
+            "type": "digital",
+            "num": 1
+          }
+        ]
+      }
+    }
+  }
+}

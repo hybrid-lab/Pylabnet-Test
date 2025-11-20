@@ -5,6 +5,7 @@ from pylabnet.utils.helper_methods import get_ip, hide_console, load_device_conf
 import pylabnet.hardware.ifm.vvb011 as vvb011
 from pylabnet.network.client_server.ifm import Service, Client
 
+
 def launch(**kwargs):
     """ Connects to toptica laser and launches server
 
@@ -24,11 +25,9 @@ def launch(**kwargs):
     ifm_service.assign_module(module=vib)
     ifm_service.assign_logger(logger=vib_logger)
     ifm_service_server = GenericServer(
-        service=ifm_service, 
+        service=ifm_service,
         host=get_ip(),
         port=kwargs['port']
     )
 
     ifm_service_server.start()
-
-
