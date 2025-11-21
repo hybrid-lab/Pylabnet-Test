@@ -1,0 +1,27 @@
+{
+    "servers" : [
+        {
+            "type": "nidaqmx",
+            "config": "ni_daq_1"
+        }
+    ],
+    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\staticlines\\staticline.py",
+    "lines": {
+        "Nidaq":
+        {
+            "hardware_type": "nidaqmx",
+            "config_name": "ni_daq_1",
+            "staticline_names": ["analog"],
+            "staticline_configs": [
+                {"type":"analog", "ao_output": "length"}
+
+            ]
+        }
+        
+    },
+    "logger": "",
+    "clients": {"OPX": ""},
+    "server_port": "70" 
+
+
+}
