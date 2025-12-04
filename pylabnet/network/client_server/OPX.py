@@ -64,6 +64,7 @@ class Service(ServiceBase):
         time_of_flight,
         smearing,
         gauss_sd,
+        variable_name,
     ):
         return self._module.get_ai_voltage(
             pulse=pulse,
@@ -77,6 +78,7 @@ class Service(ServiceBase):
             time_of_flight=time_of_flight,
             smearing=smearing,
             gauss_sd=gauss_sd,
+            variable_name=variable_name,
         )
 
     def exposed_create_new_ao_elem(
@@ -150,6 +152,15 @@ class Service(ServiceBase):
             length=length,
             elements=elements,
         )
+
+    def exposed_if_gt(self, var_name, threshold):
+        return self._module.if_gt(var_name, threshold)
+
+    def exposed_elif_gt(self, var_name, threshold):
+        return self._module.elif_gt(var_name, threshold)
+
+    def exposed_else(self):
+        return self._module.else_()
 
 
 class Client(ClientBase):
@@ -236,6 +247,7 @@ class Client(ClientBase):
         time_of_flight=defaut_time_of_flight,
         smearing=default_smearing,
         gauss_sd=default_length / 5,
+        variable_name=None,
     ):
         return self._service.exposed_get_ai_voltage(
             pulse=pulse,
@@ -249,6 +261,7 @@ class Client(ClientBase):
             time_of_flight=time_of_flight,
             smearing=smearing,
             gauss_sd=gauss_sd,
+            variable_name=variable_name,
         )
 
     def create_new_ao_elem(
@@ -322,3 +335,12 @@ class Client(ClientBase):
             length=length,
             elements=elements,
         )
+
+    def if_gt(self, var_name, threshold):
+        return self._service.exposed_if_gt(var_name, threshold)
+
+    def elif_gt(self, var_name, threshold):
+        return self._service.exposed_elif_gt(var_name, threshold)
+
+    def else_(self):
+        return self._service.exposed_else()
