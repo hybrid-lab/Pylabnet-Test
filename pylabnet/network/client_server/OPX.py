@@ -323,6 +323,7 @@ class Client(ClientBase):
             delay=delay,
             buffer=buffer,
         )
+    #Note
 
     def build_stack(self):
         return self._service.build_stack()
