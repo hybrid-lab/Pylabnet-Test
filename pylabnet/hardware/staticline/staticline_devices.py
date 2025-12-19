@@ -473,18 +473,18 @@ class OPX(StaticLineHardwareHandler):
         self.log.info(f"NiDaq output {self.ao_output} successfully assigned to staticline {self.name}.")
 
     def set_value(self, value):
-        self.hardware_client.set_ao_voltage("const", self.ao_output, value)
+        self.hardware_client.set_ao_voltage(pulse="const", ao_channel=self.ao_output, amplitude=value, frequency=0)
         self.is_up = True
 
     def up(self):
         if self.is_analog:
-            self.hardware_client.set_ao_voltage("const", self.ao_output, self.up_voltage)
+            self.hardware_client.set_ao_voltage(pulse="const", ao_channel=self.ao_output, amplitude=self.up_voltage, frequency=0)
             self.is_up = True
         if self.is_digital:
-            self.hardware_client.set_digital_voltage("ON", self.do_output)
+            self.hardware_client.set_digital_voltage(pulse="ON", do_channel=self.do_output)
 
     def down(self):
-        self.hardware_client.set_ao_voltage("const", self.ao_output, self.down_voltage)
+        self.hardware_client.set_ao_voltage(pulse="const", ao_channel=self.ao_output, amplitude=self.down_voltage, frequency=0)
         self.is_up = False
 
     def set_dig_value(self, value):

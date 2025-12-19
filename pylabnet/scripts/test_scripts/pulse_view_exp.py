@@ -77,8 +77,8 @@ def experiment(**kwargs):
     # Main loop to fetch and plot data
     while thread.running:
 
-        dataset.OPX_client.set_ao_voltage(pulse="const", ao_channel=1, amplitude=dataset.get_input_parameter('output_voltage'), frequency=10)
-        data_batch = dataset.OPX_client.get_ai_voltage(ao_channel=1, ai_channel=2, length=1000)
+        # dataset.OPX_client.set_ao_voltage(pulse="const", ao_channel=1, amplitude=dataset.get_input_parameter('output_voltage'), frequency=10)
+        data_batch = dataset.OPX_client.get_ai_voltage(ao_channel=1, ai_channel=1, length=1000)
 
         dataset.log.error(f"DATA FETCHED")
 
