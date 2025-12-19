@@ -17,7 +17,7 @@ from qm import SimulationConfig
 from qm.qua import *
 from qm import LoopbackInterface
 from qm import QuantumMachinesManager
-from pylabnet.hardware.quantum_machines.OPXdriverConfig import *
+from pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel import *
 
 # -------------------------
 # UI inputs shown in DataTaker

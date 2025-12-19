@@ -124,6 +124,73 @@ class HDAWG(StaticLineHardwareHandler):
         self.hardware_client.seti('dios/0/mode', 0)
 
 
+class OPX(StaticLineHardwareHandler):
+    def setup(self):
+        '''Sets up the staticline functions (e.g. up/down) in terms of the
+        device client function calls.
+        '''
+
+        # Retrieve arguments from configs, if not found apply default value.
+        try:
+            down_voltage = self.config['down_voltage']
+        except KeyError:
+            ###DEBUG: none of these (down_voltage, up_voltage, ao_output) are being found
+
+            down_voltage = 0
+
+        try:
+            up_voltage = self.config['up_voltage']
+        except KeyError:
+            up_voltage = 0.5
+
+        self.type = self.config["type"]
+
+        if (self.type == "analog") or (self.type == "adjustable_digital"):
+            self.is_analog = True
+            self.is_digital = False
+        if self.type == "digital":
+            self.is_analog = False
+            self.is_digital = True
+
+        # Check if voltages are in bound.
+        if not -0.5 <= down_voltage <= 0.5:
+            self.log.error(f'Down voltage of {down_voltage} V is invalid, must be between -0.5 V and 0.5 V.')
+        if not -10 <= up_voltage <= 10:
+            self.log.error(f'Up voltage of {up_voltage} V is invalid, must be between -0.5 V and 0.5 V.')
+
+        self.ao_output = self.config['ao_output']
+        self.do_output = self.config['do_output']
+
+        # Register up/down function.
+        self.up_voltage = up_voltage
+        self.down_voltage = down_voltage
+
+        self.is_up = False
+
+        # Log successfull setup.
+        self.log.info(f"NiDaq output {self.ao_output} successfully assigned to staticline {self.name}.")
+
+    def set_value(self, value):
+        self.hardware_client.set_ao_voltage("const", self.ao_output, value)
+        self.is_up = True
+
+    def up(self):
+        if self.is_analog:
+            self.hardware_client.set_ao_voltage("const", self.ao_output, self.up_voltage)
+            self.is_up = True
+        if self.is_digital:
+            self.hardware_client.set_digital_voltage("ON", self.do_output)
+
+    def down(self):
+        self.hardware_client.set_ao_voltage("const", self.ao_output, self.down_voltage)
+        self.is_up = False
+
+    def set_dig_value(self, value):
+        self.up_voltage = value
+        if (self.is_up):
+            self.up()
+
+
 class NiDaqMx(StaticLineHardwareHandler):
 
     def setup(self):
@@ -132,6 +199,7 @@ class NiDaqMx(StaticLineHardwareHandler):
         '''
 
         ###DEBUG
+        #self.log.error(f"NIDAQ server started with self.name = {self.name}")
         self.log.error(f'Config within NIDAQ: {self.config}')
         ######
 
@@ -154,7 +222,17 @@ class NiDaqMx(StaticLineHardwareHandler):
         if not -10 <= up_voltage <= 10:
             self.log.error(f'Up voltage of {up_voltage} V is invalid, must be between -10 V and 10 V.')
 
+        self.type = self.config["type"]
+
+        if (self.type == "analog") or (self.type == "adjustable_digital"):
+            self.is_analog = True
+            self.is_digital = False
+        if self.type == "digital":
+            self.is_analog = False
+            self.is_digital = True
+
         self.ao_output = self.config['ao_output']
+        self.do_output = self.config['do_output']
 
         # Register up/down function.
         self.up_voltage = up_voltage
@@ -163,19 +241,25 @@ class NiDaqMx(StaticLineHardwareHandler):
         self.is_up = False
 
         # Log successfull setup.
-        self.log.info(f"NiDaq output {self.ao_output} successfully assigned to staticline {self.name}.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        self.log.info(f"NiDaq output {self.ao_output} successfully assigned to staticline {self.name}.")
 
     def set_value(self, value):
         self.hardware_client.set_ao_voltage(self.ao_output, value)
         self.is_up = True
 
     def up(self):
-        self.hardware_client.set_ao_voltage(self.ao_output, self.up_voltage)
-        self.is_up = True
+        if self.is_analog:
+            self.hardware_client.set_ao_voltage(self.ao_output, self.up_voltage)
+            self.is_up = True
+        if self.is_digital:
+            self.hardware_client.set_do_voltage(self.do_output, 1)
 
     def down(self):
-        self.hardware_client.set_ao_voltage(self.ao_output, self.down_voltage)
-        self.is_up = False
+        if self.is_analog:
+            self.hardware_client.set_ao_voltage("const", self.ao_output, self.down_voltage)
+            self.is_up = False
+        if self.is_digital:
+            self.hardware_client.set_do_voltage(self.do_output, 0)
 
     def set_dig_value(self, value):
         self.up_voltage = value
@@ -422,73 +506,6 @@ class MCCUSB3114(StaticLineHardwareHandler):
 
     def set_dig_value(self, value):
         self.up_voltage = float(value)
-        if (self.is_up):
-            self.up()
-
-
-class OPX(StaticLineHardwareHandler):
-    def setup(self):
-        '''Sets up the staticline functions (e.g. up/down) in terms of the
-        device client function calls.
-        '''
-
-        # Retrieve arguments from configs, if not found apply default value.
-        try:
-            down_voltage = self.config['down_voltage']
-        except KeyError:
-            ###DEBUG: none of these (down_voltage, up_voltage, ao_output) are being found
-
-            down_voltage = 0
-
-        try:
-            up_voltage = self.config['up_voltage']
-        except KeyError:
-            up_voltage = 0.5
-
-        self.type = self.config["type"]
-
-        if (self.type == "analog") or (self.type == "adjustable_digital"):
-            self.is_analog = True
-            self.is_digital = False
-        if self.type == "digital":
-            self.is_analog = False
-            self.is_digital = True
-
-        # Check if voltages are in bound.
-        if not -0.5 <= down_voltage <= 0.5:
-            self.log.error(f'Down voltage of {down_voltage} V is invalid, must be between -0.5 V and 0.5 V.')
-        if not -10 <= up_voltage <= 10:
-            self.log.error(f'Up voltage of {up_voltage} V is invalid, must be between -0.5 V and 0.5 V.')
-
-        self.ao_output = self.config['ao_output']
-        self.do_output = self.config['do_output']
-
-        # Register up/down function.
-        self.up_voltage = up_voltage
-        self.down_voltage = down_voltage
-
-        self.is_up = False
-
-        # Log successfull setup.
-        self.log.info(f"NiDaq output {self.ao_output} successfully assigned to staticline {self.name}.")
-
-    def set_value(self, value):
-        self.hardware_client.set_ao_voltage("const", self.ao_output, value)
-        self.is_up = True
-
-    def up(self):
-        if self.is_analog:
-            self.hardware_client.set_ao_voltage("const", self.ao_output, self.up_voltage)
-            self.is_up = True
-        if self.is_digital:
-            self.hardware_client.set_digital_voltage("ON", self.do_output)
-
-    def down(self):
-        self.hardware_client.set_ao_voltage("const", self.ao_output, self.down_voltage)
-        self.is_up = False
-
-    def set_dig_value(self, value):
-        self.up_voltage = value
         if (self.is_up):
             self.up()
 

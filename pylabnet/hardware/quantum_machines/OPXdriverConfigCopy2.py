@@ -21,7 +21,7 @@ u = unit(coerce_to_integer=True)
 # Network parameters #
 ######################
 # IP address of the Quantum Orchestration Platform
-qop_ip = "192.168.88.252"
+qop_ip = "192.168.88.251"
 cluster_name = "Cluster_1"
 
 
