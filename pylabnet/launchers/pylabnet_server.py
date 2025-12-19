@@ -94,7 +94,7 @@ def main():
     def log_exceptions(exc_type, exc_value, exc_traceback):
         """Handler for unhandled exceptions that will write to the logs"""
         error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-        server_logger.error(f"Uncaught exception: {error_msg}")
+        server_logger.error(f"Uncaught exception bye: {error_msg}")
 
     sys.excepthook = log_exceptions
 

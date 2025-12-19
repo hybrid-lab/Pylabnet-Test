@@ -33,6 +33,11 @@ class ClientBase:
         :param port: (int) port number
         :param key: (str) name of keyfile
         """
+        #########DEBUG CODE
+        debug_message = f"DEBUG: HOST IN Client base class: {host}, port: {port}, key: {key}\n "
+        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            log_file.write(debug_message)
+        ###############
 
         # Update server address if new values are given
         if host != 'place_holder':
@@ -68,6 +73,13 @@ class ClientBase:
                     key = os.path.join('/etc/ssl/certs', key)
                 else:
                     raise UnsupportedOSException()
+
+                    #########DEBUG CODE
+                debug_message = f"DEBUG: Connection params: port: {self._port}, host: {self._host}, key: {key}\n "
+                with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                    log_file.write(debug_message)
+                ###############
+
                 self._connection = rpyc.ssl_connect(
                     host=self._host,
                     port=self._port,
@@ -75,7 +87,18 @@ class ClientBase:
                     keyfile=key,
                     certfile=key
                 )
+
+            debug_message = f"DEBUG: STOP 2\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+            ###############
+
             self._service = self._connection.root
+
+            debug_message = f"DEBUG: PASSED\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+            ###############
 
             return 0
 
@@ -95,6 +118,12 @@ class ClientBase:
                 'Connection was refused.\n'
                 f'Please check that the server is running with hostname: {host}, port: {port}'
             )
+
+            #########DEBUG CODE
+            debug_message = f"DEBUG: Connection refused ERROR\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+            ###############
             raise
 
         # Error if we did not provide any key

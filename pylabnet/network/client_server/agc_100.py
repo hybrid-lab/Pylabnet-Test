@@ -7,6 +7,7 @@ class Service(ServiceBase):
     def exposed_get_pressure(self):
         return self._module.get_pressure()
 
+
 class Client(ClientBase):
 
     def get_pressure(self):

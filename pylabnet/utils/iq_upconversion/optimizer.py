@@ -709,7 +709,7 @@ class IQOptimizer_GD(Optimizer):
         time.sleep(self._AWG_DELAY_TIME)
         q_m = self._average_marker_power(self.lower_sb_marker)
 
-        return([(phase_p - phase_m) / 2, (q_p - q_m) / 2])
+        return ([(phase_p - phase_m) / 2, (q_p - q_m) / 2])
 
     def calc_slope_dc_offsets(self, vi, vq, vi_step, vq_step):
         self.set_dc_offsets(vi + vi_step, vq)
@@ -728,7 +728,7 @@ class IQOptimizer_GD(Optimizer):
         time.sleep(self._AWG_DELAY_TIME)
         vq_m = self._average_marker_power(self.carrier_marker)
 
-        return([(vi_p - vi_m) / 2, (vq_p - vq_m) / 2])
+        return ([(vi_p - vi_m) / 2, (vq_p - vq_m) / 2])
 
 
 class IQOptimizer_GD_multifreq(Optimizer):
@@ -1070,7 +1070,7 @@ class IQOptimizer_GD_multifreq(Optimizer):
         self.set_phase_and_amp(phase, q - q_step, signal)
         q_m = self._average_marker_power(self.lower_sb_marker)
 
-        return([(phase_p - phase_m) / 2, (q_p - q_m) / 2])
+        return ([(phase_p - phase_m) / 2, (q_p - q_m) / 2])
 
     def calc_slope_dc_offsets(self, vi, vq):
         self.set_dc_offsets(vi + self.vi_step, vq)
@@ -1085,4 +1085,4 @@ class IQOptimizer_GD_multifreq(Optimizer):
         self.set_dc_offsets(vi, vq - self.vq_step)
         vq_m = self._average_marker_power(self.carrier_marker)
 
-        return([(vi_p - vi_m) / 2, (vq_p - vq_m) / 2])
+        return ([(vi_p - vi_m) / 2, (vq_p - vq_m) / 2])

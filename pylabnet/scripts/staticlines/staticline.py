@@ -28,6 +28,11 @@ class StaticLineGUIGeneric():
         self.log = LogHandler(logger=logger_client)
         self.config = config
         self.host = host
+        #DEBUG
+        debug_message = f"DEBUG: STATICLINE CLIENTS IN INIT: '{staticline_clients}'\n "
+        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            log_file.write(debug_message)
+        #########
         self.port = port
         self.config_dict = load_script_config('staticline', config, logger=self.log)
         self.initialize_drivers(staticline_clients, logger_client)
@@ -38,6 +43,7 @@ class StaticLineGUIGeneric():
         self.staticlines = {}
 
         for device_name, device_params in self.config_dict['lines'].items():
+
             # If the device name is duplicated, we ignore this hardware client.
             if device_name in self.staticlines:
                 self.log.error(f"Device name {device_name} has been matched to multiple hardware clients."
@@ -50,11 +56,18 @@ class StaticLineGUIGeneric():
             hardware_type = device_params['hardware_type']
             hardware_config = device_params['config_name']
 
+            #########DEBUG CODE
+            debug_message = f"DEBUG: Staticline CLients: '{staticline_clients}. hardware_type: {hardware_type}'\n "
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                log_file.write(debug_message)
+            ###############
+
             #Try to find if we have a matching device client in staticline_clients
             try:
                 hardware_client = find_client(staticline_clients, self.config_dict, hardware_type, hardware_config, logger_client)
                 if hardware_client is None:
                     logger_client.error('No staticline device found for device name: ' + device_name)
+                    logger_client.error('???????????????????????????????????????????????????????????????????????????????????????????')
                     hardware_client_found = False
                 else:
                     hardware_client_found = True
@@ -64,9 +77,16 @@ class StaticLineGUIGeneric():
 
             # Iterate over all staticlines for that device and create a
             # driver instance for each line.
+
+            ###DEBUG
+            logger_client.error(f"DEVICE PARAMS: {device_params}")
+
             if hardware_client_found:
                 for staticline_idx in range(len(device_params["staticline_names"])):
                     staticline_name = device_params["staticline_names"][staticline_idx]
+
+                    ###DEBUG
+                    logger_client.error(f"device_name: {device_name}, staticline_name: {staticline_name}")
 
                     # Store the staticline driver under the specified device name
                     self.staticlines[device_name][staticline_name] = staticline.Driver(
@@ -177,6 +197,7 @@ class StaticLineGUIGeneric():
 
         # Create a GUI window with layout determined by the config file
         self.gui = GUIWindowFromConfig(config=self.config, host=self.host, port=self.port, staticlines=self.staticlines)
+        #long wait
         self.gui.show()
         self.widgets = self.gui.widgets
 
@@ -191,17 +212,19 @@ def launch(**kwargs):
 
     logger = kwargs['logger']
     clients = kwargs['clients']
+    logger.error(f'KWARGS DICT IN LAUNCHER FILE!!!!!!!!!!!!!!! {kwargs}')
 
-    try:
-        staticline_gui = StaticLineGUIGeneric(
-            config=kwargs['config'],
-            staticline_clients=clients,
-            logger_client=logger,
-            host=get_ip(),
-            port=kwargs['server_port']
-        )
-    except KeyError:
-        logger.error('Please make sure the module names for required servers and GUIS are correct.')
+    ##Commented this out so that I can see why the staticline gui isn't being built
+    #try:
+    staticline_gui = StaticLineGUIGeneric(
+        config=kwargs['config'],
+        staticline_clients=clients,
+        logger_client=logger,
+        host=get_ip(),
+        port=kwargs['server_port']
+    )
+    #except KeyError:
+    #    logger.error('Please make sure the module names for required servers and GUIS are correct.')
 
     staticline_gui.run()
 
@@ -210,7 +233,8 @@ def main():
     """Main function for debugging. """
 
     staticline_gui = StaticLineGUIGeneric(
-        config='staticline_config',
+        config='staticline',
+
     )
     staticline_gui.run()
 

@@ -8,13 +8,12 @@ from pylabnet.utils.logging.logger import LogClient
 from pylabnet.scripts.pause_script import PauseService
 from pylabnet.network.core.generic_server import GenericServer
 from pylabnet.network.client_server import si_tt
-from pylabnet.utils.helper_methods import load_script_config, get_ip, unpack_launcher, load_config, get_gui_widgets,\
-     get_gui_widgets_dummy, get_legend_from_graphics_view, find_client, load_script_config
+from pylabnet.utils.helper_methods import load_script_config, get_ip, unpack_launcher, load_config, get_gui_widgets, \
+    get_gui_widgets_dummy, get_legend_from_graphics_view, find_client, load_script_config
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget
-from PyQt5.QtCore import QTimer,QDateTime
+from PyQt5.QtCore import QTimer, QDateTime
 from atlassian import Confluence
-import datetime
 import os
 from decouple import config
 
@@ -74,7 +73,6 @@ class CountMonitor:
         # Setup stylesheet.
         self.gui.apply_stylesheet()
 
-
         num_plots = 1
 
         # Get all GUI widgets
@@ -85,8 +83,6 @@ class CountMonitor:
             event_button=num_plots,
             legend_widget=num_plots
         )
-
-
 
         # Load config
         self.config = {}
@@ -145,25 +141,22 @@ class CountMonitor:
 
             # Continuously update data until paused
 
-
             while self._is_running:
                 timer = QTimer()
                 # timer.timeout.connect(lambda: self.log.info('1 sec'))
                 timer.timeout.connect(lambda: self.update())
 
                 timer.start(1000)
-                sys.exit(self.gui.app.exec_() )
-
-
+                sys.exit(self.gui.app.exec_())
 
         except Exception as exc_obj:
             self._is_running = False
             raise exc_obj\
 
+
     def update(self):
         self._update_output()
         self.gui.force_update()
-    
 
     def pause(self):
         """ Pauses the counter"""
@@ -231,9 +224,8 @@ class CountMonitor:
             )
             self.widgets['legend_widget'][plot_index].addItem(
                 self.widgets[f'curve_{channel}'],
-                ' - '+f'Channel {channel}'
+                ' - ' + f'Channel {channel}'
             )
-
 
             # Assign scalar
             # self.gui_handler.assign_label(
@@ -247,19 +239,17 @@ class CountMonitor:
         for plot_index, clear_button in enumerate(self.widgets['event_button']):
             clear_button.clicked.connect(partial(lambda plot_index: self._clear_plot(plot_index), plot_index=plot_index))
 
-
         if self.combined_channel:
-            self.widgets['curve_combo'] = self.widgets['graph_widget'][index+1].plot(
-                pen=pg.mkPen(color=self.gui.COLOR_LIST[color+1])
+            self.widgets['curve_combo'] = self.widgets['graph_widget'][index + 1].plot(
+                pen=pg.mkPen(color=self.gui.COLOR_LIST[color + 1])
             )
-            self.widgets['legend_widget'][index+1].addItem(
+            self.widgets['legend_widget'][index + 1].addItem(
                 self.widgets['curve_combo'],
-                ' - '+'Combined Counts'
+                ' - ' + 'Combined Counts'
             )
-
 
     def _clear_plot(self, plot_index):
-        self.log.info(  os.getcwd() )
+        self.log.info(os.getcwd())
         """ Clears the curves on a particular plot
 
         :param plot_index: (int) index of plot to clear
@@ -270,7 +260,7 @@ class CountMonitor:
             channel = 'combo'
             # Set the curve to constant with last point for all entries
             self.widgets[f'curve_{channel}'].setData(
-                np.ones(self._n_bins)*self.widgets[f'curve_{channel}'].yData[-1]
+                np.ones(self._n_bins) * self.widgets[f'curve_{channel}'].yData[-1]
             )
         else:
             # Find all curves in this plot
@@ -281,7 +271,7 @@ class CountMonitor:
                 # )
 
                 self.widgets[f'curve_{channel}'].setData(
-                    np.ones(200)*self.widgets[f'curve_{channel}'].yData[-1]
+                    np.ones(200) * self.widgets[f'curve_{channel}'].yData[-1]
                 )
 
         # self._ctr.clear_ctr(name=self.config['name'])
@@ -293,8 +283,8 @@ class CountMonitor:
         # x_axis = self._ctr.get_x_axis()/1e12
 
         # counts = self._ctr.get_counts(name=self.config['name'])
-        nw_counts = np.random.rand(len(self._ch_list),200)
-        nw_counts_per_sec = nw_counts*(1e12/self._bin_width)
+        nw_counts = np.random.rand(len(self._ch_list), 200)
+        nw_counts_per_sec = nw_counts * (1e12 / self._bin_width)
         # noise = np.sqrt(counts)*(1e12/self._bin_width)
         # plot_index = 0
 
@@ -322,13 +312,12 @@ class CountMonitor:
             #     text='{:.4e}'.format(count_array[-1]),
             #     label_label='Channel {}'.format(channel)
             # )
-            if(self.widgets[f'curve_{channel}'].yData is None):
-                self.widgets[f'curve_{channel}'].setData(   nw_count_array  )
+            if (self.widgets[f'curve_{channel}'].yData is None):
+                self.widgets[f'curve_{channel}'].setData(nw_count_array)
             else:
-                self.widgets[f'curve_{channel}'].setData( np.concatenate(  (self.widgets[f'curve_{channel}'].yData, nw_count_array ) ) )
+                self.widgets[f'curve_{channel}'].setData(np.concatenate((self.widgets[f'curve_{channel}'].yData, nw_count_array)))
 
-            self.widgets[f'number_label'][channel-1].setText(str(nw_count_array[-1]))
-
+            self.widgets[f'number_label'][channel - 1].setText(str(nw_count_array[-1]))
 
         # if self.combined_channel:
         #     self.widgets['curve_combo'].setData(summed_counts)
@@ -350,10 +339,8 @@ def launch(**kwargs):
     # else:
     #     combined_channel = False
     # Instantiate CountMonitor
-    
-    
-    app = QApplication(sys.argv)
 
+    app = QApplication(sys.argv)
 
     try:
         monitor = CountMonitor(
@@ -413,6 +400,3 @@ def launch(**kwargs):
 
     # Run
     monitor.run()
-
-
-

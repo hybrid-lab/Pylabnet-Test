@@ -1,0 +1,47 @@
+import numpy as np
+import os
+import time
+import math
+from PyQt5 import QtCore
+from rpyc.utils.classic import obtain
+
+
+from pylabnet.hardware.quantum_machines.OPX import Driver as OPX
+from pylabnet.network.client_server.OPX import Service as Service
+from pylabnet.network.client_server.OPX import Client as Client
+
+from pathlib import Path
+import json
+
+import importlib.util
+
+from pylabnet.scripts.data_center.take_data import ExperimentThread
+from pylabnet.scripts.data_center.datasets import SawtoothScan1D, ErrorBarGraph, InfiniteRollingLine, Dataset, SawtoothScan1D_array_update
+
+from pylabnet.launchers.siv_py_functions import upload_sequence, load_config
+
+from qm import SimulationConfig
+from qm.qua import *
+from qm import LoopbackInterface
+from qm import QuantumMachinesManager
+from pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel import *
+import pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel as opx_cfg
+
+opx = OPX("opx")
+
+
+#opx.build_stack()
+ao_el_1 = opx.create_new_ao_elem(pulse="const", ao_channel=4, amplitude=0.5)
+ai_el_1 = opx.create_new_ai_elem(ao_channel=2, ai_channel=2, length=1000)
+
+
+opx.delay(100, [ao_el_1])
+opx.get_ai_voltage(element=ai_el_1)
+
+opx.set_ao_voltage(element=ao_el_1)
+
+opx.set_ao_voltage(pulse="const", ao_channel=3, amplitude=0.5)
+
+#opx.get_ai_voltage(ai_channel=1, ao_channel=1, length=1000)
+
+#data_batch = opx.execute()

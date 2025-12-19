@@ -6,7 +6,11 @@ This file contains the pylabnet Hardware module class for a generic NI DAQ mx ca
 
 import nidaqmx
 import time
+
 import numpy as np
+if not hasattr(np, "bool"):
+    np.bool = np.bool_
+import nidaqmx
 
 from pylabnet.hardware.interface.gated_ctr import GatedCtrInterface
 from pylabnet.utils.logging.logger import LogHandler
@@ -36,7 +40,7 @@ class Driver:
         try:
             ni_daq_device = nidaqmx.system.device.Device(name=device_name)
             self.log.info(
-                "Successfully connected to NI DAQ '{device_name}' (type: {product_type}) \n"
+                "Successfully connected to NI DAQ '{device_name}' (type: {product_type})\n"
                 "".format(
                     device_name=ni_daq_device.name,
                     product_type=ni_daq_device.product_type
@@ -82,9 +86,30 @@ class Driver:
         # TODO: Understand the timing between output voltages (sample-wise?)
         channel = self._gen_ch_path(ao_channel)
 
+        self.log.error(f"NI CHANNEL PATH: {channel}")
+
         with nidaqmx.Task() as task:
             task.ao_channels.add_ao_voltage_chan(channel)
             task.write(voltages, auto_start=True)
+
+    def set_do_voltage(self, do_channel, value):
+        """Set digital output of NI DAQ mx card to a series of voltages
+
+        :do_channel: (str) Name of output channel
+        :value: True or False, 1 or 0
+        """
+
+        # TODO: Understand the timing between output voltages (sample-wise?)
+        channel = self._gen_ch_path(do_channel)
+
+        self.log.error(f"NI CHANNEL PATH: {channel}")
+
+        with nidaqmx.Task() as task:
+            task.do_channels.add_do_chan(
+                channel,
+                line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE
+            )
+            task.write(bool(value), auto_start=True)
 
     def get_ai_voltage(self, ai_channel, num_samples=1, max_range=10.0):
         """Measures the analog input voltage of NI DAQ mx card

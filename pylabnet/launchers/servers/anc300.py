@@ -16,16 +16,14 @@ def launch(**kwargs):
     device_config = load_device_config('anc300', kwargs['config'], logger=kwargs['logger'])
     telnet_config = device_config['telnet_config']
 
-
     anc300 = ANC300(
-        host=telnet_config['host'], 
-        port=telnet_config['port'], 
-        query_delay=device_config['query_delay'], 
-        passwd=telnet_config['passwd'], 
-        limits = device_config['limits'],
+        host=telnet_config['host'],
+        port=telnet_config['port'],
+        query_delay=device_config['query_delay'],
+        passwd=telnet_config['passwd'],
+        limits=device_config['limits'],
         logger=kwargs['logger']
     )
-
 
     anc300_service = Service()
     anc300_service.assign_module(module=anc300)

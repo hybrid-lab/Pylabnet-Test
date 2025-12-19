@@ -27,7 +27,7 @@ class Driver:
         # Log
         self.log = LogHandler(logger=logger)
 
-        # ignore_instacal() is used as recommended in mcculw examples. It prevents conflicts 
+        # ignore_instacal() is used as recommended in mcculw examples. It prevents conflicts
         # with previous setting of DAQ parameters by InstaCal. Reminder that InstaCal MUST be
         # installed in order to detect the DAQ device. From mcculw documentation:
         # ignore_instacal():
@@ -36,7 +36,7 @@ class Driver:
         # invoked in the application. Devices can then be added and configured at runtime using the
         # device discovery features.
         ul.ignore_instacal()
-        
+
         devices = ul.get_daq_device_inventory(InterfaceType.ANY)
         if not devices:
             self.log.error('Error: No MCC USB DAQ devices found')

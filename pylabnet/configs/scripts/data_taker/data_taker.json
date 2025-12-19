@@ -1,0 +1,16 @@
+{
+    "servers": [
+        {
+            "type": "OPX",
+            "config": "OPX"
+        },
+        {
+            "type": "nidaqmx",
+            "config": "ni_daq_1"
+        }
+    ],
+    "script": "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\data_center\\take_data.py",
+    "exp_path" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\test_scripts",
+    "save_path": "C:\\Data\\Datataker",
+    "auto_save": "False"
+}

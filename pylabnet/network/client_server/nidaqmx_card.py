@@ -13,6 +13,9 @@ class Service(ServiceBase):
             voltages=voltages
         )
 
+    def exposed_set_do_voltage(self, do_channel, value):
+        return self._module.set_do_voltage(do_channel=do_channel, value=value)
+
     def exposed_get_ai_voltage(self, ai_channel, num_samples, max_range):
         voltages = self._module.get_ai_voltage(ai_channel=ai_channel, num_samples=num_samples, max_range=max_range)
         return pickle.dumps(voltages)
@@ -48,6 +51,11 @@ class Client(ClientBase):
         return self._service.exposed_set_ao_voltage(
             ao_channel=ao_channel,
             voltage_pickle=voltage_pickle
+        )
+
+    def set_do_voltage(self, do_channel, value):
+        return self._service.exposed_set_do_voltage(
+            do_channel=do_channel, value=value
         )
 
     def get_ai_voltage(self, ai_channel, num_samples=1, max_range=10):

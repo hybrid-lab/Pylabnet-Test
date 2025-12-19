@@ -228,6 +228,7 @@ class Launcher:
         :param host: (str) host of server
         :param port: (int) port number of server
         """
+
         server = module
         try:
             full_module_name = 'pylabnet.network.client_server.' + module
@@ -235,6 +236,7 @@ class Launcher:
 
             self.clients[(server, device_id)] = client_class(host=host, port=port)
         except:
+
             spec = importlib.util.spec_from_file_location(
                 module,
                 os.path.join(
@@ -243,8 +245,11 @@ class Launcher:
                     module + '.py'
                 )
             )
+
             mod = importlib.util.module_from_spec(spec)
+
             spec.loader.exec_module(mod)
+
             self.clients[(server, device_id)] = mod.Client(host=host, port=port)
 
     def _launch_servers(self):
@@ -409,6 +414,7 @@ class Launcher:
     def _launch_scripts(self):
         """ Launch the scripts to be run sequentially in this thread """
 
+######Loads staticline.py basically (loads whatever script you click on)
         spec = importlib.util.spec_from_file_location(
             self.name,
             self.config_dict['script']
@@ -417,6 +423,7 @@ class Launcher:
         spec.loader.exec_module(mod)
 
         self.logger.info(f'Launching script {self.name}')
+######mod.launch is staticline launch and inputs are **kwargs
 
         mod.launch(
             logger=self.logger,

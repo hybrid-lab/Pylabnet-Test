@@ -178,13 +178,16 @@ class StaticLineHardwareHandler():
         self.down()
 
         # Log successfull setup.
-        self.log.info(f"NiDaq {self.hardware_module.dev} output {ao_output} successfully assigned to staticline {self.name}.")
+        self.log.info(f"NiDaq {self.hardware_module.dev} output {ao_output} successfully assigned to staticline {self.name}.??????????????????????????????????")
 
     def _setup_toptica(self, **kwargs):
 
         self.up = lambda: self.hardware_module.turn_on()
         self.down = lambda: self.hardware_module.turn_off()
         self.log.info(f'Toptica DLC PRO successfully assigned to staticline {self.name}')
+
+    def _setup_OPX(self, **kwargs):
+        pass
 
     def __init__(self, hardware_module, loghandler, name, **kwargs):
         '''Handler connecting hardware class to StaticLine instance
@@ -213,6 +216,7 @@ class StaticLineHardwareHandler():
             'nidaqmx_card': self._setup_NiDaqMxDriver,
             'toptica': self._setup_toptica,
             'hdawg': self._setup_HDWAGDriver # For hdawg client usage
+
         }
 
         # Check if hardware module is registered.

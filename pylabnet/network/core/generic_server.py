@@ -37,6 +37,11 @@ class GenericServer:
             for authentication purposes. If None, a standard server (without secure
             authentication) will be used
         """
+        #########DEBUG CODE
+        debug_message = f"DEBUG:A SERVER IS CREATED\n "
+        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            log_file.write(debug_message)
+        ###############
 
         self.operating_system = get_os()
         if key is None:

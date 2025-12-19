@@ -31,12 +31,16 @@ class GUIWindowFromConfig(QMainWindow):
         # Add IP info
         self.host = host
         self.port = port
+        self.random_random = "Hello"
         self.blockgridLayout.append(QHBoxLayout(self))
         self.gridLayout.addLayout(self.blockgridLayout[0], 0, 1)
         self.ip_label = QtWidgets.QLabel(f"IP Address: {host}")
         self.port_label = QtWidgets.QLabel(f"Port: {port}")
+        self.random1 = QtWidgets.QLabel(f"Random: {self.random_random}")
         self.blockgridLayout[0].addWidget(self.ip_label)
         self.blockgridLayout[0].addWidget(self.port_label)
+        self.blockgridLayout[0].addWidget(self.random1)
+
         self.staticlines = staticlines
 
         self.unpack_config_file()
@@ -64,6 +68,7 @@ class GUIWindowFromConfig(QMainWindow):
 
             #Device wasn't found, so don't add to GUI
             #Not a huge fan of this implementation, but its good enough for now
+
             if (self.staticlines != None and not device_name in self.staticlines):
                 continue
 

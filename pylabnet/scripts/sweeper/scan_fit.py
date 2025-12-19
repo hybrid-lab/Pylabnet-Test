@@ -86,7 +86,7 @@ class FitPopup(Popup):
         self.close()
 
     def fit_mod(self):
-        fit_fwd, fit_bwd, self.p0_fwd,\
+        fit_fwd, fit_bwd, self.p0_fwd, \
             self.p0_bwd, self.fit_suc = self.mod.fit_mod(
                 self.x_fwd,
                 self.data_fwd,
@@ -151,7 +151,7 @@ class FitModel():
             for ind, param in enumerate(self.fit_params):
                 self.pop.fparams[param].setText(str(popt1[ind]))
                 self.pop.fparams2[param].setText(str(popt2[ind]))
-            return self.func(x_fwd, *popt1), self.func(x_bwd, *popt2),\
+            return self.func(x_fwd, *popt1), self.func(x_bwd, *popt2), \
                 p0_fwd_f, p0_bwd_f, fit_suc
 
     def init_ui(self, obj):

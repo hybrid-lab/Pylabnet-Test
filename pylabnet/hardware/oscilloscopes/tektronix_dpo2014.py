@@ -61,8 +61,8 @@ class Driver():
 
         # Tidy up response using regex.
         trig_channel = re.compile(
-                    ':TRIG:MAI:EDGE:SOU[ ]([^\\n]+)'
-                ).match(res).group(1)
+            ':TRIG:MAI:EDGE:SOU[ ]([^\\n]+)'
+        ).match(res).group(1)
 
         return trig_channel
 
