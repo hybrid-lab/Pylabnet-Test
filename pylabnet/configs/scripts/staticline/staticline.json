@@ -3,17 +3,32 @@
         {
             "type": "nidaqmx",
             "config": "ni_daq_1"
+        },
+        {
+            "type": "nidaqmx",
+            "config": "ni_daq_2"
         }
     ],
-    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\staticlines\\staticline.py",
+    "script" : "C:\\Users\\User\\pylabnet\\pylabnet\\scripts\\staticlines\\staticline.py",
     "lines": {
-        "Nidaq":
+        "PXIe_6363":
         {
             "hardware_type": "nidaqmx",
             "config_name": "ni_daq_1",
-            "staticline_names": ["analog"],
+            "staticline_names": ["analog_1","digital_1"],
             "staticline_configs": [
-                {"type":"analog", "ao_output": "length"}
+                {"type":"analog", "ao_output": "ao1", "do_output":  "port0/line1"},
+                {"type":"digital", "ao_output": "ao1",  "do_output": "port0/line1"}
+
+            ]
+        },
+        "PXIe_6535":
+        {
+            "hardware_type": "nidaqmx",
+            "config_name": "ni_daq_2",
+            "staticline_names": ["digital"],
+            "staticline_configs": [
+                {"type":"digital","ao_output": "ao1", "do_output": "port0/line1"}
 
             ]
         }
