@@ -1529,6 +1529,7 @@ class Plot2D(Dataset):
             self.graph.setImage(
                 img=np.transpose(self.data),
                 autoRange=False,
+                autoLevels=False,
                 scale=((self.max_x - self.min_x) / self.pts_x, (self.max_y - self.min_y) / self.pts_y),
                 pos=(self.min_x, self.min_y)
             )
