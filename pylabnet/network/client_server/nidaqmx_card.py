@@ -16,8 +16,20 @@ class Service(ServiceBase):
     def exposed_set_do_voltage(self, do_channel, value):
         return self._module.set_do_voltage(do_channel=do_channel, value=value)
 
-    def exposed_get_ai_voltage(self, ai_channel, num_samples, max_range):
-        voltages = self._module.get_ai_voltage(ai_channel=ai_channel, num_samples=num_samples, max_range=max_range)
+    def exposed_get_ai_voltage(self, ai_channel, num_samples, max_range, sample_rate):
+        voltages = self._module.get_ai_voltage(ai_channel=ai_channel, num_samples=num_samples, max_range=max_range, sample_rate=sample_rate)
+        return pickle.dumps(voltages)
+
+    def exposed_get_ai_voltage_triggered(
+        self, ai_channel, trig_line, num_samples, sample_rate, max_range
+    ):
+        voltages = self._module.get_ai_voltage_triggered(
+            ai_channel=ai_channel,
+            trig_line=trig_line,
+            num_samples=num_samples,
+            sample_rate=sample_rate,
+            max_range=max_range
+        )
         return pickle.dumps(voltages)
 
     def exposed_get_di_state(self, port, di_channel):
@@ -58,7 +70,7 @@ class Client(ClientBase):
             do_channel=do_channel, value=value
         )
 
-    def get_ai_voltage(self, ai_channel, num_samples=1, max_range=10):
+    def get_ai_voltage(self, ai_channel, num_samples=1, max_range=10, sample_rate=100000):
         """Measures the analog input voltage of NI DAQ mx card
 
         :param ao_channel: (str) Name of output channel (e.g. 'ao1', 'ao2')
@@ -68,6 +80,25 @@ class Client(ClientBase):
         voltages_pickle = self._service.exposed_get_ai_voltage(
             ai_channel=ai_channel,
             num_samples=num_samples,
+            max_range=max_range,
+            sample_rate=sample_rate,
+        )
+        return pickle.loads(voltages_pickle)
+
+    def get_ai_voltage_triggered(
+        self,
+        ai_channel,
+        trig_line="PFI0",
+        num_samples=1000,
+        sample_rate=100000,
+        max_range=10
+    ):
+        """Measures analog input voltage after a digital start trigger."""
+        voltages_pickle = self._service.exposed_get_ai_voltage_triggered(
+            ai_channel=ai_channel,
+            trig_line=trig_line,
+            num_samples=num_samples,
+            sample_rate=sample_rate,
             max_range=max_range
         )
         return pickle.loads(voltages_pickle)
