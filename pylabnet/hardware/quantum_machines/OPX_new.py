@@ -1,4 +1,3 @@
-
 ##############################################################################################################################################################################################################
 import qm
 import numpy as np
@@ -40,6 +39,9 @@ class Driver:
 
         self.adding_to_stack = False
         self.stack = []
+        # For nested control flow: a stack-of-stacks and open IFs
+        self._current_stack = [self.stack]  # where _append() writes
+        self._if_stack = []                # open IF nodes for else_()
         self.simulating = False
 
     def _simulate(self, program, duration=4000):
@@ -64,10 +66,14 @@ class Driver:
         self.elem_counters = defaultdict(int)
         opx_cfg.config = opx_cfg.hard_coded_config.copy() #In general, this is wrong
 
+        self.stack = []
+        self._current_stack = [self.stack]
+        self._if_stack = []
+
     def set_ao_voltage(self, pulse=None, ao_channel=None, element=None, amplitude=default_amplitude, length=default_length, wave_function=None, simulate=False, frequency=default_frequency, gauss_sd=default_length / 5,): #removed pulse in driver #if we only specify ao_channel, I want pulse to play to first element for that channel
         if not pulse and element:
             pulse = next(iter(config["elements"][element]["operations"]))
-            self.log.error(f"THIS IS THE ELEMENT: {element}")
+            # self.log.error(f"THIS IS THE ELEMENT: {element}")
 
         if element == None:
             ao_channel = int(float(ao_channel))
@@ -97,7 +103,7 @@ class Driver:
                 job = qm.execute(set_voltage)  # execute QUA program
         else:
             #True of False is infinite or not infinite
-            self.stack.append(["play", element, pulse, True, simulate])
+            self._append(["play", element, pulse, True, simulate])
 
         return element
 
@@ -133,7 +139,7 @@ class Driver:
                 job = qm.execute(set_voltage)  # execute QUA program
         else:
             #True of False is infinite or not infinite
-            self.stack.append(["play", element, pulse, True, simulate])
+            self._append(["play", element, pulse, True, simulate])
 
         return element
 
@@ -151,7 +157,8 @@ class Driver:
 
         if not self.adding_to_stack:
             with program() as set_voltage:
-                play(pulse, element) #right now only defined pulse is ON pulse
+                with infinite_loop_():
+                    play(pulse, element) #right now only defined pulse is ON pulse
 
             # execute QUA program
             if simulate:
@@ -162,11 +169,11 @@ class Driver:
                 job = qm.execute(set_voltage)  # execute QUA program
         else:
             #True of False is infinite or not infinite
-            self.stack.append(["play", element, pulse, False, simulate])
+            self._append(["play", element, pulse, False, simulate])
 
         return element
 
-    def get_ai_voltage(self, pulse=default_measure_pulse, ai_channel=None, element=None, ao_channel=None, amplitude=default_amplitude, length=default_length, wave_function=None, frequency=default_frequency, time_of_flight=defaut_time_of_flight, smearing=default_smearing, gauss_sd=default_length / 5,):
+    def get_ai_voltage(self, pulse=default_measure_pulse, ai_channel=None, element=None, ao_channel=None, amplitude=default_amplitude, length=default_length, wave_function=None, frequency=default_frequency, time_of_flight=defaut_time_of_flight, smearing=default_smearing, gauss_sd=default_length / 5, variable_name=None):
         if element:
             ai_channel = config["elements"][element]["singleInput"]["port"][1]
 
@@ -210,65 +217,78 @@ class Driver:
             return out
 
         else:
-            self.stack.append(["measure", element, ai_channel])
+            if variable_name:
+                self._append(["measure_demod", element, ai_channel, variable_name])
+            else:
+                self._append(["measure", element, ai_channel])
 
         return element
 
     def execute(self):
-        self.log.error(f"EXECUTE STARTS. STACK: {self.stack}")
+        # self.log.error(f"EXECUTE STARTS. STACK: {self.stack}")
         self.adding_to_stack = False
-        measuring = False
+        self.simulating = False
+
+        measuring_flag = {"value": False}
+        measure_counter = {"value": 0}
         streams = []
 
         with program() as curr_prog:
-            for idx, op in enumerate(self.stack):
-                measure_idx = 0
-                if op[0] == "measure":
-                    measuring = True
-                    element = op[1]
-                    input_idx = op[2]  # 1 or 2
-                    measure_idx += 1
+            # -----------------------------------------------------------------
+            # 1) Declare any QUA scalar variables you need for conditionals
+            #    For now, assume one logical variable "I0" as an example:
+            #    Later you can auto-detect needed names from self.stack.
+            # -----------------------------------------------------------------
+            var_names = set()
 
-                    self.log.error(f"ELEMENT IN THE CURR PROG {element}")
+            def collect_vars(stack):
+                for op in stack:
+                    if op[0] == "measure_demod":
+                        var_names.add(op[3])
+                    elif op[0].startswith("if_"):
+                        var_names.add(op[1])
+                        collect_vars(op[3])   # then branch
+                        collect_vars(op[4])   # else branch
+                    # Play/wait/measure ops do not have vars
 
-                    s = declare_stream(adc_trace=True)
-                    measure("readout", element, adc_stream=s)
+            collect_vars(self.stack)
 
-                    # Create a unique, descriptive result name per measure
-                    # (QM handle names: letters/numbers/underscores are safe)
-                    label = f"raw_adc_{measure_idx}_in{input_idx}"
-                    streams.append((s, input_idx, label))
-                elif op[0] == 'play':
-                    if op[4]:
-                        self.simulating = True
-                    if op[3]:
-                        play(op[2], op[1])
-                    else:
-                        play(op[2], op[1])
+            # Declare all required QUA variables
+            self._qua_vars = {name: declare(fixed) for name in var_names}            # Example: a single fixed var named "I0"
+            # (You would extend this to scan stack for all var_names you use.)
+            # self._qua_vars["I0"] = declare(fixed)
 
-                elif op[0] == "wait":
-                    if op[2]:
-                        wait(op[1], *op[2])
-                    else:
-                        wait(op[1])
+            # -----------------------------------------------------------------
+            # 2) Emit all operations recursively (including any conditionals)
+            # -----------------------------------------------------------------
+            self._emit_stack(self.stack, streams, measuring_flag, measure_counter)
 
-            # ---- SINGLE stream-processing block for ALL streams ----
-            with stream_processing():
-                for s, input_idx, label in streams:
-                    if input_idx == 1:
-                        s.input1().with_timestamps().save_all(label)
-                    elif input_idx == 2:
-                        s.input2().with_timestamps().save_all(label)
-                    else:
-                        # Optional: if input_idx is unexpected, save both or raise
-                        s.input1().with_timestamps().save_all(label)
+            # -----------------------------------------------------------------
+            # 3) SINGLE stream-processing block for ALL streams
+            # -----------------------------------------------------------------
+            if streams:
+                with stream_processing():
+                    for s, input_idx, label in streams:
+                        if input_idx == 1:
+                            s.input1().with_timestamps().save_all(label)
+                        elif input_idx == 2:
+                            s.input2().with_timestamps().save_all(label)
+                        elif input_idx == -1:
+                            s.save(label)
+                        else:
+                            raise ValueError("Input idx isn't 1 or 2")
 
+        # Clear stack after building
         self.stack = []
 
+        # ---------------------------------------------------------------------
+        # 4) Run or simulate
+        # ---------------------------------------------------------------------
         if self.simulating:
             self._simulate(curr_prog)
-        elif measuring:
-            self.log.error(f"CONFIG CURRENT {config}")
+
+        elif measuring_flag["value"]:
+            # self.log.error(f"CONFIG CURRENT {config}")
 
             qm = self.qmm.open_qm(config)
             job = qm.execute(curr_prog)
@@ -279,15 +299,209 @@ class Driver:
             for _, _, label in streams:
 
                 raw = res.get(label).fetch_all()
-                raw = raw[0][0]
-                out[label] = [(int(raw[i]["timestamp"]), float(raw[i]["value"]))
-                              for i in range(raw.shape[0])]
+                self.log.error(f"{label} RAW {raw} Type: {type(raw)}")
+
+                if isinstance(raw, (int, float)):
+                    out[label] = float(raw)
+                elif len(raw) == 0:
+                    continue
+                else:
+                    raw = raw[0][0]
+                    out[label] = [(int(raw[i]["timestamp"]), float(raw[i]["value"]))
+                                  for i in range(raw.shape[0])]
 
             return out
+
         else:
+            self.log.error(f"CONFIG: {config}")
+
             qm = self.qmm.open_qm(config)
             job = qm.execute(curr_prog)
-            self.log.error("EXECUTE ENDS")
+
+    # -----------------------------------------------------------------
+    # Internal helpers for hierarchical stack building
+    # -----------------------------------------------------------------
+
+    def _emit_stack(self, stack, streams, measuring_flag, measure_counter):
+        """
+        Recursively emit QUA code for all ops in `stack`.
+
+        `streams`         : list that collects (stream, input_idx, label)
+        `measuring_flag`  : dict with {"value": bool}, so we can mutate it
+        `measure_counter` : dict with {"value": int}, so we can give each
+                            measurement a unique label.
+        """
+        for op in stack:
+            kind = op[0]
+
+            if kind == "measure":
+                # Existing flat behavior, just moved here
+                measuring_flag["value"] = True
+                element = op[1]
+                input_idx = op[2]   # 1 or 2
+
+                # bump global measurement counter
+                measure_counter["value"] += 1
+                m_idx = measure_counter["value"]
+
+                s = declare_stream(adc_trace=True)
+                measure("readout", element, adc_stream=s)
+
+                label = f"raw_adc_{m_idx}_in{input_idx}"
+                streams.append((s, input_idx, label))
+
+            elif kind == "measure_demod":
+                _, element, input_idx, var_name = op
+                measuring_flag["value"] = True
+                measure_counter["value"] += 1
+                m_idx = measure_counter["value"]
+
+                s = declare_stream(adc_trace=True)
+                var = declare_stream()
+
+                # Ensure this variable exists
+                I = self._qua_vars[var_name]
+
+                measure("readout", element, s, demod.full("cos", I))
+                save(I, var)
+
+                var_label = var_name
+                label = f"raw_adc_{m_idx}_in{input_idx}"
+                streams.append((s, input_idx, label))
+                streams.append((var, -1, var_label))
+
+            elif kind == "play":
+                # op layout: ["play", element, pulse, is_infinite, simulate]
+                element = op[1]
+                pulse = op[2]
+                simulate_flag = op[4]
+
+                if simulate_flag:
+                    self.simulating = True
+
+                # right now you ignore op[3] (infinite) at QUA level, same as before
+                play(pulse, element)
+
+            elif kind == "wait":
+                # op layout: ["wait", cycles, elements]
+                cycles = op[1]
+                elements = op[2]
+                if elements:
+                    wait(cycles, *elements)
+                else:
+                    wait(cycles)
+
+            elif kind == "if_gt":
+                # Conditional node: ["if_gt", var_name, threshold, then_stack, else_stack]
+                _, var_name, threshold, then_stack, else_stack = op
+
+                # For now: assume you have a QUA variable dict self._qua_vars
+                # created in execute(), e.g. I0 = declare(fixed)
+                v = self._qua_vars[var_name]
+
+                with if_(v > threshold):
+                    self._emit_stack(then_stack, streams, measuring_flag, measure_counter)
+
+                if else_stack:
+                    with else_():
+                        self._emit_stack(else_stack, streams, measuring_flag, measure_counter)
+
+            else:
+                # Optional: debug unknown ops
+                self.log.error(f"Unknown operation kind in stack: {kind}")
+
+    def _append(self, op):
+        """Append an operation node to the *current* active sub-stack."""
+        self._current_stack[-1].append(op)
+        self.log.error(f"current stack {self._current_stack}")
+
+    def _stack_push(self, new_stack):
+        """Descend into a nested sub-stack (e.g. THEN or ELSE)."""
+        self._current_stack.append(new_stack)
+        self.log.error(f"current stack {self._current_stack}")
+
+    def _stack_pop(self):
+        """Ascend back out of a nested sub-stack."""
+        if len(self._current_stack) == 1:
+            raise RuntimeError("Attempted to pop the root stack.")
+        self._current_stack.pop()
+        self.log.error(f"current stack {self._current_stack}")
+
+    def _get_reachable_if_node(self):
+        """
+        Finds the active IF node for the current scope.
+        Returns the 'tip' node (the one we should attach elif/else to).
+        """
+        current_block = self._current_stack[-1]
+
+        while self._if_stack:
+            # We now store tuples: (anchor_node, tip_node)
+            # anchor_node: The IF node that sits physically in the current block
+            # tip_node: The active node in the chain (could be deep in elifs)
+            anchor, tip = self._if_stack[-1]
+
+            # Check if anchor is still in the current scope
+            found = False
+            for instr in reversed(current_block):
+                if instr is anchor:
+                    found = True
+                    break
+
+            if found:
+                return tip
+            else:
+                # Stale nested IF from a closed scope
+                self._if_stack.pop()
+
+        raise RuntimeError("else_() or elif_() called, but no matching open IF block found in the current scope.")
+
+    # -----------------------------------------------------------------
+    # Public API: context-managed conditionals
+    # -----------------------------------------------------------------
+    def if_gt(self, var_name, threshold):
+        """
+        Start an IF block that will later be interpreted as:
+
+            if <var_name> > threshold:
+                ...
+
+        Example usage:
+
+            with driver.if_gt("I0", 0.1):
+                driver.set_ao_voltage(...)
+        """
+        return _IfContext(self, "gt", var_name, threshold)
+
+    def elif_gt(self, var_name, threshold):
+        """
+        Start an ELSE-IF block that will later be interpreted as:
+
+            elif <var_name> > threshold:
+                ...
+
+        Usage:
+
+            with driver.if_gt("I0", 0.5):
+                ...
+            with driver.elif_gt("I0", 0.2):
+                ...
+            with driver.else_():
+                ...
+        """
+        return _ElifContext(self, "gt", var_name, threshold)
+
+    def else_(self):
+        """
+        Start an ELSE block corresponding to the most recent open IF.
+
+        Example usage:
+
+            with driver.if_gt("I0", 0.1):
+                ...
+            with driver.else_():
+                ...
+        """
+        return _ElseContext(self)
 
     def create_new_ao_elem(self, pulse, ao_channel=None, amplitude=default_amplitude, length=default_length, wave_function=None, frequency=default_frequency, gauss_sd=default_length / 5,):
         ao_channel = int(float(ao_channel))
@@ -489,7 +703,7 @@ class Driver:
             },
             "digital_marker": "ON",
         }
-        with open("C:/Users/User/pylabnet/config_dump.txt", "w") as f:
+        with open("C:/Users/hybri/pylabnet/config_dump.txt", "w") as f:
             f.write(json.dumps(config, indent=2, default=str))
 
         return elem_name
@@ -510,4 +724,82 @@ class Driver:
             job = qm.execute(wait_prog)  # execute QUA program
         else:
             #True of False is infinite or not infinite
-            self.stack.append(["wait", cycles, elements])
+            self._append(["wait", cycles, elements])
+
+
+class _IfContext:
+    def __init__(self, driver, op_name, var_name, threshold):
+        self.driver = driver
+        # Node format: ["if_gt", "I0", 0.1, then_stack, else_stack]
+        self.node = [f"if_{op_name}", var_name, threshold, [], []]
+
+    def __enter__(self):
+        # Attach IF node to current stack
+        self.driver._append(self.node)
+
+        # Register this IF as "open".
+        # tuple format: (ANCHOR, TIP)
+        # For a fresh IF, it acts as both the anchor and the tip.
+        self.driver._if_stack.append((self.node, self.node))
+
+        # Route subsequent appends into the THEN branch
+        then_stack = self.node[3]
+        self.driver._stack_push(then_stack)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        # Leave THEN branch
+        self.driver._stack_pop()
+
+
+class _ElifContext:
+    def __init__(self, driver, op_name, var_name, threshold):
+        self.driver = driver
+        self.op_name = op_name
+        self.var_name = var_name
+        self.threshold = threshold
+        self.node = None
+
+    def __enter__(self):
+        # 1. Get the current tip of the chain
+        # (This will clean up any stale nested IFs from the stack first)
+        parent_tip = self.driver._get_reachable_if_node()
+
+        # 2. Attach new node to the ELSE branch of the parent tip
+        else_stack = parent_tip[4]
+        then_stack = []
+        self.node = [f"if_{self.op_name}", self.var_name, self.threshold, then_stack, []]
+        else_stack.append(self.node)
+
+        # 3. Update the stack to point to this new node as the tip
+        # We MUST preserve the original anchor so reachability checks still pass!
+        anchor, _ = self.driver._if_stack[-1]
+        self.driver._if_stack[-1] = (anchor, self.node)
+
+        # Route subsequent appends into the THEN branch
+        self.driver._stack_push(then_stack)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.driver._stack_pop()
+
+
+class _ElseContext:
+    def __init__(self, driver):
+        self.driver = driver
+        self.node = None
+
+    def __enter__(self):
+        # 1. Get the current tip
+        self.node = self.driver._get_reachable_if_node()
+
+        # 2. Route subsequent appends into its ELSE branch
+        else_stack = self.node[4]
+        self.driver._stack_push(else_stack)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        # Leave ELSE branch
+        self.driver._stack_pop()
+        # IF chain is now fully closed, pop from tracking stack
+        self.driver._if_stack.pop()

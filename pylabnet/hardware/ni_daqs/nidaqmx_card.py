@@ -5,6 +5,8 @@ This file contains the pylabnet Hardware module class for a generic NI DAQ mx ca
 """
 
 import nidaqmx
+from nidaqmx.constants import AcquisitionType, Edge
+
 import time
 
 import numpy as np
@@ -111,7 +113,7 @@ class Driver:
             )
             task.write(bool(value), auto_start=True)
 
-    def get_ai_voltage(self, ai_channel, num_samples=1, max_range=10.0):
+    def get_ai_voltage(self, ai_channel, num_samples=1, max_range=10.0, sample_rate=100000):
         """Measures the analog input voltage of NI DAQ mx card
 
         :param ao_channel: (str) Name of output channel (e.g. 'ao1', 'ao2')
@@ -122,8 +124,42 @@ class Driver:
         with nidaqmx.Task() as task:
             task.ai_channels.add_ai_voltage_chan(channel)
             task.ai_channels[0].ai_rng_high = max_range
+            task.timing.cfg_samp_clk_timing(
+                rate=sample_rate,
+                sample_mode=AcquisitionType.FINITE,
+                samps_per_chan=num_samples
+            )
             return task.read(number_of_samples_per_channel=num_samples)
+
         return -1
+
+    def get_ai_voltage_triggered(
+        self,
+        ai_channel="ai0",
+        trig_line="PFI0",
+        num_samples=1000,
+        sample_rate=100000,
+        max_range=10.0
+    ):
+        """Measures analog input voltage after a digital start trigger."""
+        channel = self._gen_ch_path(ai_channel)
+        with nidaqmx.Task() as task:
+            task.ai_channels.add_ai_voltage_chan(
+                channel,
+                min_val=-max_range,
+                max_val=max_range
+            )
+            task.timing.cfg_samp_clk_timing(
+                rate=sample_rate,
+                sample_mode=AcquisitionType.FINITE,
+                samps_per_chan=num_samples
+            )
+            task.triggers.start_trigger.cfg_dig_edge_start_trig(
+                trigger_source=f"/{self.dev}/{trig_line}",
+                trigger_edge=Edge.RISING
+            )
+            task.start()
+            return task.read(number_of_samples_per_channel=num_samples)
 
     def get_di_state(self, port, di_channel):
         """Measures the state of a digital Input of a of NI DAQ mx card

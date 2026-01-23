@@ -162,6 +162,12 @@ class Service(ServiceBase):
     def exposed_else(self):
         return self._module.else_()
 
+    def exposed_for_(self, var_name, start, stop, step):
+        return self._module.for_(var_name, start, stop, step)
+
+    def exposed_while_(self, var_name, operator, threshold):
+        return self._module.while_(var_name, operator, threshold)
+
 
 class Client(ClientBase):
 
@@ -345,3 +351,9 @@ class Client(ClientBase):
 
     def else_(self):
         return self._service.exposed_else()
+
+    def for_(self, var_name, start, stop, step):
+        return self._service.exposed_for_(var_name, start, stop, step)
+
+    def while_(self, var_name, operator, threshold):
+        return self._service.exposed_while_(var_name, operator, threshold)

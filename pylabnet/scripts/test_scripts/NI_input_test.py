@@ -3,10 +3,6 @@ import time
 from PyQt5 import QtCore
 from rpyc.utils.classic import obtain
 
-
-from pylabnet.hardware.quantum_machines.OPX import Driver as OPX
-
-
 from pylabnet.scripts.data_center.take_data import ExperimentThread
 from pylabnet.scripts.data_center.datasets import SawtoothScan1D, ErrorBarGraph, InfiniteRollingLine, Dataset, SawtoothScan1D_array_update
 
@@ -43,23 +39,8 @@ def configure(**kwargs):
     try:
         dataset = kwargs['dataset']
         logger = dataset.log # Get the logger for printing messages
-        OPX_client = kwargs['OPX_OPX']
-        dataset.OPX_client = OPX_client
-
-        logger.info("Connecting to QM Manager client...")
-
-        #qm_manager = kwargs[OPX_OPX]
-        logger.info("Successfully connected to QM Manager client.")
-
-        # Add a child dataset for the plot
-        # dataset.add_child(
-        #     name='Real-time ADC',
-        #     data_type=InfiniteRollingLine, # Use a rolling plot
-        #     x_label='Timestamp (a.u.)',
-        #     y_label='ADC Reading (a.u.)'
-        # )
-        # # Give the child dataset a more accessible name
-        # dataset.adc_plot = dataset.children['Real-time ADC']
+        NI_client = kwargs['ni_daq_1_PXI1Slot2_1']
+        dataset.NI_client = NI_client
 
     except Exception as e:
         # This will catch ANY error and print it to the log
@@ -77,8 +58,7 @@ def experiment(**kwargs):
     # Main loop to fetch and plot data
     while thread.running:
 
-        # dataset.OPX_client.set_ao_voltage(pulse="const", ao_channel=1, amplitude=dataset.get_input_parameter('output_voltage'), frequency=10)
-        data_batch = dataset.OPX_client.get_ai_voltage(ao_channel=1, ai_channel=1, length=1000)
+        data_batch = dataset.NI_client.get_ai_voltage(ai_channel="ai0", num_samples=1000)
 
         dataset.log.error(f"DATA FETCHED")
 
@@ -90,15 +70,10 @@ def experiment(**kwargs):
             # Extract the measurement values (first element of each tuple)
             measurements = [item[1] for item in data_batch]
 
-            #dataset.log.error(f"measurements: {measurements}")
-
             # Average the batch of points and plot the result
             avg_value = np.mean(measurements)
             for point in measurements:
                 dataset.set_data(point)
-            #dataset.set_data(avg_value)
-            # rolling_dataset = dataset.children['Real-time ADC']
-            # rolling_dataset.set_children_data()
 
         # A short pause to control the plot update rate
         time.sleep(dataset.get_input_parameter('take_data_rate'))
