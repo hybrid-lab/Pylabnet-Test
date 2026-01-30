@@ -1,0 +1,41 @@
+{
+    "servers" : [
+        {
+            "type" : "wavelength_meter_config_folder",
+            "config" : "wavelength_meter_config",
+            "auto_launch" : "False"
+        },
+        {
+            "type" : "analog_voltage_output_config_folder",
+            "config" : "analog_voltage_output_config"
+        }
+    ],
+    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\wlm_monitor.py",
+    "device_id" : "PXI1Slot2_1",
+    "script_service" : "True",
+    "wm_type": [
+        "wavelength_meter_config_folder"
+    ],
+    "num_lasers": "1 (max is 2) (num)",
+    "channels" : {
+        "1" : {
+            "channel" : "channel_on_wavelength_meter (num)",
+            "name" : "what_you_want_to_name_this_channel",
+            "ao" : {
+                "client" : "analog_voltage_output_config_folder",
+                "config" : "analog_voltage_output_config",
+                "channel" : "analog_voltage_output_name"
+            },
+            "pid" : {
+                "p" : "p_value (num)",
+                "i" : "i_value (num)",
+                "d" : "d_value (num)"
+            },
+            "memory" : "memory_value_for_id (num)",
+            "voltage_monitor" : "True",
+            "min_voltage" : "min_voltage (num)",
+            "max_voltage" : "max_voltage (num)",
+            "gain" : "gain_value (num)"
+        }
+    }
+}
