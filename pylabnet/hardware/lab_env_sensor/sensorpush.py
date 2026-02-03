@@ -8,7 +8,7 @@ tz_pacific = pytz.timezone('US/Pacific')
 
 
 class Driver:
-    def __init__(self, sensor_name, logger=None):
+    def __init__(self, logger=None):
         """
         Instantiate driver class
 
@@ -23,25 +23,27 @@ class Driver:
             raise SystemExit
 
         self.sensorpush = PySensorPush(user, password)
-        for s, info in self.sensorpush.sensors.items():
-            if info['name'] is sensor_name:
-                self.sensor_id = s
 
     def get_data(self, num_points=1):
+        sensors_config = self.sensorpush.sensors
         samples = self.sensorpush.samples(limit=num_points)
-        data = {}
-        data['datetime'] = []
-        data['humidity'] = []
-        data['temperature'] = []
+        sensors = []
 
         for sensor, reading in samples['sensors'].items():
-            if sensor is self.sensor_id:
-                for r in reading:
-                    time = r['observed'] #GMT
-                    dt = datetime.fromisoformat(time)
-                    data['datetime'].append(dt.astimezone(tz_pacific))
+            sensor_data = {}
+            sensors.append(sensor_data)
 
-                    data['humidity'].append(r['calibrated_humidity'])
-                    data['temperature'].append((r['calibrated_temperature'] - 32) * 5 / 9)  #data read in farenheit
+            sensor_data['name'] = sensors_config[sensor]['name']
+            sensor_data['datetime'] = []
+            sensor_data['humidity'] = []
+            sensor_data['temperature'] = []
 
-        return data
+            for r in reading:
+                time = r['observed'] #GMT
+                dt = datetime.fromisoformat(time)
+                sensor_data['datetime'].append(dt.astimezone(tz_pacific))
+
+                sensor_data['humidity'].append(r['calibrated_humidity'])
+                sensor_data['temperature'].append((r['calibrated_temperature'] - 32) * 5 / 9)  #data read in farenheit
+
+        return sensor_data

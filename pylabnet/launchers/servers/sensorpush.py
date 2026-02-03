@@ -15,9 +15,7 @@ def launch(**kwargs):
 
     #Instantiate driver
     logger = kwargs['logger']
-    config_dict = load_device_config('sensorpush', kwargs['config'], logger)
     driver = Driver(
-        device_name=config_dict['device_name'],
         logger=logger
     )
 
