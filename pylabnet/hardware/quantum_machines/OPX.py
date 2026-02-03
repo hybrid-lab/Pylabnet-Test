@@ -408,7 +408,16 @@ class Driver:
                 # ["for", var_name, start, stop, step, body]
                 _, var_name, start, stop, step, body = op
                 i = self._qua_vars[var_name]
-                with for_(i, start, stop, step):
+
+                # Handle positive vs negative steps
+                if step > 0:
+                    cond = (i < stop)
+                    update = (i + step)
+                else:
+                    cond = (i > stop)
+                    update = (i + step)
+
+                with for_(i, start, cond, update):
                     self._emit_stack(body, streams, measuring_flag, measure_counter)
 
             elif kind == "while":
