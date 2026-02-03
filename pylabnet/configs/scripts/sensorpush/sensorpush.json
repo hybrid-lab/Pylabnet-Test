@@ -6,7 +6,7 @@
             "auto_launch" : "False"
         }
     ],
-    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\wlm_monitor.py",
+    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lab_env_sensing\\sensorpush.py",
     "device_id" : "sensorpush",
     "script_service" : "True",
     "wm_type": [
