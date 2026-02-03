@@ -1,0 +1,37 @@
+{
+    "servers" : [
+        {
+            "type" : "sensorpush",
+            "config" : "sensorpush",
+            "auto_launch" : "False"
+        }
+    ],
+    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\wlm_monitor.py",
+    "device_id" : "sensorpush",
+    "script_service" : "True",
+    "wm_type": [
+        "wavelength_meter_config_folder"
+    ],
+    "num_lasers": "1 (max is 2) (num)",
+    "channels" : {
+        "1" : {
+            "channel" : "1",
+            "name" : "hi",
+            "ao" : {
+                "client" : "analog_voltage_output_config_folder",
+                "config" : "analog_voltage_output_config",
+                "channel" : "analog_voltage_output_name"
+            },
+            "pid" : {
+                "p" : 1,
+                "i" : 1,
+                "d" : 1
+            },
+            "memory" : 10,
+            "voltage_monitor" : "True",
+            "min_voltage" : "0.01",
+            "max_voltage" : "100",
+            "gain" : "1"
+        }
+    }
+}
