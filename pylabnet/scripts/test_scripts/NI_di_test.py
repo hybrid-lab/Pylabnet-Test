@@ -1,24 +1,7 @@
-import numpy as np
 import time
-from PyQt5 import QtCore
-from rpyc.utils.classic import obtain
+import numpy as np
 
-
-from pylabnet.hardware.quantum_machines.OPX import Driver as OPX
-
-
-from pylabnet.scripts.data_center.take_data import ExperimentThread
-from pylabnet.scripts.data_center.datasets import SawtoothScan1D, ErrorBarGraph, InfiniteRollingLine, Dataset, SawtoothScan1D_array_update
-
-from pylabnet.launchers.siv_py_functions import upload_sequence, load_config
-
-from qm import SimulationConfig
-from qm.qua import *
-from qm import LoopbackInterface
-from qm import QuantumMachinesManager
-from pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel import *
-
-
+#INIT_DICT is copied from NI_test experiment and does nothing at all
 INIT_DICT = {
     'readout_len': {'Readout Length (ns)': '1000'},
     'avg_count': {'Points to Average': '10'},
@@ -45,7 +28,7 @@ def configure(**kwargs):
         logger = dataset.log # Get the logger for printing messages
         logger.error(f"Kwargs{kwargs}")
 
-        NI_client = kwargs['nidaqmx_ni_daq_1']
+        NI_client = kwargs['nidaqmx_ni_daq_2']
         dataset.NI_client = NI_client
 
         # Add a child dataset for the plot
@@ -66,23 +49,46 @@ def configure(**kwargs):
 
 
 def experiment(**kwargs):
-    """The main experiment loop that runs when you click 'Run'."""
+    """
+    Uses our NI driver to output a *triggered* digital waveform (TTL pulse train).
 
-    thread = kwargs['thread']
-    dataset = kwargs['dataset']
+    Wiring (typical):
+      - Trigger source TTL OUT  -> NI PFI0
+      - Trigger source GND      -> NI DGND
+      - NI DO line (e.g. port0/line0) -> your device TTL input / scope
+      - NI DGND -> your device ground / scope ground
+    """
 
-    # Main loop to fetch and plot data
+    thread = kwargs["thread"]
+    dataset = kwargs["dataset"]
+
+    # ---- Waveform parameters ----
+    sample_rate = 100_000  # 100 kHz -> 10 us per sample
+    di_channel = "dio1"  # change to whatever DO line you want
+
+    # Build a single pulse: LOW 10 ms, HIGH 2 ms, LOW 10 ms
+    # (You can change these durations easily.)
+    low1_samps = int(0.200 * sample_rate)  # 200 ms
+    high_samps = int(1 * sample_rate)  # 200 ms
+    low2_samps = int(0.200 * sample_rate)  # 200 ms
+
+    do_waveform = ([0] * low1_samps) + ([1] * high_samps) + ([0] * low2_samps)
+
     while thread.running:
         ni = dataset.NI_client
-        # dataset.NI_client.set_ao_voltage(ao_channel="ao1", voltages=1)
         ni.build_stack()
-        ni.get_ai_voltage(ai_channel="ai0", num_samples=100, sample_rate=100000)
+        ni.get_di_state(
+            di_channel="line0",
+            sample_rate=100000,
+            num_samples=100,
+            port="port0"
+        )
         ni.set_trigger(
-            target="ai",
+            target="di",
             trig_line="PFI0"
         )
         data_batch = ni.execute()
-        data_batch = data_batch["ai_1"]
+        data_batch = data_batch["di_1"]
 
         dataset.log.error(f"DATA FETCHED")
 
