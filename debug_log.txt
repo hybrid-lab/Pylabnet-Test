@@ -39073,4 +39073,11 @@ DEBUG: HOST IN Client base class: 192.168.88.253, port: 16210, key: pylabnet.pem
  DEBUG: Connection params: port: 1986, host: 192.168.88.253, key: C:\WINDOWS\System32\pylabnet.pem
  DEBUG: STOP 2
  DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.35, port: 6884, key: pylabnet.pem
+ DEBUG: Connection params: port: 6884, host: 192.168.0.35, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.35, port: 6884, key: pylabnet.pem
+ DEBUG: Connection params: port: 6884, host: 192.168.0.35, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Connection refused ERROR
  
