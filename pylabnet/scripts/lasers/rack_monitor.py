@@ -15,7 +15,7 @@ import pyqtgraph as pg
 
 
 class RackMonitor:
-    """ A script class for monitoring and locking lasers based on the wavemeter """
+    """ A script class for monitoring laser rack conditions and locking lasers based on the wavemeter """
 
     def __init__(self, wlm_client, logger_client, gui='wavemeter_monitor', ao_clients=None, display_pts=5000, threshold=0.0002, port=None, params=None, three_lasers=False):
         """ Instantiates WlmMonitor script object for monitoring wavemeter
@@ -820,7 +820,7 @@ def launch(**kwargs):
     params = dict(channel_params=channel_params)
 
     # Instantiate Monitor script
-    wlm_monitor = WlmMonitor(
+    rack_monitor = RackMonitor(
         wlm_client=wavemeter_client,
         ao_clients=ao_clients,
         logger_client=logger,
@@ -829,12 +829,12 @@ def launch(**kwargs):
     )
 
     update_service = kwargs['service']
-    update_service.assign_module(module=wlm_monitor)
+    update_service.assign_module(module=rack_monitor)
     logger.update_data(data=dict(device_id=device_id))
-    wlm_monitor.gui.set_network_info(port=kwargs['server_port'])
+    rack_monitor.gui.set_network_info(port=kwargs['server_port'])
 
     # Run continuously
     # Note that the actual operation inside run() can be paused using the update server
     while True:
 
-        wlm_monitor.run()
+        rack_monitor.run()

@@ -1,7 +1,7 @@
 from pylabnet.hardware.lab_env_sensor.sensorpush import Driver
 from pylabnet.network.client_server.sensorpush import Service, Client
 from pylabnet.network.core.generic_server import GenericServer
-from pylabnet.utils.helper_methods import get_ip, load_device_config
+from pylabnet.utils.helper_methods import get_ip, load_device_config, load_config
 
 
 def launch(**kwargs):
@@ -15,7 +15,9 @@ def launch(**kwargs):
 
     #Instantiate driver
     logger = kwargs['logger']
+    config = load_config(kwargs['config'])
     driver = Driver(
+        sensor_name=config['device_id'],
         logger=logger
     )
 

@@ -6,13 +6,13 @@
             "auto_launch" : "False"
         }
     ],
-    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\wlm_monitor.py",
+    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\rack_monitor.py",
     "device_id" : "sensorpush",
     "script_service" : "True",
     "wm_type": [
         "wavelength_meter_config_folder"
     ],
-    "num_lasers": "1",
+    "num_lasers": "3",
     "channels" : {
         "1" : {
             "channel" : "1",
