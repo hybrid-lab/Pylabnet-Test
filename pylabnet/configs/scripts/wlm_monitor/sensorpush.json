@@ -1,12 +1,8 @@
 {
     "servers" : [
-        {
-            "type" : "sensorpush",
-            "config" : "Bob",
-            "auto_launch" : "False"
-        }
+       
     ],
-    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\rack_monitor.py",
+    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\wlm_monitor.py",
     "device_id" : "sensorpush",
     "script_service" : "True",
     "wm_type": [
