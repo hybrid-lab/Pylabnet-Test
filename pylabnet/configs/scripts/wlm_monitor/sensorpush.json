@@ -2,7 +2,7 @@
     "servers" : [
         {
             "type" : "sensorpush",
-            "config" : "sensorpush",
+            "config" : "Bob",
             "auto_launch" : "False"
         }
     ],
