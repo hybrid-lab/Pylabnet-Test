@@ -17,7 +17,7 @@ import pyqtgraph as pg
 class RackMonitor:
     """ A script class for monitoring laser rack conditions and locking lasers based on the wavemeter """
 
-    def __init__(self, wlm_client, sensorpush_client, logger_client, gui='wavemeter_monitor', ao_clients=None, display_pts=5000, threshold=0.0002, port=None, params=None):
+    def __init__(self, wlm_client, sensorpush_client, logger_client, gui='wavemeter_monitor', ao_clients=None, display_pts=5000, threshold=0.0002, port=None, params=None, num_lasers=2):
         """ Instantiates WlmMonitor script object for monitoring wavemeter
 
         :param wlm_client: (obj) instance of wavemeter client
@@ -30,6 +30,7 @@ class RackMonitor:
         :param threshold: (float, optional) threshold in THz for lock error signal
         :param port: (int) port number for update server
         :param params: (dict) see set_parameters below for details
+        :param num_lasers: (int) number of lasers to show/lock
         """
         self.channels = []
 
@@ -39,6 +40,7 @@ class RackMonitor:
         self.display_pts = display_pts
         self.threshold = threshold
         self.log = LogHandler(logger_client)
+        self.num_lasers = num_lasers
 
         # Instantiate gui
         self.gui = Window(
@@ -51,10 +53,18 @@ class RackMonitor:
         # Setup stylesheet.
         self.gui.apply_stylesheet()
 
-        self.widgets = get_gui_widgets(
+        '''self.widgets = get_gui_widgets(
             gui=self.gui,
             freq=2, sp=2, rs=2, lock=2, error_status=2, graph=4, legend=4, clear=4,
             zero=4, voltage=2, error=2, P_laser=2, I_laser=2, D_laser=2, PID_upd_laser=2
+        )'''
+
+        num_plots = 2 * (num_lasers + 1)
+        self.widgets = get_gui_widgets(
+            gui=self.gui,
+            freq=num_lasers, sp=num_lasers, rs=num_lasers, lock=num_lasers, error_status=num_lasers, graph=num_plots,
+            legend=num_plots, clear=num_plots, zero=num_plots, voltage=num_lasers, error=num_lasers,
+            P_laser=num_lasers, I_laser=num_lasers, D_laser=num_lasers, PID_upd_laser=num_lasers
         )
 
         # Set parameters
@@ -295,30 +305,30 @@ class RackMonitor:
 
         # Create curves
         # frequency
-        self.widgets['curve'].append(self.widgets['graph'][2 * index].plot(
+        self.widgets['curve'].append(self.widgets['graph'][2 * index + 2].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
         add_to_legend(
-            legend=self.widgets['legend'][2 * index],
-            curve=self.widgets['curve'][4 * index],
+            legend=self.widgets['legend'][2 * index + 2],
+            curve=self.widgets['curve'][4 * index + 2],
             curve_name=channel.curve_name
         )
 
         # Setpoint
-        self.widgets['curve'].append(self.widgets['graph'][2 * index].plot(
+        self.widgets['curve'].append(self.widgets['graph'][2 * index + 2].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[1])
         ))
         add_to_legend(
-            legend=self.widgets['legend'][2 * index],
-            curve=self.widgets['curve'][4 * index + 1],
+            legend=self.widgets['legend'][2 * index + 2],
+            curve=self.widgets['curve'][4 * index + 2 + 1],
             curve_name=channel.setpoint_name
         )
 
         # Clear data
-        self.widgets['clear'][2 * index].clicked.connect(
+        self.widgets['clear'][2 * index + 2].clicked.connect(
             lambda: self.clear_channel(channel)
         )
-        self.widgets['clear'][2 * index + 1].clicked.connect(
+        self.widgets['clear'][2 * index + 2 + 1].clicked.connect(
             lambda: self.clear_channel(channel)
         )
 
@@ -341,30 +351,30 @@ class RackMonitor:
         )
 
         # Voltage
-        self.widgets['curve'].append(self.widgets['graph'][2 * index + 1].plot(
+        self.widgets['curve'].append(self.widgets['graph'][2 * index + 2 + 1].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
         add_to_legend(
-            legend=self.widgets['legend'][2 * index + 1],
-            curve=self.widgets['curve'][4 * index + 2],
+            legend=self.widgets['legend'][2 * index + 2 + 1],
+            curve=self.widgets['curve'][4 * index + 2 + 2],
             curve_name=channel.voltage_curve
         )
 
         # Error
-        self.widgets['curve'].append(self.widgets['graph'][2 * index + 1].plot(
+        self.widgets['curve'].append(self.widgets['graph'][2 * index + 2 + 1].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[1])
         ))
         add_to_legend(
-            legend=self.widgets['legend'][2 * index + 1],
-            curve=self.widgets['curve'][4 * index + 3],
+            legend=self.widgets['legend'][2 * index + 2 + 1],
+            curve=self.widgets['curve'][4 * index + 2 + 3],
             curve_name=channel.error_curve
         )
 
         # zero
-        self.widgets['zero'][2 * index].clicked.connect(
+        self.widgets['zero'][2 * index + 2].clicked.connect(
             lambda: self.zero_voltage(channel)
         )
-        self.widgets['zero'][2 * index + 1].clicked.connect(
+        self.widgets['zero'][2 * index + 2 + 1].clicked.connect(
             lambda: self.zero_voltage(channel)
         )
 
@@ -385,11 +395,11 @@ class RackMonitor:
             channel.update(self.wlm_client.get_wavelength(channel.number))
 
             # Update frequency
-            self.widgets['curve'][4 * index].setData(channel.data)
+            self.widgets['curve'][4 * index + 2].setData(channel.data)
             self.widgets['freq'][index].setValue(channel.data[-1])
 
             # Update setpoints
-            self.widgets['curve'][4 * index + 1].setData(channel.sp_data)
+            self.widgets['curve'][4 * index + 2 + 1].setData(channel.sp_data)
 
             # Update the setpoint to GUI directly if it has been changed
             # if channel.setpoint_override:
@@ -408,9 +418,9 @@ class RackMonitor:
                 self.widgets['error_status'][index].setChecked(False)
 
             # Now update lock + voltage plots
-            self.widgets['curve'][4 * index + 2].setData(channel.voltage)
+            self.widgets['curve'][4 * index + 2 + 2].setData(channel.voltage)
             self.widgets['voltage'][index].setValue(channel.voltage[-1])
-            self.widgets['curve'][4 * index + 3].setData(channel.error)
+            self.widgets['curve'][4 * index + 2 + 3].setData(channel.error)
             self.widgets['error'][index].setValue(channel.error[-1])
 
     def _get_gui_data(self):
