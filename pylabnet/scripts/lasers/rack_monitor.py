@@ -17,10 +17,11 @@ import pyqtgraph as pg
 class RackMonitor:
     """ A script class for monitoring laser rack conditions and locking lasers based on the wavemeter """
 
-    def __init__(self, wlm_client, logger_client, gui='wavemeter_monitor', ao_clients=None, display_pts=5000, threshold=0.0002, port=None, params=None, three_lasers=False):
+    def __init__(self, wlm_client, sensorpush_client, logger_client, gui='wavemeter_monitor', ao_clients=None, display_pts=5000, threshold=0.0002, port=None, params=None):
         """ Instantiates WlmMonitor script object for monitoring wavemeter
 
         :param wlm_client: (obj) instance of wavemeter client
+        :param sensorpush_client: (obj) instance of sensorpush client
         :param gui_client: (obj) instance of GUI client.
         :param logger_client: (obj) instance of logger client.
         :param ao_clients: (dict, optional) dictionary of ao client objects with keys to identify. Exmaple:
@@ -29,14 +30,11 @@ class RackMonitor:
         :param threshold: (float, optional) threshold in THz for lock error signal
         :param port: (int) port number for update server
         :param params: (dict) see set_parameters below for details
-        :three_lasers: (bool) If three lasers are in use (instead of 2)
         """
         self.channels = []
 
-        if three_lasers:
-            gui = 'wavemeter_monitor_3lasers'
-
         self.wlm_client = wlm_client
+        self.sensorpush_client = sensorpush_client
         self.ao_clients = ao_clients
         self.display_pts = display_pts
         self.threshold = threshold
@@ -53,18 +51,11 @@ class RackMonitor:
         # Setup stylesheet.
         self.gui.apply_stylesheet()
 
-        if three_lasers:
-            self.widgets = get_gui_widgets(
-                gui=self.gui,
-                freq=3, sp=3, rs=3, lock=3, error_status=3, graph=6, legend=6, clear=6,
-                zero=6, voltage=3, error=3, P_laser=3, I_laser=3, D_laser=3, PID_upd_laser=3
-            )
-        else:
-            self.widgets = get_gui_widgets(
-                gui=self.gui,
-                freq=2, sp=2, rs=2, lock=2, error_status=2, graph=4, legend=4, clear=4,
-                zero=4, voltage=2, error=2, P_laser=2, I_laser=2, D_laser=2, PID_upd_laser=2
-            )
+        self.widgets = get_gui_widgets(
+            gui=self.gui,
+            freq=2, sp=2, rs=2, lock=2, error_status=2, graph=4, legend=4, clear=4,
+            zero=4, voltage=2, error=2, P_laser=2, I_laser=2, D_laser=2, PID_upd_laser=2
+        )
 
         # Set parameters
         self.set_parameters(**params)
@@ -452,6 +443,15 @@ class RackMonitor:
         physical_channel = self.channels[self._get_channels().index(channel)]
         return self.wlm_client.get_wavelength(physical_channel.number)
 
+    def get_env_data(self, num_points=1):
+        return self.sensorpush_client.get_data(num_points)
+
+    def get_temperature(self):
+        return self.sensorpush_client.get_temperature()
+
+    def get_humidity(self):
+        return self.sensorpush_client.get_humidity()
+
 
 class Service(ServiceBase):
     """ A service to enable external updating of WlmMonitor parameters """
@@ -489,6 +489,15 @@ class Service(ServiceBase):
     def exposed_get_wavelength(self, channel):
         return self._module.get_wavelength(channel)
 
+    def exposed_get_env_data(self, num_points=1):
+        return self._module.get_env_data(num_points)
+
+    def exposed_get_temperature(self):
+        return self._module.get_temperature()
+
+    def exposed_get_humidity(self):
+        return self._module.get_humidity()
+
 
 class Client(ClientBase):
 
@@ -499,6 +508,12 @@ class Client(ClientBase):
 
     def get_wavelength(self, channel):
         return self._service.exposed_get_wavelength(channel)
+
+    def get_temperature(self):
+        return self._service.exposed_get_temperature()
+
+    def get_humidity(self):
+        return self._service.exposed_get_humidity()
 
     def clear_channel(self, channel):
         return self._service.exposed_clear_channel(channel)
@@ -790,11 +805,6 @@ def launch(**kwargs):
         logger=logger
     )
 
-    # TODO: Generalize this for n lasers.
-    if config['num_lasers'] == 3:
-        three_lasers = True
-    else:
-        three_lasers = False
     device_id = config['device_id']
 
     wavemeter_client = find_client(
@@ -802,6 +812,13 @@ def launch(**kwargs):
         settings=config,
         client_type='high_finesse_ws7',
         logger=logger)
+
+    sensorpush_client = find_client(
+        clients=kwargs['clients'],
+        settings=config,
+        client_type='sensorpush',
+        logger=logger
+    )
 
     # Get list of ao client names
     ao_clients = {}
@@ -822,10 +839,10 @@ def launch(**kwargs):
     # Instantiate Monitor script
     rack_monitor = RackMonitor(
         wlm_client=wavemeter_client,
+        sensorpush_client=sensorpush_client,
         ao_clients=ao_clients,
         logger_client=logger,
-        params=params,
-        three_lasers=three_lasers
+        params=params
     )
 
     update_service = kwargs['service']
