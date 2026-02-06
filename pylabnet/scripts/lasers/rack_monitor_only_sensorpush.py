@@ -45,11 +45,8 @@ class RackMonitor:
 
         self.widgets = get_gui_widgets(
             gui=self.gui,
-            temp=1, humidity=1, graph=2, legend=2, clear=2
+            freq=2, graph=2, legend=2, clear=2
         )
-
-        self.sensor = Sensor(self.sensorpush_client, log=self.log)
-        self._initialize_sensor()
 
         # Configure plots
         # Get actual legend widgets
@@ -57,18 +54,21 @@ class RackMonitor:
 
         self.widgets['curve'] = []
 
+        self.sensor = Sensor(self.sensorpush_client, log=self.log)
+        self._initialize_sensor()
+
     def run(self):
         """Runs the WlmMonitor
 
         Can be stopped using the pause() method
         """
 
-        self._update_channels()
+        self._update_sensor()
         self.gui.force_update()
 
     # Technical methods
 
-    def _initialize_channel(self):
+    def _initialize_sensor(self):
         """Initializes a channel and outputs to the GUI
 
         Should only be called in the beginning of channel use to assign physical GUI widgets
@@ -96,7 +96,7 @@ class RackMonitor:
             curve_name='Humidity (%)'
         )
 
-    def _update_channels(self):
+    def _update_sensor(self):
         """ Updates all channels + displays
 
         Called continuously inside run() method to refresh WLM data and output on GUI
@@ -108,11 +108,11 @@ class RackMonitor:
 
         # Update temperature
         self.widgets['curve'][TEMP_INDEX].setData(self.sensor.temp)
-        self.widgets['data'][TEMP_INDEX].setValue(self.sensor.temp[-1])
+        self.widgets['freq'][TEMP_INDEX].setValue(self.sensor.temp[-1])
 
         # Update humidity
         self.widgets['curve'][HUMIDITY_INDEX].setData(self.sensor.humidity)
-        self.widgets['data'][HUMIDITY_INDEX].setValue(self.sensor.humidity[-1])
+        self.widgets['freq'][HUMIDITY_INDEX].setValue(self.sensor.humidity[-1])
 
     def get_env_data(self, num_points=1):
         return self.sensorpush_client.get_data(num_points)
@@ -221,8 +221,8 @@ class Sensor:
         :param value: (float) current value
         """
 
-        self.temp = np.append(self.data[1:], temp)
-        self.humidity = np.append(self.data[1:], humidity)
+        self.temp = np.append(self.temp[1:], temp)
+        self.humidity = np.append(self.humidity[1:], humidity)
 
 
 def launch(**kwargs):

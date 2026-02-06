@@ -4,7 +4,9 @@ from pysensorpush import PySensorPush #if running first time, run 'pip3 install 
 
 from datetime import datetime
 import pytz #may need to run 'pip3 install pytz'
+
 tz_pacific = pytz.timezone('US/Pacific')
+date_format = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 
 class Driver:
@@ -23,10 +25,11 @@ class Driver:
             raise SystemExit
 
         self.logger = logger
+        self.sensor_id = None
         self.sensorpush = PySensorPush(user, password)
         self.logger.info('sensorpush initiated')
         for s, info in self.sensorpush.sensors.items():
-            if info['name'] is sensor_name:
+            if info['name'] == sensor_name:
                 self.sensor_id = s
                 self.logger.info('sensor_name initiated')
 
@@ -38,10 +41,10 @@ class Driver:
         data['temperature'] = []
 
         for sensor, reading in samples['sensors'].items():
-            if sensor is self.sensor_id:
+            if sensor == self.sensor_id:
                 for r in reading:
                     time = r['observed'] #GMT
-                    dt = datetime.fromisoformat(time)
+                    dt = datetime.strptime(time, date_format)
                     data['datetime'].append(dt.astimezone(tz_pacific))
 
                     data['humidity'].append(r['calibrated_humidity'])
