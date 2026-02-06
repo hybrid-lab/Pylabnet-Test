@@ -22,10 +22,13 @@ class Driver:
             print('ERROR! Must define env variables SENSORPUSH_USER and SENSORPUSH_PASSWORD')
             raise SystemExit
 
+        self.logger = logger
         self.sensorpush = PySensorPush(user, password)
+        self.logger.info('sensorpush initiated')
         for s, info in self.sensorpush.sensors.items():
             if info['name'] is sensor_name:
                 self.sensor_id = s
+                self.logger.info('sensor_name initiated')
 
     def get_data(self, num_points=1):
         samples = self.sensorpush.samples(limit=num_points)

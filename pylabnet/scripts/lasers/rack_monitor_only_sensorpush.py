@@ -18,7 +18,7 @@ HUMIDITY_INDEX = 1
 class RackMonitor:
     """ A script class for monitoring laser rack conditions and locking lasers based on the wavemeter """
 
-    def __init__(self, sensorpush_client, logger_client, gui='wavemeter_monitor', display_pts=720, port=None, params=None):
+    def __init__(self, sensorpush_client, logger_client, gui='wavemeter_monitor', display_pts=720, port=None):
         """ Instantiates WlmMonitor script object for monitoring wavemeter
 
         :param sensorpush_client: (obj) instance of sensorpush client
@@ -26,7 +26,6 @@ class RackMonitor:
         :param logger_client: (obj) instance of logger client.
         :param display_pts: (int, optional) number of points to display on plot
         :param port: (int) port number for update server
-        :param params: (dict) see set_parameters below for details
         """
 
         self.sensorpush_client = sensorpush_client
@@ -231,7 +230,7 @@ def launch(**kwargs):
 
     logger = kwargs['logger']
     config = load_script_config(
-        script='wlm_monitor',
+        script='rack_monitor',
         config=kwargs['config'],
         logger=logger
     )
@@ -245,14 +244,10 @@ def launch(**kwargs):
         logger=logger
     )
 
-    channel_params = [p for p in config['channels'].values()]
-    params = dict(channel_params=channel_params)
-
     # Instantiate Monitor script
     rack_monitor = RackMonitor(
         sensorpush_client=sensorpush_client,
-        logger_client=logger,
-        params=params
+        logger_client=logger
     )
 
     update_service = kwargs['service']
