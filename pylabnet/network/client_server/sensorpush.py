@@ -11,6 +11,10 @@ class Client(ClientBase):
     def get_data(self, num_points=1):
         return self._service.exposed_get_data(num_points)
 
+    def get_time(self):
+        data = self.get_data()
+        return data['datetime'][0]
+
     def get_temperature(self):
         data = self.get_data()
         return data['temperature'][0]

@@ -102,20 +102,25 @@ class RackMonitor:
         Called continuously inside run() method to refresh WLM data and output on GUI
         """
         # Update data with the new temperature and humidity
+        time = self.sensorpush_client.get_time()
         temp = self.sensorpush_client.get_temperature()
         humidity = self.sensorpush_client.get_humidity()
-        self.sensor.update(temp, humidity)
+        self.sensor.update(time, temp, humidity)
 
+        #TODO: error sending datetime object as x-axis --> pull out hour and/or minute
         # Update temperature
-        self.widgets['curve'][TEMP_INDEX].setData(self.sensor.temp)
+        self.widgets['curve'][TEMP_INDEX].setData([self.sensor.time, self.sensor.temp])
         self.widgets['freq'][TEMP_INDEX].setValue(self.sensor.temp[-1])
 
         # Update humidity
-        self.widgets['curve'][HUMIDITY_INDEX].setData(self.sensor.humidity)
+        self.widgets['curve'][HUMIDITY_INDEX].setData([self.sensor.time, self.sensor.humidity])
         self.widgets['freq'][HUMIDITY_INDEX].setValue(self.sensor.humidity[-1])
 
     def get_env_data(self, num_points=1):
         return self.sensorpush_client.get_data(num_points)
+
+    def get_time(self):
+        return self.sensorpush_client.get_time()
 
     def get_temperature(self):
         return self.sensorpush_client.get_temperature()
@@ -151,6 +156,9 @@ class Service(ServiceBase):
     def exposed_get_env_data(self, num_points=1):
         return self._module.get_env_data(num_points)
 
+    def exposed_get_time(self):
+        return self._module.get_time()
+
     def exposed_get_temperature(self):
         return self._module.get_temperature()
 
@@ -177,6 +185,9 @@ class Client(ClientBase):
     def get_env_data(self, num_points=1):
         return self._service.exposed_get_env_data(num_points)
 
+    def get_time(self):
+        return self._service.exposed_get_time()
+
     def get_temperature(self):
         return self._service.exposed_get_temperature()
 
@@ -201,6 +212,7 @@ class Sensor:
         self.labels_updated = False  # Flag to check if we have updated all labels
 
         # Initialize relevant placeholders
+        self.time = np.array([])
         self.temp = np.array([])
         self.humidity = np.array([])
 
@@ -211,16 +223,18 @@ class Sensor:
         :param display_pts: number of points to display on the plot
         """
         if self.sensor_client != None:
+            self.time = self.sensor_client.get_data(display_pts)['datetime']
             self.temp = self.sensor_client.get_data(display_pts)['temperature']
             self.humidity = self.sensor_client.get_data(display_pts)['humidity']
 
-    def update(self, temp, humidity):
+    def update(self, time, temp, humidity):
         """
         Updates the data
 
         :param value: (float) current value
         """
 
+        self.time = np.append(self.time[1:], time)
         self.temp = np.append(self.temp[1:], temp)
         self.humidity = np.append(self.humidity[1:], humidity)
 
