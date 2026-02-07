@@ -45,6 +45,7 @@ class Driver:
                 for r in reading:
                     time = r['observed'] #GMT
                     dt = datetime.strptime(time, date_format)
+                    dt = dt.replace(tzinfo=pytz.UTC)
                     data['datetime'].append(dt.astimezone(tz_pacific))
 
                     data['humidity'].append(r['calibrated_humidity'])

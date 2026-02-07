@@ -18,7 +18,7 @@ HUMIDITY_INDEX = 1
 class RackMonitor:
     """ A script class for monitoring laser rack conditions and locking lasers based on the wavemeter """
 
-    def __init__(self, sensorpush_client, logger_client, gui='wavemeter_monitor', display_pts=720, port=None):
+    def __init__(self, sensorpush_client, logger_client, gui='rack_monitor_v1', display_pts=500, port=None):
         """ Instantiates WlmMonitor script object for monitoring wavemeter
 
         :param sensorpush_client: (obj) instance of sensorpush client
@@ -45,12 +45,10 @@ class RackMonitor:
 
         self.widgets = get_gui_widgets(
             gui=self.gui,
-            freq=2, graph=2, legend=2, clear=2
+            temp=1, humidity=1, graph=2
         )
 
         # Configure plots
-        # Get actual legend widgets
-        self.widgets['legend'] = [get_legend_from_graphics_view(legend) for legend in self.widgets['legend']]
 
         self.widgets['curve'] = []
 
@@ -73,28 +71,18 @@ class RackMonitor:
 
         Should only be called in the beginning of channel use to assign physical GUI widgets
         """
-        self.sensor.initialize()
+        self.sensor.initialize(self.display_pts)
 
         # Create curves
         # temperature
         self.widgets['curve'].append(self.widgets['graph'][TEMP_INDEX].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
-        add_to_legend(
-            legend=self.widgets['legend'][TEMP_INDEX],
-            curve=self.widgets['curve'][TEMP_INDEX],
-            curve_name='Temperature ($\degree$C)'
-        )
 
         # humidity
         self.widgets['curve'].append(self.widgets['graph'][HUMIDITY_INDEX].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
-        add_to_legend(
-            legend=self.widgets['legend'][HUMIDITY_INDEX],
-            curve=self.widgets['curve'][HUMIDITY_INDEX],
-            curve_name='Humidity (%)'
-        )
 
     def _update_sensor(self):
         """ Updates all channels + displays
@@ -108,13 +96,16 @@ class RackMonitor:
         self.sensor.update(time, temp, humidity)
 
         #TODO: error sending datetime object as x-axis --> pull out hour and/or minute
+        #completely cursed, but time will be graphed as 'hour.(minute*60/100)' --> days loop around
+        times = [t.hour + (t.minute / 60) for t in self.sensor.time]
+
         # Update temperature
-        self.widgets['curve'][TEMP_INDEX].setData([self.sensor.time, self.sensor.temp])
-        self.widgets['freq'][TEMP_INDEX].setValue(self.sensor.temp[-1])
+        self.widgets['curve'][TEMP_INDEX].setData(x=times, y=self.sensor.temp)
+        self.widgets['temp'].setValue(self.sensor.temp[0])
 
         # Update humidity
-        self.widgets['curve'][HUMIDITY_INDEX].setData([self.sensor.time, self.sensor.humidity])
-        self.widgets['freq'][HUMIDITY_INDEX].setValue(self.sensor.humidity[-1])
+        self.widgets['curve'][HUMIDITY_INDEX].setData(x=times, y=self.sensor.humidity)
+        self.widgets['humidity'].setValue(self.sensor.humidity[0])
 
     def get_env_data(self, num_points=1):
         return self.sensorpush_client.get_data(num_points)
@@ -216,6 +207,9 @@ class Sensor:
         self.temp = np.array([])
         self.humidity = np.array([])
 
+        #for updating data
+        self.count = 0
+
     def initialize(self, display_pts=720):
         """
         Initializes the channel based on the current value
@@ -233,10 +227,12 @@ class Sensor:
 
         :param value: (float) current value
         """
-
-        self.time = np.append(self.time[1:], time)
-        self.temp = np.append(self.temp[1:], temp)
-        self.humidity = np.append(self.humidity[1:], humidity)
+        self.count = self.count + 1
+        if self.count == 10:
+            self.time = np.append(time, self.time[:-1])
+            self.temp = np.append(temp, self.temp[:-1])
+            self.humidity = np.append(humidity, self.humidity[:-1])
+            self.count = 0
 
 
 def launch(**kwargs):
