@@ -74,17 +74,18 @@ class RackMonitor:
         Should only be called in the beginning of channel use to assign physical GUI widgets
         """
         self.sensor.initialize(self.display_pts)
-        axis = pg.DateAxisItem(orientation='bottom')
 
         # Create curves
         # temperature
-        self.widgets['graph'][TEMP_INDEX].setAxisItems({'bottom': axis})
+        axis1 = pg.DateAxisItem(orientation='bottom')
+        self.widgets['graph'][TEMP_INDEX].setAxisItems({'bottom': axis1})
         self.widgets['curve'].append(self.widgets['graph'][TEMP_INDEX].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
 
         # humidity
-        self.widgets['graph'][HUMIDITY_INDEX].setAxisItems({'bottom': axis})
+        axis2 = pg.DateAxisItem(orientation='bottom')
+        self.widgets['graph'][HUMIDITY_INDEX].setAxisItems({'bottom': axis2})
         self.widgets['curve'].append(self.widgets['graph'][HUMIDITY_INDEX].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
