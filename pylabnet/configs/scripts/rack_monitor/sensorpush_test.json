@@ -1,0 +1,11 @@
+{
+    "servers" : [
+       {
+            "type" : "sensorpush",
+            "config" : "Bob"
+        }
+    ],
+    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\rack_monitor_only_sensorpush.py",
+    "device_id" : "Bob",
+    "script_service" : "True"
+}
