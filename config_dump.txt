@@ -59,50 +59,6 @@
     }
   },
   "elements": {
-    "generic_ai_elem_ch4_1": {
-      "singleInput": {
-        "port": [
-          "con1",
-          4
-        ]
-      },
-      "intermediate_frequency": 0,
-      "operations": {
-        "const": "square_pulse_ch4_1"
-      }
-    },
-    "generic_output_elem_ch2_ch2_1": {
-      "singleInput": {
-        "port": [
-          "con1",
-          2
-        ]
-      },
-      "intermediate_frequency": 10000000,
-      "operations": {
-        "readout": "meas_pulse_out_ch2_in_ch2_1"
-      },
-      "time_of_flight": 24,
-      "smearing": 0,
-      "outputs": {
-        "out1": [
-          "con1",
-          2
-        ]
-      }
-    },
-    "generic_ai_elem_ch3_1": {
-      "singleInput": {
-        "port": [
-          "con1",
-          3
-        ]
-      },
-      "intermediate_frequency": 0,
-      "operations": {
-        "const": "square_pulse_ch3_1"
-      }
-    },
     "generic_output_elem_ch1_ch1_1": {
       "singleInput": {
         "port": [
@@ -122,21 +78,26 @@
           1
         ]
       }
+    },
+    "generic_ai_elem_ch3_1": {
+      "singleInput": {
+        "port": [
+          "con1",
+          3
+        ]
+      },
+      "intermediate_frequency": 50000000,
+      "operations": {
+        "const": "square_pulse_ch3_1"
+      }
     }
   },
   "pulses": {
-    "square_pulse_ch4_1": {
-      "operation": "control",
-      "length": 100,
-      "waveforms": {
-        "single": "square_wf_ch4_1"
-      }
-    },
-    "meas_pulse_out_ch2_in_ch2_1": {
+    "meas_pulse_out_ch1_in_ch1_1": {
       "operation": "measurement",
-      "length": 1000,
+      "length": 500,
       "waveforms": {
-        "single": "square_measure_wf_ch2_1"
+        "single": "square_measure_wf_ch1_1"
       },
       "integration_weights": {
         "cos": "cos",
@@ -147,23 +108,10 @@
     },
     "square_pulse_ch3_1": {
       "operation": "control",
-      "length": 100,
+      "length": 300,
       "waveforms": {
         "single": "square_wf_ch3_1"
       }
-    },
-    "meas_pulse_out_ch1_in_ch1_1": {
-      "operation": "measurement",
-      "length": 1000,
-      "waveforms": {
-        "single": "square_measure_wf_ch1_1"
-      },
-      "integration_weights": {
-        "cos": "cos",
-        "sin": "sin",
-        "minus_sin": "minus_sin"
-      },
-      "digital_marker": "ON"
     }
   },
   "waveforms": {
@@ -276,21 +224,13 @@
         0.0
       ]
     },
-    "square_wf_ch4_1": {
-      "type": "constant",
-      "sample": 0.5
-    },
-    "square_measure_wf_ch2_1": {
+    "square_measure_wf_ch1_1": {
       "type": "constant",
       "sample": 0.3
     },
     "square_wf_ch3_1": {
       "type": "constant",
-      "sample": 0.5
-    },
-    "square_measure_wf_ch1_1": {
-      "type": "constant",
-      "sample": 0.3
+      "sample": 0.4
     }
   },
   "digital_waveforms": {
@@ -308,13 +248,13 @@
       "cosine": [
         [
           4.0,
-          20
+          500
         ]
       ],
       "sine": [
         [
           0.0,
-          20
+          500
         ]
       ]
     },
@@ -322,13 +262,13 @@
       "cosine": [
         [
           0.0,
-          20
+          500
         ]
       ],
       "sine": [
         [
           4.0,
-          20
+          500
         ]
       ]
     },

@@ -9,6 +9,10 @@
             "config": "ni_daq_2"
         },
         {
+            "type": "nidaqmx",
+            "config": "ni_daq_3"
+        },
+        {
             "type":"OPX",
             "config":"OPX"
         }

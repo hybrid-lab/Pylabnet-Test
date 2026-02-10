@@ -10,30 +10,26 @@ Key ideas:
 - You can fill stacks (build_stack mode), then call execute() to:
     1) Compile each stack into a single DAQmx Task per subsystem
     2) Configure timing (sample clock) and optional digital start trigger per subsystem
-    3) Start tasks in a safe order (outputs first, then inputs) and collect readbacks
+    3) Start tasks in a safe order (inputs first, then outputs) and collect readbacks
     4) Return a dict of results for AI/DI operations (and optional debug metadata)
 
-Notes / scope:
-- This is a practical "sequence compiler" for simple finite sequences (concatenated waveforms).
-- It intentionally does NOT implement special "trigger-then-read/play combined helpers" beyond
-  setting a trigger target subsystem via set_trigger(..., target="ao"/"ai"/"do"/"di").
-- You can still call the *_now methods by not using build_stack().
+NEW (for simultaneous multi-device execution):
+- Added arm() and finalize() so you can:
+    arm(dev1); arm(dev2); start OPX; finalize(dev1); finalize(dev2)
+  This prevents execute() from blocking/closing tasks before other devices are armed.
 
-Edits relative to the prior NI driver:
-- Replaced single self.stack with self.stacks: dict[str, list]
-- Added set_trigger(target=...) API and per-subsystem trigger config in execute()
-- execute() now builds up to 4 tasks (ao/ai/do/di) and runs them together
-
+Backwards compatibility:
+- execute() is still available; it now uses arm()+finalize() internally.
 """
 
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Union
+import re
 
 import nidaqmx
 from nidaqmx.constants import AcquisitionType, Edge
 import numpy as np
-import re
 
 # Compatibility for older numpy code
 if not hasattr(np, "bool"):
@@ -49,9 +45,18 @@ from pylabnet.utils.decorators.dummy_wrapper import dummy_wrap
 
 @dataclass
 class _TriggerCfg:
-    trig_line: str = "PFI0"          # e.g. "PFI0"
+    trig_line: str = "PFI0"          # e.g. "PFI0", "PXI_Trig0"
     edge: Edge = Edge.RISING        # nidaqmx.constants.Edge
-    # Note: trigger_source is compiled as f"/{dev}/{trig_line}"
+
+
+@dataclass
+class _ArmedHandle:
+    """
+    Returned by Driver.arm(). Holds open DAQmx Task objects that must be finalized/closed.
+    """
+    tasks: Dict[str, nidaqmx.Task]
+    compiled: Dict[str, Dict[str, Any]]
+    meta: Dict[str, Any]
 
 
 # -----------------------------
@@ -67,27 +72,17 @@ class Driver:
     - Digital Input (DI)
     - Optional per-subsystem digital start trigger
 
+    NEW:
+    - arm(): compile + create tasks + configure + write buffers + start (arm) tasks, but DO NOT wait/close.
+    - finalize(handle): wait/read/close tasks from an arm() call.
+
     Stack usage example:
 
         dev = Driver("Dev1")
         dev.build_stack()
-
-        # Build AO waveform
         dev.set_ao_voltage("ao0", [0, 1, 0], sample_rate=10000)
-
-        # Build DO waveform (boolean samples)
-        dev.set_do_voltage("port0/line0", [0, 1, 1, 0], sample_rate=10000)
-
-        # Arm AI readback (same sample clock rate implied by sample_rate argument)
-        trace = dev.get_ai_voltage("ai0", num_samples=1000, sample_rate=10000, variable_name="trace")
-
-        # Trigger outputs together
         dev.set_trigger(target="ao", trig_line="PFI0", edge=Edge.RISING)
-        dev.set_trigger(target="do", trig_line="PFI0", edge=Edge.RISING)
-        dev.set_trigger(target="ai", trig_line="PFI0", edge=Edge.RISING)
-
         out = dev.execute()
-        data = out["trace"]
     """
 
     STACK_KEYS = ("ao", "ai", "do", "di")
@@ -97,8 +92,12 @@ class Driver:
         self.log = LogHandler(logger=logger)
         self.dummy = dummy
 
+        # Defaults used inside _compile_stacks and _cfg_timing_if_needed
         self.default_clock_source = "/PXI1Slot2_1/PFI0"
-        self.default_start_trigger = "/PXI1Slot2_1/PFI1"
+        # NOTE: APFI0 is not a digital trigger terminal. Kept for compatibility with your existing file,
+        # but NOT used by _cfg_trigger_if_needed (which uses set_trigger()).
+        self.default_start_trigger = "/PXI1Slot2_1/APFI0"
+        self.not_OPX_clock = False
 
         # Try to get info of DAQ device to verify connection
         try:
@@ -110,18 +109,10 @@ class Driver:
                     product_type=ni_daq_device.product_type
                 )
             )
-
-        # If failed, provide info about connected DAQs
         except (nidaqmx.DaqError, OSError):
-
-            # Log exception message
-
-            # - get names of all connected NI DAQs
             try:
                 ni_daqs_names = nidaqmx.system._collections.device_collection.\
                     DeviceCollection().device_names
-
-                # - exception message
                 self.log.error(
                     "NI DAQ card {} not found. \n"
                     "There are {} NI DAQs available: \n "
@@ -132,12 +123,12 @@ class Driver:
                         ni_daqs_names
                     )
                 )
-            except:
-                self.log.error('No NI modules found')
+            except Exception:
+                self.log.error("No NI modules found")
             if self.dummy:
-                self.log.info('Entering dummy mode instead')
+                self.log.info("Entering dummy mode instead")
 
-        # Timed counters are left as-is from prior driver
+        # Timed counters (unchanged)
         self.counters: Dict[str, TimedCounter] = {}
 
         # Stack mode control
@@ -153,6 +144,8 @@ class Driver:
     # ---------------------------------------------------------------------
     # Stack control
     # ---------------------------------------------------------------------
+    def not_use_OPX_clock(self):
+        self.not_OPX_clock = True
 
     def build_stack(self) -> None:
         """Enable stack mode and clear existing stacks + triggers."""
@@ -183,7 +176,7 @@ class Driver:
         Define a digital edge start trigger for a given subsystem task.
 
         :param target: one of "ao", "ai", "do", "di"
-        :param trig_line: e.g. "PFI0"
+        :param trig_line: e.g. "PFI0", "PXI_Trig0"
         :param edge: nidaqmx.constants.Edge.RISING / FALLING
         """
         if target not in self._triggers:
@@ -193,7 +186,8 @@ class Driver:
         if self.adding_to_stack:
             # Record as metadata op so "stack replay" captures intent
             self._append(target, ["trigger", trig_line, edge])
-        # Always set effective trigger config (so immediate use also works if desired)
+
+        # Always set effective trigger config
         self._triggers[target] = cfg
 
     # ---------------------------------------------------------------------
@@ -211,14 +205,6 @@ class Driver:
     ) -> None:
         """
         Queue or immediately output analog voltage(s).
-
-        If voltages is a sequence, it is treated as a finite waveform to be clocked at sample_rate.
-        If voltages is a scalar, it is treated as a single-sample write (1 sample).
-
-        :param ao_channel: e.g. "ao0"
-        :param voltages: scalar or list/np.array
-        :param sample_rate: required for multi-sample waveforms; optional for scalar
-        :param max_range: reserved; used when creating channels on some devices
         """
         if self.adding_to_stack:
             self._append("ao", ["ao_write", ao_channel, _to_1d_array(voltages), sample_rate, max_range])
@@ -234,15 +220,7 @@ class Driver:
     ) -> None:
         """
         Queue or immediately output digital value(s).
-
-        If value is a sequence, it is treated as a finite waveform of booleans clocked at sample_rate.
-        If value is scalar, it is treated as a single-sample write.
-
-        :param do_channel: preferred "port0/line0", OR "dioX" where X is an integer (e.g. "dio18")
-        :param value: bool/int or list thereof
-        :param sample_rate: required for multi-sample waveforms
         """
-
         # Allow user-friendly "dioX" naming (e.g., "dio0", "DIO18")
         # Maps DIO index -> port{index//8}/line{index%8}
         if isinstance(do_channel, str):
@@ -271,9 +249,6 @@ class Driver:
     ) -> Union[List[float], str]:
         """
         Queue or immediately measure analog input.
-
-        Stack mode returns the label that will be present in execute() output dict.
-        Immediate mode returns the read data.
         """
         if self.adding_to_stack:
             if variable_name is None:
@@ -295,11 +270,6 @@ class Driver:
     ) -> Union[bool, List[bool], str]:
         """
         Queue or immediately measure digital input line(s).
-
-        :param port: e.g. "port0"
-        :param di_channel: e.g. "line1" or "line0:7"
-        :param num_samples: number of samples to read (finite)
-        :param sample_rate: sample rate for finite acquisition
         """
         if self.adding_to_stack:
             if variable_name is None:
@@ -311,103 +281,115 @@ class Driver:
         return self._di_read_now(port, di_channel, num_samples=num_samples, sample_rate=sample_rate)
 
     # ---------------------------------------------------------------------
-    # Execute: compile stacks -> tasks -> run -> return results
+    # NEW: Build tasks helper + arm/finalize API
     # ---------------------------------------------------------------------
 
-    def execute(self) -> Dict[str, Any]:
+    def _build_tasks_from_compiled(
+        self,
+        compiled: Dict[str, Dict[str, Any]],
+    ):
         """
-        Compile each non-empty subsystem stack into one DAQmx Task and execute the full "sequence".
+        Create DAQmx tasks for each non-empty subsystem stack, add channels,
+        configure timing + trigger, and write output buffers (AO/DO) with auto_start=False.
+        Does NOT start tasks and does NOT close tasks.
+        """
+        tasks: Dict[str, nidaqmx.Task] = {}
+        meta: Dict[str, Any] = {"compiled": {}}
 
-        Returns a dict of named readbacks:
-          - AI ops: variable_name -> list[float] (or float if num_samples==1)
-          - DI ops: variable_name -> list[bool] (or bool if num_samples==1)
+        for key in self.STACK_KEYS:
+            info = compiled[key]
+            if not info["ops"]:
+                continue
 
-        Also returns a "_meta" key with a small amount of debug info (channels, lengths, rates).
+            task = nidaqmx.Task()
+            tasks[key] = task
+
+            if key == "ao":
+                for ch in info["channels"]:
+                    task.ao_channels.add_ao_voltage_chan(self._gen_ch_path(ch))
+                self._cfg_timing_if_needed(task, info)
+                _cfg_trigger_if_needed(task, info)
+                if info["write_buffer"] is not None:
+                    task.write(info["write_buffer"], auto_start=False)
+
+            elif key == "do":
+                for ch in info["channels"]:
+                    task.do_channels.add_do_chan(
+                        self._gen_ch_path(ch),
+                        line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE,
+                    )
+                self._cfg_timing_if_needed(task, info)
+                _cfg_trigger_if_needed(task, info)
+                if info["write_buffer"] is not None:
+                    task.write(info["write_buffer"], auto_start=False)
+
+            elif key == "ai":
+                for ch in info["channels"]:
+                    ai = task.ai_channels.add_ai_voltage_chan(self._gen_ch_path(ch))
+                    ai.ai_rng_high = float(info["max_range"])
+                    ai.ai_rng_low = -float(info["max_range"])
+                self._cfg_timing_if_needed(task, info)
+                _cfg_trigger_if_needed(task, info)
+
+            elif key == "di":
+                for ch in info["channels"]:
+                    task.di_channels.add_di_chan(
+                        self._gen_ch_path(ch),
+                        line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE,
+                    )
+                self._cfg_timing_if_needed(task, info)
+                _cfg_trigger_if_needed(task, info)
+
+            meta["compiled"][key] = {
+                "channels": info["channels"],
+                "total_samples": info["total_samples"],
+                "sample_rate": info["sample_rate"],
+                "trigger": info["trigger_source"],
+                "clock_source": info.get("clock_source", None),
+            }
+
+        return tasks, meta
+
+    def arm(self) -> _ArmedHandle:
+        """
+        Compile stacks -> create tasks -> configure -> write buffers -> START tasks (arm them).
+        Does NOT wait for completion and does NOT close tasks.
         """
         # Leave stack mode
         self.adding_to_stack = False
 
-        # Pre-parse stacks into per-subsystem "compiled" intent
         compiled = self._compile_stacks(self.stacks, self._triggers, dev=self.dev, log=self.log)
 
-        # If nothing to do, clear and return
         if not any(compiled[k]["ops"] for k in self.STACK_KEYS):
             self.clear_stack()
-            return {}
+            return _ArmedHandle(tasks={}, compiled=compiled, meta={"compiled": {}})
 
-        tasks: Dict[str, nidaqmx.Task] = {}
+        tasks, meta = self._build_tasks_from_compiled(compiled)
+
+        # Start order: inputs first, then outputs (same intention as before)
+        start_order = [k for k in ("ai", "di", "ao", "do") if k in tasks]
+        for k in start_order:
+            tasks[k].start()
+
+        return _ArmedHandle(tasks=tasks, compiled=compiled, meta=meta)
+
+    def finalize(
+        self,
+        handle: _ArmedHandle,
+        *,
+        timeout: float = 30.0,
+        close: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Wait for tasks to complete, read AI/DI, then stop/close tasks (default).
+        Returns outputs + _meta.
+        """
+        tasks = handle.tasks
+        compiled = handle.compiled
         outputs: Dict[str, Any] = {}
-        meta: Dict[str, Any] = {"compiled": {}}
 
         try:
-            # 1) Create tasks, add channels, configure timing + triggers
-            for key in self.STACK_KEYS:
-                info = compiled[key]
-                if not info["ops"]:
-                    continue
-
-                task = nidaqmx.Task()
-                tasks[key] = task
-
-                if key == "ao":
-                    for ch in info["channels"]:
-                        task.ao_channels.add_ao_voltage_chan(self._gen_ch_path(ch))
-                    self._cfg_timing_if_needed(task, info)
-                    _cfg_trigger_if_needed(task, info)
-
-                    # Write concatenated buffer (if present)
-                    if info["write_buffer"] is not None:
-                        task.write(info["write_buffer"], auto_start=False)
-
-                elif key == "do":
-                    for ch in info["channels"]:
-                        task.do_channels.add_do_chan(
-                            self._gen_ch_path(ch),
-                            line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE,
-                        )
-                    self._cfg_timing_if_needed(task, info)
-                    _cfg_trigger_if_needed(task, info)
-                    if info["write_buffer"] is not None:
-                        task.write(info["write_buffer"], auto_start=False)
-
-                elif key == "ai":
-                    for ch in info["channels"]:
-                        ai = task.ai_channels.add_ai_voltage_chan(self._gen_ch_path(ch))
-                        # Range per-read op may differ; choose conservative max_range
-                        ai.ai_rng_high = float(info["max_range"])
-                        ai.ai_rng_low = -float(info["max_range"])
-                    self._cfg_timing_if_needed(task, info)
-                    _cfg_trigger_if_needed(task, info)
-
-                elif key == "di":
-                    for ch in info["channels"]:
-                        task.di_channels.add_di_chan(
-                            self._gen_ch_path(ch),
-                            line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE,
-                        )
-                    self._cfg_timing_if_needed(task, info)
-                    _cfg_trigger_if_needed(task, info)
-
-                meta["compiled"][key] = {
-                    "channels": info["channels"],
-                    "total_samples": info["total_samples"],
-                    "sample_rate": info["sample_rate"],
-                    "trigger": info["trigger_source"],
-                }
-
-            # 2) Start tasks. Generally: start inputs first if they are triggered by outputs?
-            #    With digital start triggers, order is less critical, but a safe pattern is:
-            #       - Start inputs first (they arm and wait)
-            #       - Start outputs last (they may generate the trigger elsewhere)
-            #
-            #    However, if your trigger comes from an external source, any order works.
-            start_order = [k for k in ("ai", "di", "ao", "do") if k in tasks]
-
-            for k in start_order:
-                tasks[k].start()
-
-            # 3) If there are input tasks, block until done and read buffers
-            #    Use task.read and then slice results per op.
+            # Read inputs (blocks until total_samples are available)
             if "ai" in tasks:
                 info = compiled["ai"]
                 raw = tasks["ai"].read(number_of_samples_per_channel=info["total_samples"])
@@ -418,34 +400,42 @@ class Driver:
                 raw = tasks["di"].read(number_of_samples_per_channel=info["total_samples"])
                 outputs.update(_split_di_results(raw, info))
 
-            # 4) Wait for output tasks to complete if finite
+            # Wait for finite outputs
             for k in ("ao", "do"):
                 if k in tasks:
-                    # With finite sample clocks, readback isn't needed; wait until done.
-                    # DAQmx doesn't provide a universal "wait until done" across all tasks,
-                    # but .wait_until_done exists.
+                    tasks[k].wait_until_done(timeout=timeout)
+
+        finally:
+            if close:
+                for t in tasks.values():
                     try:
-                        tasks[k].wait_until_done(timeout=10.0)
+                        t.stop()
+                    except Exception:
+                        pass
+                    try:
+                        t.close()
                     except Exception:
                         pass
 
-        finally:
-            # Close tasks
-            for t in tasks.values():
-                try:
-                    t.stop()
-                except Exception:
-                    pass
-                try:
-                    t.close()
-                except Exception:
-                    pass
+                self.clear_stack()
 
-            # Clear stacks after execution
-            self.clear_stack()
-
-        outputs["_meta"] = meta
+        outputs["_meta"] = handle.meta
         return outputs
+
+    # ---------------------------------------------------------------------
+    # Execute: compile stacks -> tasks -> run -> return results
+    # (kept for backwards compatibility; now implemented via arm()+finalize())
+    # ---------------------------------------------------------------------
+
+    def execute(self) -> Dict[str, Any]:
+        """
+        Backwards-compatible synchronous execution:
+          arm() -> finalize()
+        """
+        h = self.arm()
+        if not h.tasks:
+            return {}
+        return self.finalize(h, timeout=10.0, close=True)
 
     # ---------------------------------------------------------------------
     # Immediate-mode helpers (single task each call)
@@ -586,45 +576,41 @@ class Driver:
     def close_timed_counter(self, name): self.counters[name].close()
     def get_count(self, name): return int(self.counters[name].count)
 
+    # ---------------------------------------------------------------------
+    # Compiler + timing config (unchanged except kept as in your original)
+    # ---------------------------------------------------------------------
+
     def _compile_stacks(self, stacks: Dict[str, List[list]], triggers: Dict[str, Optional[_TriggerCfg]], *, dev: str, log: LogHandler) -> Dict[str, Dict[str, Any]]:
         """
-        Turn stacks into compiled per-subsystem plan:
-        - channels involved
-        - concatenated write buffers (AO/DO)
-        - total_samples + sample_rate (AI/DI and waveform outputs)
-        - per-op slicing plan for reads
-        - trigger source (if configured)
+        Turn stacks into compiled per-subsystem plan.
         """
         compiled: Dict[str, Dict[str, Any]] = {}
 
         for key in Driver.STACK_KEYS:
             ops = stacks.get(key, [])
-            # Extract effective trigger (either via set_trigger or "trigger" ops)
             trig_cfg = triggers.get(key, None)
             for op in ops:
                 if op and op[0] == "trigger":
-                    # op = ["trigger", trig_line, edge]
                     trig_cfg = _TriggerCfg(trig_line=op[1], edge=op[2])
 
             info: Dict[str, Any] = {
                 "ops": ops,
                 "channels": [],
-                "sample_rate": None,     # float or None
-                "total_samples": 0,      # int
-                "write_buffer": None,    # AO/DO: list or list-of-lists
-                "read_plan": [],         # AI/DI: list of dict segments with variable_name, nsamps
-                "max_range": 10.0,       # AI only
+                "sample_rate": None,
+                "total_samples": 0,
+                "write_buffer": None,
+                "read_plan": [],
+                "max_range": 10.0,
                 "trigger_cfg": trig_cfg,
                 "trigger_source": None,
                 "clock_source": self.default_clock_source,
-                "start_trigger": self.default_start_trigger
+                "start_trigger": self.default_start_trigger,
             }
 
             if trig_cfg is not None:
                 info["trigger_source"] = f"/{dev}/{trig_cfg.trig_line}"
 
             if key == "ao":
-                # ops: ["ao_write", ao_channel, buf(np array), sample_rate, max_range]
                 channels: List[str] = []
                 per_chan_buffers: Dict[str, List[float]] = {}
                 sample_rate: Optional[float] = None
@@ -649,11 +635,9 @@ class Driver:
                             sample_rate = float(sr)
                         elif abs(sample_rate - float(sr)) > 1e-9:
                             raise ValueError("All AO waveform ops must share the same sample_rate in a single execute().")
-                    # Append samples
                     per_chan_buffers[ch].extend(buf.tolist())
                     total_samples = max(total_samples, len(per_chan_buffers[ch]))
 
-                # Pad shorter channels with last value or zeros to match total_samples
                 for ch in channels:
                     buf_list = per_chan_buffers[ch]
                     if len(buf_list) == 0:
@@ -663,9 +647,6 @@ class Driver:
                         buf_list.extend([pad_val] * (total_samples - len(buf_list)))
                     per_chan_buffers[ch] = buf_list
 
-                # Prepare DAQmx write buffer:
-                # - If one channel: list[float]
-                # - If multiple: list[list[float]] where each inner list is per-channel samples
                 write_buffer = None
                 if channels:
                     write_buffer = [per_chan_buffers[ch] for ch in channels]
@@ -680,7 +661,6 @@ class Driver:
                 })
 
             elif key == "do":
-                # ops: ["do_write", do_channel, buf(bool array), sample_rate]
                 channels: List[str] = []
                 per_chan_buffers: Dict[str, List[bool]] = {}
                 sample_rate: Optional[float] = None
@@ -731,7 +711,6 @@ class Driver:
                 })
 
             elif key == "ai":
-                # ops: ["ai_read", var, ai_channel, num_samples, max_range, sample_rate]
                 channels: List[str] = []
                 read_plan: List[dict] = []
                 sample_rate: Optional[float] = None
@@ -759,7 +738,6 @@ class Driver:
                         raise ValueError("All AI ops must share the same sample_rate in a single execute().")
 
                     max_range = max(max_range, mr)
-
                     read_plan.append({"var": var, "ns": ns})
                     total_samples += ns
 
@@ -772,7 +750,6 @@ class Driver:
                 })
 
             elif key == "di":
-                # ops: ["di_read", var, port, di_channel, num_samples, sample_rate]
                 channels: List[str] = []
                 read_plan: List[dict] = []
                 sample_rate: Optional[float] = None
@@ -817,26 +794,30 @@ class Driver:
     def _cfg_timing_if_needed(self, task, info):
         N = int(info.get("total_samples", 0))
         fs = info.get("sample_rate", None)
-
         if N <= 1:
             return
         if fs is None:
             raise ValueError("sample_rate required for buffered timing")
 
         kwargs = dict(
-            rate=float(fs),                    # still required
+            rate=float(fs),
             sample_mode=AcquisitionType.FINITE,
             samps_per_chan=N,
         )
 
-        if self.dev == "PXI1Slot2_1":
-            clk = info.get("clock_source", None)   # NEW
-            kwargs["source"] = clk             # e.g. "/Dev1/PFI1"
-            task.timing.cfg_samp_clk_timing(**kwargs)
-            task.export_signals.samp_clk_output_term = "/PXI1Slot2_1/PXI_Trig0"
+        if not self.not_OPX_clock:
 
+            if self.dev == "PXI1Slot2_1":
+                clk = info.get("clock_source", None)   # e.g. "/PXI1Slot2_1/PFI0"
+                kwargs["source"] = clk
+                task.timing.cfg_samp_clk_timing(**kwargs)
+                # Export sample clock onto chassis backplane
+                task.export_signals.samp_clk_output_term = "/PXI1Slot2_1/PXI_Trig0"
+            else:
+                # Consume backplane clock
+                kwargs["source"] = f"/{self.dev}/PXI_Trig0"
+                task.timing.cfg_samp_clk_timing(**kwargs)
         else:
-            kwargs["source"] = f"/{self.dev}/PXI_Trig0"
             task.timing.cfg_samp_clk_timing(**kwargs)
 
     def _cfg_start_trigger(task, info):
@@ -866,33 +847,6 @@ def _to_bool_array(x: Union[bool, int, Sequence[Union[bool, int]]]) -> np.ndarra
     return arr
 
 
-# def _cfg_timing_if_needed(task: nidaqmx.Task, info: Dict[str, Any]) -> None:
-#     """
-#     Configure sample clock timing for finite operations when total_samples>1.
-#     For AO/DO: total_samples comes from waveform length.
-#     For AI/DI: total_samples comes from concatenated read length.
-#     """
-#     total_samples = int(info.get("total_samples") or 0)
-#     sample_rate = info.get("sample_rate", None)
-
-#     # No timing required for 0 or 1 samples (on-demand)
-#     if total_samples >= 1 and sample_rate is not None:
-#         task.timing.cfg_samp_clk_timing(
-#             rate=sample_rate,
-#             sample_mode=AcquisitionType.FINITE,
-#             samps_per_chan=total_samples
-#         )
-
-#     if sample_rate is None:
-#         raise ValueError("sample_rate must be defined for finite (multi-sample) task timing.")
-
-#     task.timing.cfg_samp_clk_timing(
-#         rate=float(sample_rate),
-#         sample_mode=AcquisitionType.FINITE,
-#         samps_per_chan=total_samples,
-#     )
-
-
 def _cfg_trigger_if_needed(task: nidaqmx.Task, info: Dict[str, Any]) -> None:
     cfg: Optional[_TriggerCfg] = info.get("trigger_cfg", None)
     if cfg is None:
@@ -904,19 +858,11 @@ def _cfg_trigger_if_needed(task: nidaqmx.Task, info: Dict[str, Any]) -> None:
 
 
 def _split_ai_results(raw: Any, info: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Split concatenated AI read buffer into per-op results.
-
-    DAQmx task.read return types:
-    - 1 channel: list[float] length N
-    - multi-channel: list[list[float]] shape (nch, N)
-    """
     plan = info["read_plan"]
     if not plan:
         return {}
 
     channels = info["channels"]
-    # Normalize raw -> np array shape (nch, N)
     if len(channels) == 1:
         arr = np.asarray(raw, dtype=float).reshape(1, -1)
     else:
@@ -932,9 +878,6 @@ def _split_ai_results(raw: Any, info: Dict[str, Any]) -> Dict[str, Any]:
         block = arr[:, cursor:cursor + ns]
         cursor += ns
 
-        # Output format:
-        # - single channel: list[float] or float if ns==1
-        # - multi-channel: dict mapping channel->list[float]/float
         if arr.shape[0] == 1:
             data = block.reshape(-1).tolist()
             out[var] = data[0] if ns == 1 else data
@@ -949,22 +892,12 @@ def _split_ai_results(raw: Any, info: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _split_di_results(raw: Any, info: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Split concatenated DI reads into per-op results.
-
-    DAQmx read for DI often returns:
-    - single line: bool if 1 sample, or list[bool] for N
-    - multi-line: list[list[bool]]
-
-    We normalize similarly to AI.
-    """
     plan = info["read_plan"]
     if not plan:
         return {}
 
     channels = info["channels"]
 
-    # Normalize raw to array shape (nch, N)
     if len(channels) == 1:
         if isinstance(raw, (bool, np.bool_)):
             arr = np.asarray([raw], dtype=np.bool_).reshape(1, 1)
