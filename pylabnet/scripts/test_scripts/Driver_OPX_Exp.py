@@ -97,4 +97,4 @@ def experiment(**kwargs):
             # rolling_dataset.set_children_data()
 
         # A short pause to control the plot update rate
-        time.sleep(0.02)
+        time.sleep(0.5)

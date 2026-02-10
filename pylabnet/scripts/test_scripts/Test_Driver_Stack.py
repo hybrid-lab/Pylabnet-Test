@@ -80,9 +80,9 @@ def experiment(**kwargs):
     while thread.running:
         c = dataset.OPX_client
         c.build_stack()
-        with c.for_("i", 0, 10, 1):
-            c.get_ai_voltage(length=500, ai_channel=1, ao_channel=1) # DO NOT MEASURE DIGITAL PULSE DIRECTLY
-            c.set_ao_voltage(length=300, pulse="const", amplitude=0.4, ao_channel=3, frequency=50)
+        with c.for_("i", 0, 1000000, 1):
+            # c.get_ai_voltage(length=500, ai_channel=1, ao_channel=1) # DO NOT MEASURE DIGITAL PULSE DIRECTLY
+            c.set_ao_voltage(length=3000, pulse="const", amplitude=0.4, ao_channel=3, frequency=50)
 
         # with c.if_gt("I0", -0.041248):
         #     c.get_ai_voltage(length=500, amplitude=0.4, ao_channel=2, ai_channel=2, frequency=0)
@@ -115,21 +115,21 @@ def experiment(**kwargs):
 
             # Extract the measurement values (first element of each tuple)
             measurements = [item[1] for item in data_batch['raw_adc_1_in1']]
-            i = 2
-            measurements2 = None
+            # i = 2
+            # measurements2 = None
 
-            while True:
-                key = f'raw_adc_{i}_in2'
-                if key in data_batch and len(data_batch[key]) > 0:
-                    measurements2 = [item[1] for item in data_batch[key]]
-                    break
-                i += 1
+            # while True:
+            #     key = f'raw_adc_{i}_in2'
+            #     if key in data_batch and len(data_batch[key]) > 0:
+            #         measurements2 = [item[1] for item in data_batch[key]]
+            #         break
+            #     i += 1
 
-                # safety stop (optional)
-                if i > 20:
-                    raise KeyError("No raw_adc_*_in2 key found in data_batch")
+            #     # safety stop (optional)
+            #     if i > 20:
+            #         raise KeyError("No raw_adc_*_in2 key found in data_batch")
 
-            I_value = data_batch["I0"]
+            # I_value = data_batch["I0"]
 
             # dataset.log.error(f"measurements: {measurements}")
 
@@ -137,14 +137,14 @@ def experiment(**kwargs):
             avg_value = np.mean(measurements)
 
             dataset.set_data(np.asarray(measurements))
-            dataset.children["Dependent Pulse"].set_data(np.asarray(measurements2))
-            dataset.children["I0 Value"].set_data(I_value)
+            # dataset.children["Dependent Pulse"].set_data(np.asarray(measurements2))
+            # dataset.children["I0 Value"].set_data(I_value)
             # dataset.set_data(avg_value)
             # rolling_dataset = dataset.children['Real-time ADC']
             # rolling_dataset.set_children_data()
 
         # A short pause to control the plot update rate
-        time.sleep(dataset.get_input_parameter('take_data_rate'))
+        time.sleep(4)
 
 
 def custom_body(q, cfg):

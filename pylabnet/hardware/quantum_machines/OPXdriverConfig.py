@@ -18,7 +18,7 @@ u = unit(coerce_to_integer=True)
 ######################
 # Network parameters #
 ######################
-qop_ip = "192.168.88.251"
+qop_ip = "192.168.88.253"
 cluster_name = "Cluster_1"
 
 #############
@@ -104,7 +104,7 @@ square_amp_single = 0.1   # Volts
 set_length_single = 100
 zero_pulse_single = [0.3] * set_length_single
 
-on_len = 320  # ns
+on_len = 1000  # ns
 IF = 0
 
 ################

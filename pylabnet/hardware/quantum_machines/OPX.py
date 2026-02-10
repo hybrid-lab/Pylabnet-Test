@@ -32,7 +32,7 @@ class Driver:
         self.dummy = dummy
         self.elem_counters = defaultdict(int) #can this list be in the config?
         self.elems = [] #can this list be in the config?
-        self.qop_ip = "192.168.88.251"
+        self.qop_ip = "192.168.88.253"
         self.cluster_name = "Cluster_1"
 
         self.qmm = QuantumMachinesManager(host=self.qop_ip, cluster_name=self.cluster_name)
@@ -747,7 +747,7 @@ class Driver:
             },
             "digital_marker": "ON",
         }
-        with open("C:/Users/hybri/pylabnet/config_dump.txt", "w") as f:
+        with open("C:/Users/User/pylabnet/config_dump.txt", "w") as f:
             f.write(json.dumps(config, indent=2, default=str))
 
         return elem_name
