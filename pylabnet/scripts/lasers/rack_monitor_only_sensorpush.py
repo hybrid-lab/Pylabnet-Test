@@ -10,6 +10,8 @@ from pylabnet.utils.logging.logger import LogClient, LogHandler
 import numpy as np
 import pickle
 import pyqtgraph as pg
+import matplotlib.dates as mdates
+import pytz
 
 TEMP_INDEX = 0
 HUMIDITY_INDEX = 1
@@ -18,7 +20,7 @@ HUMIDITY_INDEX = 1
 class RackMonitor:
     """ A script class for monitoring laser rack conditions and locking lasers based on the wavemeter """
 
-    def __init__(self, sensorpush_client, logger_client, gui='rack_monitor_v1', display_pts=500, port=None):
+    def __init__(self, sensorpush_client, logger_client, gui='rack_monitor_v1', display_pts=1000, port=None):
         """ Instantiates WlmMonitor script object for monitoring wavemeter
 
         :param sensorpush_client: (obj) instance of sensorpush client
@@ -72,14 +74,17 @@ class RackMonitor:
         Should only be called in the beginning of channel use to assign physical GUI widgets
         """
         self.sensor.initialize(self.display_pts)
+        axis = pg.DateAxisItem(orientation='bottom')
 
         # Create curves
         # temperature
+        self.widgets['graph'][TEMP_INDEX].setAxisItems({'bottom': axis})
         self.widgets['curve'].append(self.widgets['graph'][TEMP_INDEX].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
 
         # humidity
+        self.widgets['graph'][HUMIDITY_INDEX].setAxisItems({'bottom': axis})
         self.widgets['curve'].append(self.widgets['graph'][HUMIDITY_INDEX].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
@@ -95,9 +100,7 @@ class RackMonitor:
         humidity = self.sensorpush_client.get_humidity()
         self.sensor.update(time, temp, humidity)
 
-        #TODO: error sending datetime object as x-axis --> pull out hour and/or minute
-        #completely cursed, but time will be graphed as 'hour.(minute*60/100)' --> days loop around
-        times = [t.hour + (t.minute / 60) for t in self.sensor.time]
+        times = [t.timestamp() for t in self.sensor.time]
 
         # Update temperature
         self.widgets['curve'][TEMP_INDEX].setData(x=times, y=self.sensor.temp)
