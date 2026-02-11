@@ -20,7 +20,7 @@ HUMIDITY_INDEX = 1
 class RackMonitor:
     """ A script class for monitoring laser rack conditions and locking lasers based on the wavemeter """
 
-    def __init__(self, sensorpush_client, logger_client, gui='rack_monitor_v1', display_pts=1000, port=None):
+    def __init__(self, sensorpush_client, ni_client, logger_client, gui='rack_monitor_1lasers', display_pts=1000, port=None):
         """ Instantiates WlmMonitor script object for monitoring wavemeter
 
         :param sensorpush_client: (obj) instance of sensorpush client
@@ -31,6 +31,7 @@ class RackMonitor:
         """
 
         self.sensorpush_client = sensorpush_client
+        self.ni_client = ni_client
         self.display_pts = display_pts
         self.log = LogHandler(logger_client)
 
@@ -47,7 +48,7 @@ class RackMonitor:
 
         self.widgets = get_gui_widgets(
             gui=self.gui,
-            temp=1, humidity=1, graph=2
+            temp=1, humidity=1, voltage=1, graph=3, reset=3
         )
 
         # Configure plots
@@ -55,7 +56,8 @@ class RackMonitor:
         self.widgets['curve'] = []
 
         self.sensor = Sensor(self.sensorpush_client, log=self.log)
-        self._initialize_sensor()
+        self._initialize_sensor(TEMP_INDEX)
+        self._initialize_sensor(HUMIDITY_INDEX)
 
     def run(self):
         """Runs the WlmMonitor
@@ -66,9 +68,14 @@ class RackMonitor:
         self._update_sensor()
         self.gui.force_update()
 
+    def reset(self, plot_index):
+        """resets the plot back to initial framing"""
+
+        self.widgets['graph'][plot_index].getPlotItem().enableAutoRange(axis='xy', enable=True)
+
     # Technical methods
 
-    def _initialize_sensor(self):
+    def _initialize_sensor(self, index):
         """Initializes a channel and outputs to the GUI
 
         Should only be called in the beginning of channel use to assign physical GUI widgets
@@ -77,18 +84,14 @@ class RackMonitor:
 
         # Create curves
         # temperature
-        axis1 = pg.DateAxisItem(orientation='bottom')
-        self.widgets['graph'][TEMP_INDEX].setAxisItems({'bottom': axis1})
-        self.widgets['curve'].append(self.widgets['graph'][TEMP_INDEX].plot(
+        axis = pg.DateAxisItem(orientation='bottom')
+        self.widgets['graph'][index].setAxisItems({'bottom': axis})
+        self.widgets['curve'].append(self.widgets['graph'][index].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
-
-        # humidity
-        axis2 = pg.DateAxisItem(orientation='bottom')
-        self.widgets['graph'][HUMIDITY_INDEX].setAxisItems({'bottom': axis2})
-        self.widgets['curve'].append(self.widgets['graph'][HUMIDITY_INDEX].plot(
-            pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
-        ))
+        self.widgets['reset'][index].clicked.connect(
+            lambda: self.reset(index)
+        )
 
     def _update_sensor(self):
         """ Updates all channels + displays
@@ -122,6 +125,9 @@ class RackMonitor:
 
     def get_humidity(self):
         return self.sensorpush_client.get_humidity()
+
+    def get_voltage(self):
+        return self.ni_client.get_ai_voltage(ai_channel="ai0")
 
 
 class Service(ServiceBase):
@@ -237,6 +243,43 @@ class Sensor:
             self.temp = np.append(temp, self.temp[:-1])
             self.humidity = np.append(humidity, self.humidity[:-1])
             self.count = 0
+
+
+class NI_channel:
+    """Object containing all information regarding a single NI Channel"""
+
+    def __init__(self, NI_client=None, log: LogHandler = None):
+        """
+        Initializes all parameters given, sets others to default. Also sets up some defaults + placeholders for data
+
+        :param sensor_client: Sensorpush client object
+        :param log: (LogHandler) instance of LogHandler for logging metadata
+        """
+
+        # Set channel parameters to default values
+        self.NI_client = NI_client
+        self.log = log
+        self.labels_updated = False  # Flag to check if we have updated all labels
+
+        # Initialize relevant placeholders
+        self.data = np.array([])
+
+    def initialize(self, display_pts=720):
+        """
+        Initializes the channel based on the current value
+
+        :param display_pts: number of points to display on the plot
+        """
+        if self.NI_client != None:
+            self.data = self.NI_client.get_ai_voltage(ai_channel="ai0", num_samples=display_pts, sample_rate=1000)
+
+    def update(self, new_data):
+        """
+        Updates the data
+
+        :param value: (float) current value
+        """
+        self.data = np.append(self.data[1:], new_data)
 
 
 def launch(**kwargs):
