@@ -264,7 +264,7 @@
          <string notr="true"/>
         </property>
         <property name="title">
-         <string>Plot 1</string>
+         <string>Laser 1</string>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_3">
          <item>
@@ -277,12 +277,12 @@
               </font>
              </property>
              <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Frequency&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Voltage&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QDoubleSpinBox" name="freq_2">
+            <widget class="QDoubleSpinBox" name="voltage">
              <property name="font">
               <font>
                <pointsize>16</pointsize>
@@ -321,115 +321,29 @@
             </widget>
            </item>
            <item>
-            <widget class="QLabel" name="label_6">
+            <widget class="QPushButton" name="reset_3">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>150</width>
+               <height>33</height>
+              </size>
+             </property>
              <property name="font">
               <font>
                <pointsize>12</pointsize>
               </font>
              </property>
-             <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:16pt;&quot;&gt;Setpoint&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QDoubleSpinBox" name="sp_2">
-             <property name="font">
-              <font>
-               <pointsize>16</pointsize>
-              </font>
-             </property>
-             <property name="styleSheet">
-              <string notr="true"/>
-             </property>
-             <property name="frame">
-              <bool>false</bool>
-             </property>
-             <property name="buttonSymbols">
-              <enum>QAbstractSpinBox::NoButtons</enum>
-             </property>
-             <property name="accelerated">
-              <bool>false</bool>
-             </property>
-             <property name="correctionMode">
-              <enum>QAbstractSpinBox::CorrectToNearestValue</enum>
-             </property>
-             <property name="keyboardTracking">
-              <bool>false</bool>
-             </property>
-             <property name="decimals">
-              <number>6</number>
-             </property>
-             <property name="minimum">
-              <double>-1000.000000000000000</double>
-             </property>
-             <property name="maximum">
-              <double>1000.000000000000000</double>
-             </property>
-             <property name="singleStep">
-              <double>0.000010000000000</double>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="rs_2">
              <property name="styleSheet">
               <string notr="true"/>
              </property>
              <property name="text">
-              <string>Set to frequency</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="lock_2">
-             <property name="font">
-              <font>
-               <pointsize>14</pointsize>
-              </font>
-             </property>
-             <property name="styleSheet">
-              <string notr="true"/>
-             </property>
-             <property name="text">
-              <string>Lock Active</string>
-             </property>
-             <property name="icon">
-              <iconset>
-               <normaloff>green_LED_off.svg</normaloff>
-               <normalon>green_LED_on.svg</normalon>green_LED_off.svg</iconset>
-             </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
-             <property name="checked">
-              <bool>false</bool>
-             </property>
-             <property name="autoExclusive">
-              <bool>false</bool>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="error_status_2">
-             <property name="font">
-              <font>
-               <pointsize>14</pointsize>
-              </font>
-             </property>
-             <property name="text">
-              <string>Lock Error</string>
-             </property>
-             <property name="icon">
-              <iconset>
-               <normaloff>red_LED_off.svg</normaloff>
-               <normalon>red_LED_on.svg</normalon>red_LED_off.svg</iconset>
-             </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
-             <property name="autoExclusive">
-              <bool>false</bool>
+              <string>RESET PLOT</string>
              </property>
             </widget>
            </item>
@@ -473,45 +387,6 @@
                <width>200</width>
                <height>16777215</height>
               </size>
-             </property>
-            </widget>
-            <widget class="QPushButton" name="clear_3">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="maximumSize">
-              <size>
-               <width>150</width>
-               <height>33</height>
-              </size>
-             </property>
-             <property name="font">
-              <font>
-               <pointsize>12</pointsize>
-              </font>
-             </property>
-             <property name="styleSheet">
-              <string notr="true"/>
-             </property>
-             <property name="text">
-              <string>CLEAR PLOT</string>
-             </property>
-            </widget>
-            <widget class="QPushButton" name="zero_3">
-             <property name="maximumSize">
-              <size>
-               <width>16777215</width>
-               <height>33</height>
-              </size>
-             </property>
-             <property name="styleSheet">
-              <string notr="true"/>
-             </property>
-             <property name="text">
-              <string>Zero Voltage</string>
              </property>
             </widget>
            </widget>
