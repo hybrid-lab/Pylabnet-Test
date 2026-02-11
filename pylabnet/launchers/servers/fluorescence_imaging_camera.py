@@ -16,7 +16,7 @@ def launch(**kwargs):
 
     ######### DEBUG CODE
     debug_message = f"DEBUG: Port: '{kwargs.get('port')}'\n"
-    with open("c:/users/User/pylabnet/debug_log.txt", "a") as log_file:
+    with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
         log_file.write(debug_message)
     ###############
 

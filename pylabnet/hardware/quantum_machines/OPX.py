@@ -747,7 +747,7 @@ class Driver:
             },
             "digital_marker": "ON",
         }
-        with open("C:/Users/User/pylabnet/config_dump.txt", "w") as f:
+        with open("C:/Users/user/pylabnet/config_dump.txt", "w") as f:
             f.write(json.dumps(config, indent=2, default=str))
 
         return elem_name

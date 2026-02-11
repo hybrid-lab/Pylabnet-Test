@@ -20,7 +20,7 @@ def launch(**kwargs):
     try:
         #########DEBUG CODE
         debug_message = f"DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n "
-        with open("c:/users/User/pylabnet/debug_log.txt", "a") as log_file:
+        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
             log_file.write(debug_message)
         ###############
         ni_driver = nidaqmx_card.Driver(
@@ -31,7 +31,7 @@ def launch(**kwargs):
         try:
             #########DEBUG CODE
             debug_message = f"DEBUG:IT ACUTALLY GOES THROUGH!!!!!!!!!!!!!!!!!!!!!\n "
-            with open("c:/users/User/pylabnet/debug_log.txt", "a") as log_file:
+            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
                 log_file.write(debug_message)
             ###############
             config = load_config(kwargs['config'])
