@@ -5,7 +5,7 @@
             "config" : "Bob"
         }
     ],
-    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\rack_monitor_only_sensorpush.py",
+    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\rack_monitor.py",
     "device_id" : "Bob",
     "script_service" : "True"
 }
