@@ -10,7 +10,7 @@
             "config" : "analog_voltage_output_config"
         }
     ],
-    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\wlm_monitor.py",
+    "script" : "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\lasers\\wlm_monitor.py",
     "device_id" : "PXI1Slot2_1",
     "script_service" : "True",
     "wm_type": [

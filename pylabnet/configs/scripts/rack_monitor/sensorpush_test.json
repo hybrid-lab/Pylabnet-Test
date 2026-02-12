@@ -9,7 +9,7 @@
             "config" : "ni_daq_1"
         }
     ],
-    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\rack_monitor.py",
+    "script" : "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\lasers\\rack_monitor.py",
     "device_id" : "Bob",
     "script_service" : "True",
     "channels" : {

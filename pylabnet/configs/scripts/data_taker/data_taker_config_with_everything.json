@@ -17,8 +17,8 @@
             "config": "bfs_u3_51s5m"
         }
     ],
-    "script": "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\data_center\\take_data.py",
-    "exp_path" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\test_scripts",
+    "script": "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\data_center\\take_data.py",
+    "exp_path" : "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\test_scripts",
     "save_path": "C:\\Data\\Datataker",
     "auto_save": "False"
 }
