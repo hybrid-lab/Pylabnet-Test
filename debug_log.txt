@@ -45847,4 +45847,34 @@ DEBUG: Connection refused ERROR
  DEBUG: STOP 2
  DEBUG: PASSED
 >>>>>>> 496ef4023feea7db591144204237a5d8cef5f030
+ DEBUG:A SERVER IS CREATED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 30245, key: pylabnet.pem
+ DEBUG: Connection params: port: 30245, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Connection refused ERROR
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 46935, key: pylabnet.pem
+ DEBUG: Connection params: port: 46935, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Connection refused ERROR
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 18363, key: pylabnet.pem
+ DEBUG: Connection params: port: 18363, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Connection refused ERROR
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 18363, key: pylabnet.pem
+ DEBUG: Connection params: port: 18363, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 2664, key: pylabnet.pem
+ DEBUG: Connection params: port: 2664, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 18363, key: pylabnet.pem
+ DEBUG: Connection params: port: 18363, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 2664, key: pylabnet.pem
+ DEBUG: Connection params: port: 2664, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG:A SERVER IS CREATED
  
