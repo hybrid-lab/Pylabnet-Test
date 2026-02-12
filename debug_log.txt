@@ -45251,4 +45251,233 @@ DEBUG: Connection refused ERROR
 >>>>>>> 295869ed49980c7aa32e1381a7c386f14ed9c1fa
  DEBUG: STOP 2
  DEBUG: PASSED
+ DEBUG:A SERVER IS CREATED
+ DEBUG:A SERVER IS CREATED
+ DEBUG:A SERVER IS CREATED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 44112, key: pylabnet.pem
+ DEBUG: Connection params: port: 44112, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 5418, key: pylabnet.pem
+ DEBUG: Connection params: port: 5418, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 45885, key: pylabnet.pem
+ DEBUG: Connection params: port: 45885, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 15200, key: pylabnet.pem
+ DEBUG: Connection params: port: 15200, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Port: '15200'
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 17682, key: pylabnet.pem
+ DEBUG: Connection params: port: 17682, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 44112, key: pylabnet.pem
+ DEBUG: Connection params: port: 44112, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 5418, key: pylabnet.pem
+ DEBUG: Connection params: port: 5418, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 45885, key: pylabnet.pem
+ DEBUG: Connection params: port: 45885, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 15200, key: pylabnet.pem
+ DEBUG: Connection params: port: 15200, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 17682, key: pylabnet.pem
+ DEBUG: Connection params: port: 17682, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Connection refused ERROR
+ DEBUG:A SERVER IS CREATED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 35634, key: pylabnet.pem
+ DEBUG: Connection params: port: 35634, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 25539, key: pylabnet.pem
+ DEBUG: Connection params: port: 25539, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 20197, key: pylabnet.pem
+ DEBUG: Connection params: port: 20197, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 27618, key: pylabnet.pem
+ DEBUG: Connection params: port: 27618, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Port: '27618'
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 45957, key: pylabnet.pem
+ DEBUG: Connection params: port: 45957, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 35634, key: pylabnet.pem
+ DEBUG: Connection params: port: 35634, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 25539, key: pylabnet.pem
+ DEBUG: Connection params: port: 25539, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 20197, key: pylabnet.pem
+ DEBUG: Connection params: port: 20197, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 27618, key: pylabnet.pem
+ DEBUG: Connection params: port: 27618, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 35634, key: pylabnet.pem
+ DEBUG: Connection params: port: 35634, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Connection refused ERROR
+ DEBUG:A SERVER IS CREATED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 4812, key: pylabnet.pem
+ DEBUG: Connection params: port: 4812, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 33572, key: pylabnet.pem
+ DEBUG: Connection params: port: 33572, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 29304, key: pylabnet.pem
+ DEBUG: Connection params: port: 29304, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 34636, key: pylabnet.pem
+ DEBUG: Connection params: port: 34636, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Port: '34636'
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 13615, key: pylabnet.pem
+ DEBUG: Connection params: port: 13615, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 4812, key: pylabnet.pem
+ DEBUG: Connection params: port: 4812, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 33572, key: pylabnet.pem
+ DEBUG: Connection params: port: 33572, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 29304, key: pylabnet.pem
+ DEBUG: Connection params: port: 29304, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 34636, key: pylabnet.pem
+ DEBUG: Connection params: port: 34636, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 4812, key: pylabnet.pem
+ DEBUG: Connection params: port: 4812, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Connection refused ERROR
+ DEBUG:A SERVER IS CREATED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 34655, key: pylabnet.pem
+ DEBUG: Connection params: port: 34655, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 16052, key: pylabnet.pem
+ DEBUG: Connection params: port: 16052, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 15092, key: pylabnet.pem
+ DEBUG: Connection params: port: 15092, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 9183, key: pylabnet.pem
+ DEBUG: Connection params: port: 9183, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Port: '9183'
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 23510, key: pylabnet.pem
+ DEBUG: Connection params: port: 23510, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 34655, key: pylabnet.pem
+ DEBUG: Connection params: port: 34655, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 16052, key: pylabnet.pem
+ DEBUG: Connection params: port: 16052, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 15092, key: pylabnet.pem
+ DEBUG: Connection params: port: 15092, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 9183, key: pylabnet.pem
+ DEBUG: Connection params: port: 9183, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 34655, key: pylabnet.pem
+ DEBUG: Connection params: port: 34655, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Connection refused ERROR
+ DEBUG:A SERVER IS CREATED
+ DEBUG:A SERVER IS CREATED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 2664, key: pylabnet.pem
+ DEBUG: Connection params: port: 2664, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 19847, key: pylabnet.pem
+ DEBUG: Connection params: port: 19847, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 35911, key: pylabnet.pem
+ DEBUG: Connection params: port: 35911, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG: HOST IN Client base class: 192.168.0.60, port: 15201, key: pylabnet.pem
+ DEBUG: Connection params: port: 15201, host: 192.168.0.60, key: C:\WINDOWS\System32\pylabnet.pem
+ DEBUG: Port: '15201'
+ DEBUG:A SERVER IS CREATED
+ DEBUG: STOP 2
+ DEBUG: PASSED
+ DEBUG:A SERVER IS CREATED
  

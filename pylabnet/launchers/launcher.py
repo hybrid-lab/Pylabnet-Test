@@ -328,12 +328,18 @@ class Launcher:
             else:
                 self.logger.info(f'No active servers matching module {module_name}'
                                  ' were found. Instantiating a new server.')
+
+                if "port" in config:
+                    server_port = config["port"]
+                else:
+                    server_port = np.random.randint(1024, 49151)
+
                 host, port = launch_device_server(
                     server=module,
                     dev_config=config_name,
                     log_ip=self.log_ip,
                     log_port=self.log_port,
-                    server_port=np.random.randint(1024, 49151),
+                    server_port=server_port,
                     debug=self.server_debug,
                     logger=self.logger
                 )
@@ -383,6 +389,10 @@ class Launcher:
             # If the user's choice did not exist, just launch a new GUI
             except IndexError:
                 self.logger.info('Launching new server')
+                if "port" in config:
+                    server_port = config["port"]
+                else:
+                    server_port = np.random.randint(1024, 49151)
                 host, port = launch_device_server(
                     server=module,
                     dev_config=config_name,
