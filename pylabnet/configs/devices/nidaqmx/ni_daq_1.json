@@ -1,3 +1,10 @@
 {
-    "device_id": "PXI1Slot2_1"
+    "device_id": "PXI1Slot2_1",
+    "ssh_config": {
+        "hostname": "diane\\user",
+        "ip": "192.168.0.60",
+        "LOCALHOST_PW": "mmWave40",
+        "python_path": "Users/user/pylabnet/env/dev/Scripts/python.exe",
+        "script_path": "Users/user/pylabnet/pylabnet/launchers/pylabnet_server.py"
+    }
 }
