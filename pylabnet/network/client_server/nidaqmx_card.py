@@ -243,6 +243,7 @@ class Client(ClientBase):
         Immediate mode: returns list[float] (or float if 1 sample) from server.
         Stack mode (after build_stack): returns a label (str) you can later use in execute() output.
         """
+        print(self._service)
         result_pickle = self._service.exposed_get_ai_voltage(
             ai_channel=ai_channel,
             num_samples=num_samples,

@@ -15,6 +15,8 @@ import pyqtgraph as pg
 import matplotlib.dates as mdates
 import pytz
 
+import tracemalloc
+
 TEMP_INDEX = 0
 HUMIDITY_INDEX = 1
 
@@ -337,6 +339,7 @@ class NI_channel:
 
 def launch(**kwargs):
     """ Launches the rack monitor script """
+    tracemalloc.start()
 
     logger = kwargs['logger']
 
