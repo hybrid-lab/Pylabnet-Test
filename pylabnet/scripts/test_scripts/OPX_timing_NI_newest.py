@@ -1,6 +1,5 @@
 import numpy as np
 import qm
-import time
 
 from qm.qua import infinite_loop_, play, program, wait
 from qm import QuantumMachinesManager
@@ -11,10 +10,10 @@ from pylabnet.hardware.quantum_machines.OPXdriverConfig import config
 # ----------------------------
 # Hardware / experiment params
 # ----------------------------
-ni   = Driver(device_name="PXI1Slot2_1")
+ni = Driver(device_name="PXI1Slot2_1")
 ni_2 = Driver(device_name="PXI1Slot6_1")
 
-ni_ao   = "ao0"
+ni_ao = "ao0"
 ni_2_ao = "ao15"
 
 qop_ip = "192.168.88.253"
@@ -32,7 +31,7 @@ fs = 100000
 ni.build_stack()
 ni.set_ao_voltage(ao_channel=ni_ao, voltages=ramp, sample_rate=fs)
 #ni.not_use_OPX_clock()
-# ni_2.build_stack() 
+# ni_2.build_stack()
 # ni_2.set_ao_voltage(ao_channel=ni_2_ao, voltages=ramp, sample_rate=1000)
 # ni_2.not_use_OPX_clock()
 
@@ -40,7 +39,6 @@ with program() as pulse_train:
     with infinite_loop_():
         play("ON", "generic_di_elem_ch1")
         wait(22500)
-
 qmm = QuantumMachinesManager(host=qop_ip, cluster_name=cluster_name)
 qm = qmm.open_qm(config)
 job = qm.execute(pulse_train)
@@ -49,10 +47,9 @@ job = qm.execute(pulse_train)
 h1 = ni.arm()
 
 
-
-
 out1 = ni.finalize(h1, timeout=60.0)
 # out2 = ni_2.finalize(h2, timeout=60.0)
 
 #print("Slot2 meta:", out1.get("_meta", {}))
 # print("Slot6 meta:", out2.get("_meta", {}))
+print("Finished Running")

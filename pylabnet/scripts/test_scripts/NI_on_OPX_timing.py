@@ -7,7 +7,7 @@ from pylabnet.scripts.data_center.datasets import Dataset, InfiniteRollingLine
 # so EVERYTHING here must be numeric strings.
 INIT_DICT = {
     # OPX clock train
-    "clock_rate_hz": {"OPX clock rate (Hz)": "100000"},     # 100 kHz
+    "DELAY": {"DELAY": "9900"},     # 100 kHz
     "clock_seconds": {"Clock duration (s)": "0.500"},       # 500 ms
 
     # NI ramp
@@ -45,6 +45,7 @@ def configure(**kwargs):
     dataset.NI_client = kwargs["nidaqmx_ni_daq_1"]
     dataset.NI_client2 = kwargs["nidaqmx_ni_daq_3"]
     dataset.OPX_client = kwargs["OPX_OPX"]
+    logger = dataset.log # Get the logger for printing messages
 
     dataset.add_child(
         name="Ramp monitor",
@@ -63,6 +64,7 @@ def experiment(**kwargs):
     opx = dataset.OPX_client
 
     ni_2 = dataset.NI_client2
+    log = dataset.log # Get the logger for printing messages
 
     ni_ao = "ao0"
     ni_2_ao = "ao15"
@@ -71,16 +73,16 @@ def experiment(**kwargs):
     #OPX timing frequency is 10 kHz
     ramp_min = 0
     ramp_max = 3
-    N = 100000
+    N = 1000000
     #ramp = [1] * N
     ramp = np.linspace(ramp_min, ramp_max, N, dtype=np.float64)
     voltages = ramp
-    fs = 100000
+    fs = 1000000
 
     while thread.running:
 
-        # ni.build_stack()
-        # ni.set_ao_voltage(ao_channel=ni_ao, voltages=ramp, sample_rate=fs) #For future, make a set_timing function that will set the timing of a card to be an external clock
+        ni.build_stack()
+        ni.set_ao_voltage(ao_channel=ni_ao, voltages=ramp, sample_rate=fs) #For future, make a set_timing function that will set the timing of a card to be an external clock
 
         # ni_2.build_stack()
         # ni_2.set_ao_voltage(ao_channel=ni_2_ao, voltages=ramp, sample_rate=fs)
@@ -90,18 +92,22 @@ def experiment(**kwargs):
             do_channel=1,
             length=1000
         )
-        opx.set_digital_voltage(
-            element=clock_elem
-        )
-        # with opx.for_("i", 0, N, 1):
-        #     opx.set_digital_voltage(
-        #         element=clock_elem
-        #     )
-        #     opx.delay(99000, elements=[clock_elem])
+        log.error("Check 1")
 
-        # ni.execute()
+        with opx.for_("i", 0, N, 1):
+            opx.set_digital_voltage(
+                element=clock_elem
+            )
+            opx.delay(dataset.get_input_parameter("DELAY"), elements=[clock_elem])
+        log.error("Check 2")
+        h1 = ni.arm()
+        log.error("Check 3")
+
         # ni_2.execute()
         opx.execute()
+        ni.finalize(h1, timeout=120.0)
+
+        log.error("Check 4")
 
         time.sleep(float(dataset.get_input_parameter("take_data_rate")))
         time.sleep(10)

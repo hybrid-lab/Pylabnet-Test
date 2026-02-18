@@ -1,11 +1,5 @@
 import numpy as np
-import qm
-
-from qm.qua import infinite_loop_, play, program, wait
-from qm import QuantumMachinesManager
-
 from pylabnet.hardware.ni_daqs.nidaqmx_card import Driver
-from pylabnet.hardware.quantum_machines.OPXdriverConfig import config
 
 # ----------------------------
 # Hardware / experiment params
@@ -30,4 +24,4 @@ ni_2.not_use_OPX_clock()
 
 
 h2 = ni_2.arm()
-out2 = ni_2.finalize(h2, timeout=60.0)
+out2 = ni_2.finalize(h2, timeout=120.0)

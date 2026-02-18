@@ -1,5 +1,8 @@
 import pickle
+import uuid
 from typing import Any, Dict, Optional
+from rpyc.utils.classic import obtain
+
 
 from pylabnet.network.core.service_base import ServiceBase
 from pylabnet.network.core.client_base import ClientBase
@@ -42,19 +45,34 @@ class Service(ServiceBase):
     """
     RPC wrapper for the NI DAQmx driver.
 
-    Updated to support the new stacked driver interface:
+    Supports the stacked driver interface:
       - build_stack()
       - clear_stack()
       - set_trigger(target="ao"/"ai"/"do"/"di", trig_line="PFI0", edge="rising"/"falling")
-      - execute() -> dict of results
+      - arm() -> returns {"handle_id": str|None, "meta": dict}
+      - finalize(handle_id, timeout=..., close=...) -> dict of results
       - set_ao_voltage(..., sample_rate=..., max_range=...)
       - set_do_voltage(..., sample_rate=...)
       - get_ai_voltage(..., variable_name=...)  (returns label in stack mode, data in immediate mode)
       - get_di_state(..., num_samples=..., sample_rate=..., variable_name=...) (label or data)
 
-    Backward compatibility:
-      - exposed_get_ai_voltage_triggered is kept and implemented using the new stack+trigger flow.
+    Notes:
+      - We intentionally DO NOT expose execute() anymore; the correct multi-device flow is:
+            build_stack()
+            ... queue ops ...
+            handle = arm()
+            ... coordinate with OPX / other devices ...
+            out = finalize(handle)
+
+      - arm() returns a server-side handle token. The actual DAQmx Task objects remain on the server.
     """
+
+    # ---- internal handle registry ----
+    def _handles(self) -> Dict[str, Any]:
+        # ServiceBase may or may not call __init__; store lazily.
+        if not hasattr(self, "_armed_handles"):
+            self._armed_handles = {}
+        return self._armed_handles
 
     # ---- Stack control ----
     def exposed_build_stack(self):
@@ -77,13 +95,67 @@ class Service(ServiceBase):
 
         return self._module.set_trigger(target=target, trig_line=trig_line, edge=edge_enum)
 
-    # ---- Execute ----
-    def exposed_execute(self):
-        out = self._module.execute()
+    # ---- Arm / Finalize ----
+    def exposed_arm(self):
+        """
+        Arms the currently built stack and returns a pickled dict:
+          {"handle_id": <uuid str or None>, "meta": <dict>}
+        """
+        handle = self._module.arm()
+        if not getattr(handle, "tasks", None):
+            payload = {"handle_id": None, "meta": getattr(handle, "meta", {})}
+            return pickle.dumps(payload)
+
+        hid = str(uuid.uuid4())
+        self._handles()[hid] = handle
+        payload = {"handle_id": hid, "meta": getattr(handle, "meta", {})}
+        return pickle.dumps(payload)
+
+    def exposed_finalize(self, handle_id, timeout=60.0, close=True):
+        # Convert RPyC netrefs to local python objects when possible
+        try:
+            handle_id_local = obtain(handle_id)
+        except Exception:
+            handle_id_local = handle_id
+
+        # Accept either:
+        #   - handle_id string
+        #   - the dict returned by arm(): {"handle_id": ..., "meta": ...}
+        if isinstance(handle_id_local, dict):
+            handle_id_local = handle_id_local.get("handle_id", None)
+
+        # If arm() returned None (nothing was armed), just return empty output
+        if handle_id_local is None:
+            return pickle.dumps({})
+
+        handle = self._handles().get(handle_id_local, None)
+        if handle is None:
+            raise KeyError(f"Unknown handle_id: {handle_id_local!r}")
+
+        out = self._module.finalize(handle, timeout=timeout, close=close)
+
+        # If tasks were closed, drop the stored handle
+        if close:
+            self._handles().pop(handle_id_local, None)
+
+        # IMPORTANT: always return pickled bytes to match Client.finalize()
         return pickle.dumps(out)
 
+        # Normal single-handle path (must be hashable)
+        handle = self._handles().get(handle_id_local, None)
+        if handle is None:
+            raise KeyError(f"Unknown handle_id: {handle_id_local!r}")
+
+        return self._module.finalize(handle, timeout=timeout, close=close)
+
     # ---- AO / DO ----
-    def exposed_set_ao_voltage(self, ao_channel: str, voltage_pickle: bytes, sample_rate: Optional[float] = None, max_range: float = 10.0):
+    def exposed_set_ao_voltage(
+        self,
+        ao_channel: str,
+        voltage_pickle: bytes,
+        sample_rate: Optional[float] = None,
+        max_range: float = 10.0,
+    ):
         voltages = pickle.loads(voltage_pickle)
         return self._module.set_ao_voltage(
             ao_channel=ao_channel,
@@ -144,10 +216,11 @@ class Service(ServiceBase):
         sample_rate: float = 100000.0,
         max_range: float = 10.0,
         edge: str = "rising",
+        timeout: float = 30.0,
     ):
         """
         Backward-compatible wrapper using the new stacked API:
-          build_stack -> get_ai_voltage(label) -> set_trigger(target="ai") -> execute -> return label data
+          build_stack -> get_ai_voltage(label) -> set_trigger(target="ai") -> arm -> finalize -> return label data
         """
         edge = _normalize_edge(edge)
 
@@ -167,7 +240,9 @@ class Service(ServiceBase):
             variable_name="ai_triggered",
         )
         self._module.set_trigger(target="ai", trig_line=trig_line, edge=edge_enum)
-        out = self._module.execute()
+
+        handle = self._module.arm()
+        out = self._module.finalize(handle, timeout=timeout, close=True)
         return pickle.dumps(out[label])
 
     # ---- Timed counter passthrough (unchanged) ----
@@ -207,9 +282,26 @@ class Client(ClientBase):
         edge = _normalize_edge(edge)
         return self._service.exposed_set_trigger(target=target, trig_line=trig_line, edge=edge)
 
-    # ---- Execute ----
-    def execute(self) -> Dict[str, Any]:
-        out_pickle = self._service.exposed_execute()
+    # ---- Arm / Finalize ----
+    def arm(self) -> Dict[str, Any]:
+        """
+        Arms the server-side stack. Returns:
+          {"handle_id": str|None, "meta": dict}
+        """
+        payload_pickle = self._service.exposed_arm()
+        return pickle.loads(payload_pickle)
+
+    def finalize(self, handle_id: str, timeout: float = 30.0, close: bool = True) -> Dict[str, Any]:
+        """
+        Finalizes a previously armed handle_id.
+        You may pass either:
+        - handle_id (str), or
+        - the dict returned by arm(): {"handle_id": ..., "meta": ...}
+        """
+        if isinstance(handle_id, dict):
+            handle_id = handle_id.get("handle_id", None)
+
+        out_pickle = self._service.exposed_finalize(handle_id, timeout=timeout, close=close)
         return pickle.loads(out_pickle)
 
     # ---- AO / DO ----
@@ -241,7 +333,7 @@ class Client(ClientBase):
     ):
         """
         Immediate mode: returns list[float] (or float if 1 sample) from server.
-        Stack mode (after build_stack): returns a label (str) you can later use in execute() output.
+        Stack mode (after build_stack): returns a label (str) you can later use in finalize() output.
         """
         result_pickle = self._service.exposed_get_ai_voltage(
             ai_channel=ai_channel,
@@ -262,7 +354,7 @@ class Client(ClientBase):
     ):
         """
         Immediate mode: returns bool or list[bool].
-        Stack mode: returns label (str) to use in execute() output.
+        Stack mode: returns label (str) to use in finalize() output.
         """
         result_pickle = self._service.exposed_get_di_state(
             port=port,
@@ -282,6 +374,7 @@ class Client(ClientBase):
         sample_rate: float = 100000.0,
         max_range: float = 10.0,
         edge: str = "rising",
+        timeout: float = 30.0,
     ):
         """
         Legacy helper retained for old code paths.
@@ -294,6 +387,7 @@ class Client(ClientBase):
             sample_rate=sample_rate,
             max_range=max_range,
             edge=edge,
+            timeout=timeout,
         )
         return pickle.loads(voltages_pickle)
 
