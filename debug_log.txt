@@ -45255,6 +45255,7 @@ DEBUG: Connection refused ERROR
  DEBUG:A SERVER IS CREATED
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
  DEBUG:A SERVER IS CREATED
  DEBUG:A SERVER IS CREATED
  DEBUG: HOST IN Client base class: 192.168.0.60, port: 44112, key: pylabnet.pem
@@ -45878,6 +45879,8 @@ DEBUG: Connection refused ERROR
  DEBUG: STOP 2
  DEBUG: PASSED
  DEBUG:A SERVER IS CREATED
+=======
+>>>>>>> dd62b2ae981a12812cb7b3771e3f798cb6673d0c
 =======
 >>>>>>> dd62b2ae981a12812cb7b3771e3f798cb6673d0c
  
