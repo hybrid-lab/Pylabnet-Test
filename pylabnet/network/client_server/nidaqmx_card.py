@@ -5,6 +5,15 @@ from pylabnet.network.core.service_base import ServiceBase
 from pylabnet.network.core.client_base import ClientBase
 
 
+class _ArmedHandle:
+    """
+    Returned by Driver.arm(). Holds open DAQmx Task objects that must be finalized/closed.
+    """
+    tasks: Dict[str, nidaqmx.Task]
+    compiled: Dict[str, Dict[str, Any]]
+    meta: Dict[str, Any]
+
+
 # -------------------------
 # Helpers for trigger "edge"
 # -------------------------
@@ -56,7 +65,20 @@ class Service(ServiceBase):
       - exposed_get_ai_voltage_triggered is kept and implemented using the new stack+trigger flow.
     """
 
+    def exposed_arm(self):
+        return self._module.arm()
+
+    def exposed_finalize(self, handle: _ArmedHandle,
+                         *,
+                         timeout: float = 30.0,
+                         close: bool = True,
+                         ) -> Dict[str, Any]:
+        return self._module.finalize(handle, timeout, close)
+
+    def exposed_not_use_OPX_clock(self):
+        return self._module.not_use_OPX_clock()
     # ---- Stack control ----
+
     def exposed_build_stack(self):
         return self._module.build_stack()
 
@@ -314,3 +336,16 @@ class Client(ClientBase):
 
     def get_count(self, name):
         return self._service.exposed_get_count(name)
+
+    def not_use_OPX_clock(self):
+        return self._service.exposed_not_use_OPX_clock()
+
+    def arm(self):
+        return self._service.exposed_arm()
+
+    def finalize(self, handle: _ArmedHandle,
+                 *,
+                 timeout: float = 30.0,
+                 close: bool = True,
+                 ) -> Dict[str, Any]:
+        return self._service.exposed_finalize(handle, timeout, close)

@@ -1,5 +1,4 @@
 import numpy as np
-import time
 from PyQt5 import QtCore
 from rpyc.utils.classic import obtain
 
@@ -68,6 +67,11 @@ def configure(**kwargs):
 def experiment(**kwargs):
     """The main experiment loop that runs when you click 'Run'."""
 
+    ramp_min = 0
+    ramp_max = 3
+    N = 10000
+    ramp = np.linspace(ramp_min, ramp_max, N, dtype=np.float64)
+
     thread = kwargs['thread']
     dataset = kwargs['dataset']
 
@@ -76,32 +80,7 @@ def experiment(**kwargs):
         ni = dataset.NI_client
         # dataset.NI_client.set_ao_voltage(ao_channel="ao1", voltages=1)
         ni.build_stack()
-        ni.get_ai_voltage(ai_channel="ai0", num_samples=100, sample_rate=100000)
-        ni.set_trigger(
-            target="ai",
-            trig_line="PFI0"
-        )
-        data_batch = ni.execute()
-        data_batch = data_batch["ai_1"]
-
-        dataset.log.error(f"DATA FETCHED")
-
-        # # If data was fetched, process and plot it
-        if data_batch is not None and len(data_batch) > 0:
-
-            dataset.log.error("DATA BATCH: " + repr(data_batch))
-
-            # Extract the measurement values (first element of each tuple)
-            measurements = [item for item in data_batch]
-
-            dataset.log.error(f"measurements: {measurements}")
-
-            # Average the batch of points and plot the result
-            for point in measurements:
-                dataset.set_data(point)
-        #dataset.set_data(avg_value)
-        # rolling_dataset = dataset.children['Real-time ADC']
-        # rolling_dataset.set_children_data()
-
-        # Optional: slow down loop so you don’t re-arm immediately
-        time.sleep(1.0)
+        ni.not_use_OPX_clock()
+        ni.set_ao_voltage(ao_channel="ao0", voltages=ramp, sample_rate=100000)
+        h = ni.arm()
+        ni.finalize(h, timeout=30)
