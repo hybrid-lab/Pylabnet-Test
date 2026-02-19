@@ -74,13 +74,6 @@ class Service(ServiceBase):
             self._armed_handles = {}
         return self._armed_handles
 
-    def exposed_finalize(self, handle: _ArmedHandle,
-                         *,
-                         timeout: float = 30.0,
-                         close: bool = True,
-                         ) -> Dict[str, Any]:
-        return self._module.finalize(handle, timeout, close)
-
     def exposed_not_use_OPX_clock(self):
         return self._module.not_use_OPX_clock()
 
