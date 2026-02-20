@@ -15,7 +15,7 @@
     "channels" : {
         "1" : {
             "channel" : "ai0",
-            "index" : 1,
+            "index" : 0,
             "name" : "test",
             "voltage_monitor" : "True"
         }

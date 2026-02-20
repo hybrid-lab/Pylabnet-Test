@@ -51,6 +51,8 @@ from pylabnet.network.core.service_base import ServiceBase
 from pylabnet.network.core.generic_server import GenericServer
 from pylabnet.gui.pyqt.external_gui import ParameterPopup, fresh_popup, warning_popup
 
+DEFAULT_SERVER_PORT = 15202
+
 
 class Launcher:
 
@@ -328,12 +330,16 @@ class Launcher:
             else:
                 self.logger.info(f'No active servers matching module {module_name}'
                                  ' were found. Instantiating a new server.')
+                if 'port' in config:
+                    server_port = config['port']
+                else:
+                    server_port = DEFAULT_SERVER_PORT
                 host, port = launch_device_server(
                     server=module,
                     dev_config=config_name,
                     log_ip=self.log_ip,
                     log_port=self.log_port,
-                    server_port=np.random.randint(1024, 49151),
+                    server_port=server_port,
                     debug=self.server_debug,
                     logger=self.logger
                 )
@@ -383,12 +389,16 @@ class Launcher:
             # If the user's choice did not exist, just launch a new GUI
             except IndexError:
                 self.logger.info('Launching new server')
+                if 'port' in config:
+                    server_port = config['port']
+                else:
+                    server_port = DEFAULT_SERVER_PORT
                 host, port = launch_device_server(
                     server=module,
                     dev_config=config_name,
                     log_ip=self.log_ip,
                     log_port=self.log_port,
-                    server_port=np.random.randint(1024, 49151),
+                    server_port=server_port,
                     debug=self.server_debug,
                     logger=self.logger
                 )
