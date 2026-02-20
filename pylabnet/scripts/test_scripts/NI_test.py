@@ -16,7 +16,7 @@ from qm.qua import *
 from qm import LoopbackInterface
 from qm import QuantumMachinesManager
 from pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel import *
-
+from pylabnet.network.client_server.nidaqmx_card import Client
 
 INIT_DICT = {
     'readout_len': {'Readout Length (ns)': '1000'},
@@ -45,7 +45,9 @@ def configure(**kwargs):
         logger.error(f"Kwargs{kwargs}")
 
         NI_client = kwargs['nidaqmx_ni_daq_1']
-        dataset.NI_client = NI_client
+        #NI_client = Client(host="192.168.0.60", port=15202)
+        dataset.ni = NI_client
+        #dataset.NI_client = NI_client
 
         # Add a child dataset for the plot
         # dataset.add_child(
@@ -74,13 +76,14 @@ def experiment(**kwargs):
 
     thread = kwargs['thread']
     dataset = kwargs['dataset']
-
+    ni = dataset.ni
     # Main loop to fetch and plot data
     while thread.running:
-        ni = dataset.NI_client
+        #ni = dataset.NI_client
+
         # dataset.NI_client.set_ao_voltage(ao_channel="ao1", voltages=1)
         ni.build_stack()
         ni.not_use_OPX_clock()
-        ni.set_ao_voltage(ao_channel="ao0", voltages=ramp, sample_rate=100000)
+        ni.set_ao_voltage(ao_channel="ao0", voltages=ramp, sample_rate=100)
         h = ni.arm()
         ni.finalize(h, timeout=30)

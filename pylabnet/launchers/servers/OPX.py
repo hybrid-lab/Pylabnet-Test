@@ -11,12 +11,6 @@ def launch(**kwargs):
         :port: (int) port number for the Cnt Monitor server
     """
 
-#########DEBUG CODE
-    debug_message = f"DEBUG: Port: '{kwargs['port']}'\n "
-    with open("c:/users/user/pylabnet/debug_log.txt", "a") as log_file:
-        log_file.write(debug_message)
-    ###############
-
     # Instantiate driver
     try:
         logger = kwargs['logger']

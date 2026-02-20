@@ -28,11 +28,7 @@ class StaticLineGUIGeneric():
         self.log = LogHandler(logger=logger_client)
         self.config = config
         self.host = host
-        #DEBUG
-        debug_message = f"DEBUG: STATICLINE CLIENTS IN INIT: '{staticline_clients}'\n "
-        with open("c:/users/user/pylabnet/debug_log.txt", "a") as log_file:
-            log_file.write(debug_message)
-        #########
+
         self.port = port
         self.config_dict = load_script_config('staticline', config, logger=self.log)
         self.initialize_drivers(staticline_clients, logger_client)
@@ -55,12 +51,6 @@ class StaticLineGUIGeneric():
 
             hardware_type = device_params['hardware_type']
             hardware_config = device_params['config_name']
-
-            #########DEBUG CODE
-            debug_message = f"DEBUG: Staticline CLients: '{staticline_clients}. hardware_type: {hardware_type}'\n "
-            with open("c:/users/user/pylabnet/debug_log.txt", "a") as log_file:
-                log_file.write(debug_message)
-            ###############
 
             #Try to find if we have a matching device client in staticline_clients
             try:

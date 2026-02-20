@@ -132,10 +132,8 @@ class Launcher:
 
     def _scan_servers(self):
         """ Scans all servers/GUIs connected as clients to the LogServer and adds them to internal attributes"""
-
         # Retrieve all client conncetions
         for client_name in self.client_dict.keys():
-
             # Client dict will contain entry for this script itself, don't want this
             # to be added as a connector.
 
@@ -228,7 +226,6 @@ class Launcher:
         :param host: (str) host of server
         :param port: (int) port number of server
         """
-
         server = module
         try:
             full_module_name = 'pylabnet.network.client_server.' + module
@@ -254,7 +251,6 @@ class Launcher:
 
     def _launch_servers(self):
         """ Searches through active servers and connects/launches them """
-
         for server in self.config_dict['servers']:
             module_name = server['type']
             if "script" in server and server["script"] == "True":
@@ -272,6 +268,7 @@ class Launcher:
 
             matches = []
             for connector in self.connectors.values():
+
                 # Add servers that have the correct name and ID
                 if (connector.name.startswith(module_name)) and (server_config['device_id'] == connector.device_id):
                     matches.append(connector)
@@ -301,8 +298,12 @@ class Launcher:
         :param auto_connect: (bool) whether or not to automatically connect to the device/server
         :param optional_clients: (bool) whether the current script should still run if it cannot connect to a desired client server
         """
-
         device_id = config['device_id']
+
+        if "ip" in config and "port" in config:
+            self.logger.info(f"Config pins {module} to {config['ip']}:{config['port']}")
+            self._connect_to_server(module, config["ip"], int(config["port"]), device_id)
+            return
 
         num_matches = len(matches)
         module_name = module
