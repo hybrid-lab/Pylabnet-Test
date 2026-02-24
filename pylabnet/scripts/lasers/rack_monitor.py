@@ -151,12 +151,15 @@ class RackMonitor:
         )
 
     def _update_channel(self, channel):
-        num = 2
+        num = 2 #will crash if num=1 (don't know why)
         channel.update(num_samples=num)
         index = channel.index + 2
 
         self.widgets['curve'][index].setData(channel.data)
-        self.widgets['voltage'][channel.index].setValue(channel.data[-1])
+        if len(self.channels) == 1:
+            self.widgets['voltage'].setValue(channel.data[-1])
+        else:
+            self.widgets['voltage'][channel.index].setValue(channel.data[-1])
 
     def get_env_data(self, num_points=1):
         return self.sensorpush_client.get_data(num_points)

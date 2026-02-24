@@ -282,7 +282,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QDoubleSpinBox" name="voltage">
+            <widget class="QDoubleSpinBox" name="voltage_1">
              <property name="font">
               <font>
                <pointsize>16</pointsize>
@@ -371,11 +371,6 @@
              <string notr="true"/>
             </property>
            </widget>
-           <widget class="QSplitter" name="splitter_6">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-           </widget>
           </widget>
          </item>
         </layout>
@@ -398,7 +393,7 @@
          <string notr="true"/>
         </property>
         <property name="title">
-         <string>Plot 1</string>
+         <string>Laser 2</string>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_4">
          <item>
@@ -455,53 +450,29 @@
             </widget>
            </item>
            <item>
-            <widget class="QLabel" name="label_8">
+            <widget class="QPushButton" name="reset_4">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>150</width>
+               <height>33</height>
+              </size>
+             </property>
              <property name="font">
               <font>
                <pointsize>12</pointsize>
               </font>
              </property>
-             <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:16pt;&quot;&gt;Error&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QDoubleSpinBox" name="error_2">
-             <property name="font">
-              <font>
-               <pointsize>16</pointsize>
-              </font>
-             </property>
              <property name="styleSheet">
               <string notr="true"/>
              </property>
-             <property name="frame">
-              <bool>false</bool>
-             </property>
-             <property name="buttonSymbols">
-              <enum>QAbstractSpinBox::NoButtons</enum>
-             </property>
-             <property name="accelerated">
-              <bool>false</bool>
-             </property>
-             <property name="correctionMode">
-              <enum>QAbstractSpinBox::CorrectToNearestValue</enum>
-             </property>
-             <property name="keyboardTracking">
-              <bool>false</bool>
-             </property>
-             <property name="decimals">
-              <number>6</number>
-             </property>
-             <property name="minimum">
-              <double>-1000.000000000000000</double>
-             </property>
-             <property name="maximum">
-              <double>1000.000000000000000</double>
-             </property>
-             <property name="singleStep">
-              <double>0.000010000000000</double>
+             <property name="text">
+              <string>RESET PLOT</string>
              </property>
             </widget>
            </item>
@@ -530,141 +501,8 @@
             <property name="orientation">
              <enum>Qt::Vertical</enum>
             </property>
-            <widget class="GraphicsView" name="legend_4">
-             <property name="minimumSize">
-              <size>
-               <width>150</width>
-               <height>0</height>
-              </size>
-             </property>
-             <property name="maximumSize">
-              <size>
-               <width>200</width>
-               <height>16777215</height>
-              </size>
-             </property>
-            </widget>
-            <widget class="QPushButton" name="clear_4">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="maximumSize">
-              <size>
-               <width>150</width>
-               <height>33</height>
-              </size>
-             </property>
-             <property name="font">
-              <font>
-               <pointsize>12</pointsize>
-              </font>
-             </property>
-             <property name="styleSheet">
-              <string notr="true"/>
-             </property>
-             <property name="text">
-              <string>CLEAR PLOT</string>
-             </property>
-            </widget>
-            <widget class="QPushButton" name="zero_4">
-             <property name="maximumSize">
-              <size>
-               <width>16777215</width>
-               <height>33</height>
-              </size>
-             </property>
-             <property name="styleSheet">
-              <string notr="true"/>
-             </property>
-             <property name="text">
-              <string>Zero Voltage</string>
-             </property>
-            </widget>
            </widget>
           </widget>
-         </item>
-         <item>
-          <layout class="QHBoxLayout" name="horizontalLayout_3">
-           <item>
-            <widget class="QLabel" name="label_13">
-             <property name="text">
-              <string>P</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QDoubleSpinBox" name="P_laser_2">
-             <property name="buttonSymbols">
-              <enum>QAbstractSpinBox::NoButtons</enum>
-             </property>
-             <property name="decimals">
-              <number>5</number>
-             </property>
-             <property name="minimum">
-              <double>-99.989999999999995</double>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="label_12">
-             <property name="text">
-              <string>I</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QDoubleSpinBox" name="I_laser_2">
-             <property name="buttonSymbols">
-              <enum>QAbstractSpinBox::NoButtons</enum>
-             </property>
-             <property name="decimals">
-              <number>5</number>
-             </property>
-             <property name="minimum">
-              <double>-99.989999999999995</double>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="label_11">
-             <property name="text">
-              <string>D</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QDoubleSpinBox" name="D_laser_2">
-             <property name="buttonSymbols">
-              <enum>QAbstractSpinBox::NoButtons</enum>
-             </property>
-             <property name="decimals">
-              <number>5</number>
-             </property>
-             <property name="minimum">
-              <double>-99.989999999999995</double>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="PID_upd_laser_2">
-             <property name="text">
-              <string>Update PID parameters</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
          </item>
         </layout>
        </widget>

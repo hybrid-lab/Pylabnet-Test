@@ -18,6 +18,12 @@
             "index" : 0,
             "name" : "test",
             "voltage_monitor" : "True"
+        }, 
+        "2" : {
+            "channel" : "ai1",
+            "index" : 1,
+            "name" : "test2",
+            "voltage_monitor" : "True"
         }
     }
 }
