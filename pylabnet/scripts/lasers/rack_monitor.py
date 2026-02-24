@@ -151,8 +151,8 @@ class RackMonitor:
         )
 
     def _update_channel(self, channel):
-        voltage = self.ni_client.get_ai_voltage(ai_channel=channel)
-        channel.update(voltage)
+        num = 2
+        channel.update(num_samples=num)
         index = channel.index + 2
 
         self.widgets['curve'][index].setData(channel.data)
@@ -328,13 +328,14 @@ class NI_channel:
         if self.ni_client != None:
             self.data = self.ni_client.get_ai_voltage(ai_channel=self.channel, num_samples=display_pts, sample_rate=1000)
 
-    def update(self, new_data):
+    def update(self, num_samples):
         """
         Updates the data
 
         :param value: (float) current value
         """
-        self.data = np.append(self.data[1:], new_data)
+        new_data = self.ni_client.get_ai_voltage(ai_channel=self.channel, num_samples=num_samples, sample_rate=1000)
+        self.data = np.append(self.data[num_samples:], new_data)
 
 
 def launch(**kwargs):
