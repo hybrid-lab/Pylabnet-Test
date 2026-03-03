@@ -1,7 +1,6 @@
 ##############################################################################################################################################################################################################
 import qm
 import numpy as np
-import json
 
 from collections import defaultdict
 from qm import SimulationConfig
@@ -747,8 +746,6 @@ class Driver:
             },
             "digital_marker": "ON",
         }
-        with open("C:/Users/user/pylabnet/config_dump.txt", "w") as f:
-            f.write(json.dumps(config, indent=2, default=str))
 
         return elem_name
 

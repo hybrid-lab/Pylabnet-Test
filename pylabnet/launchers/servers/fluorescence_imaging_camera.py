@@ -14,12 +14,6 @@ def launch(**kwargs):
         :config: (str) path/name of config file (optional if device_id provided)
     """
 
-    ######### DEBUG CODE
-    debug_message = f"DEBUG: Port: '{kwargs.get('port')}'\n"
-    with open("c:/users/user/pylabnet/debug_log.txt", "a") as log_file:
-        log_file.write(debug_message)
-    ###############
-
     logger = kwargs.get("logger", None)
 
     # Instantiate driver
