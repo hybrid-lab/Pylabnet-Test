@@ -12,6 +12,96 @@ class Driver:
         self.connect()
         self.image_list = []
 
+    def _set_enum(self, nodemap, node_name: str, entry_name: str):
+        node = PySpin.CEnumerationPtr(nodemap.GetNode(node_name))
+        if not (PySpin.IsAvailable(node) and PySpin.IsWritable(node)):
+            raise RuntimeError(f"Node {node_name} not available/writable")
+        entry = node.GetEntryByName(entry_name)
+        if not (PySpin.IsAvailable(entry) and PySpin.IsReadable(entry)):
+            raise RuntimeError(f"Enum entry {entry_name} for {node_name} not readable")
+        node.SetIntValue(entry.GetValue())
+
+    def _try_set_enum(self, nodemap, node_name: str, entry_name: str):
+        """Best-effort enum set (some cameras don't expose all nodes)."""
+        try:
+            self._set_enum(nodemap, node_name, entry_name)
+            return True
+        except Exception:
+            return False
+
+    def _try_set_float(self, nodemap, node_name: str, value: float):
+        try:
+            node = PySpin.CFloatPtr(nodemap.GetNode(node_name))
+            if PySpin.IsAvailable(node) and PySpin.IsWritable(node):
+                node.SetValue(float(value))
+                return True
+        except Exception:
+            pass
+        return False
+
+    def disable_trigger(self):
+        """Return camera to non-triggered (free-run / normal) mode."""
+        if self.cam is None or not self.initialized:
+            raise RuntimeError("Camera not initialized")
+
+        if self.cam.IsStreaming():
+            self.cam.EndAcquisition()
+
+        nm = self.cam.GetNodeMap()
+        self._set_enum(nm, "TriggerMode", "Off")
+
+    def set_hardware_trigger(
+        self,
+        line: str = "Line0",
+        activation: str = "RisingEdge",
+        selector: str = "FrameStart",
+        overlap: str = "ReadOut",   # often "Off" or "ReadOut"
+        acquisition_mode: str = "SingleFrame",
+    ):
+        """
+        Configure external hardware trigger.
+
+        After calling this, you must call arm() / start_acquisition().
+        Each TTL pulse on `line` will cause one frame, and GetNextImage()
+        will block until a trigger arrives (or timeout).
+
+        Common values:
+          line: "Line0", "Line1", ...
+          activation: "RisingEdge" or "FallingEdge"
+          selector: "FrameStart"
+          overlap: "Off" or "ReadOut" (if available)
+          acquisition_mode: "Continuous"
+        """
+        if self.cam is None or not self.initialized:
+            raise RuntimeError("Camera not initialized")
+
+        # safest to configure when not streaming
+        if self.cam.IsStreaming():
+            self.cam.EndAcquisition()
+
+        nm = self.cam.GetNodeMap()
+
+        # Best practice: disable trigger before changing trigger settings
+        self._set_enum(nm, "TriggerMode", "Off")
+
+        # Set acquisition mode (continuous stream, but frames only happen on triggers)
+        self._try_set_enum(nm, "AcquisitionMode", acquisition_mode)
+
+        # Choose what the trigger starts
+        self._set_enum(nm, "TriggerSelector", selector)
+
+        # Source is the hardware line
+        self._set_enum(nm, "TriggerSource", line)
+
+        # Edge polarity
+        self._set_enum(nm, "TriggerActivation", activation)
+
+        # Optional performance-related setting (not present on all models)
+        self._try_set_enum(nm, "TriggerOverlap", overlap)
+
+        # Enable trigger
+        self._set_enum(nm, "TriggerMode", "On")
+
     def connect(self):
         self.system = PySpin.System.GetInstance()
         self.cam_list = self.system.GetCameras()

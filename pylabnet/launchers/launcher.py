@@ -328,7 +328,6 @@ class Launcher:
             else:
                 self.logger.info(f'No active servers matching module {module_name}'
                                  ' were found. Instantiating a new server.')
-
                 if "port" in config:
                     server_port = config["port"]
                 else:

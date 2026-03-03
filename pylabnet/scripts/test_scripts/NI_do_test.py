@@ -49,7 +49,7 @@ def experiment(**kwargs):
 
     # Pulse shape: LOW 50 ms, HIGH 10 ms, LOW 50 ms
     low1_s = 0.050
-    high_s = 0.010
+    high_s = 0.300
     low2_s = 0.050
 
     low1_n = int(low1_s * sample_rate)
@@ -61,22 +61,22 @@ def experiment(**kwargs):
     # Main loop
     while thread.running:
         ni.build_stack()
-
         # Queue DO waveform (note: your API uses `value=...`, not `voltages=...`)
         ni.set_do_voltage(
             do_channel=do_channel,
             value=waveform,
             sample_rate=sample_rate,
         )
+        ni.not_use_OPX_clock()
 
         # Arm trigger on PFI0 for DO task
-        ni.set_trigger(
-            target="do",
-            trig_line="PFI0",
-        )
+        # ni.set_trigger(
+        #     target="do",
+        #     trig_line="PFI0",
+        # )
 
-        # Arms task; it will WAIT until the trigger edge arrives on PFI0
-        ni.execute()
+        h = ni.arm()
+        ni.finalize(h, 30)
 
         # Optional: print debug metadata
         # print(out.get("_meta", {}))

@@ -38,7 +38,7 @@ ni.set_ao_voltage(ao_channel=ni_ao, voltages=ramp, sample_rate=fs)
 with program() as pulse_train:
     with infinite_loop_():
         play("ON", "generic_di_elem_ch1")
-        wait(22500)
+        wait(225000)
 qmm = QuantumMachinesManager(host=qop_ip, cluster_name=cluster_name)
 qm = qmm.open_qm(config)
 job = qm.execute(pulse_train)
