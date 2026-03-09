@@ -66,7 +66,6 @@ def configure(**kwargs):
 
 def experiment(**kwargs):
     """The main experiment loop that runs when you click 'Run'."""
-    ni = Client(host="192.168.0.60", port=15202)
 
     ramp_min = 0
     ramp_max = 3
@@ -75,7 +74,7 @@ def experiment(**kwargs):
 
     thread = kwargs['thread']
     dataset = kwargs['dataset']
-    ni = dataset.ni
+
     # Main loop to fetch and plot data
     while thread.running:
         ni = dataset.NI_client

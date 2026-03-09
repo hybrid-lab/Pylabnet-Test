@@ -15,9 +15,17 @@ from pylabnet.launchers.siv_py_functions import upload_sequence, load_config  # 
 import matplotlib.pyplot as plt
 
 
+if not hasattr(np, "int"):
+    np.int = int  # type: ignore[attr-defined]
+if not hasattr(np, "bool"):
+    np.bool = bool  # type: ignore[attr-defined]
+if not hasattr(np, "float"):
+    np.float = float  # type: ignore[attr-defined]
+
 # -----------------------------
 # Qt-safe plotting infrastructure
 # -----------------------------
+
 
 class _FramePlotter(QtCore.QObject):
     """QObject to ferry frames from worker thread -> Qt main thread."""

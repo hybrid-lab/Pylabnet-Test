@@ -4,6 +4,13 @@ import numpy as np
 from pylabnet.scripts.data_center.take_data import ExperimentThread  # noqa: F401
 from pylabnet.scripts.data_center.datasets import Dataset, Plot2D  # noqa: F401
 
+if not hasattr(np, "int"):
+    np.int = int  # type: ignore[attr-defined]
+if not hasattr(np, "bool"):
+    np.bool = bool  # type: ignore[attr-defined]
+if not hasattr(np, "float"):
+    np.float = float  # type: ignore[attr-defined]
+
 INIT_DICT = {
     "timeout_ms": {"GetNextImage timeout (ms)": "25000"},
     "blank1": {"filler": "0"},
