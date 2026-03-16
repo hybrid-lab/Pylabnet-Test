@@ -23,15 +23,60 @@ class Driver:
         self.serial = serial
         self.analog_offset = analog_offset
 
-        #Open PicoScope 2000a Series device
-        #Returns handle to chandle for use in future API functions
-        self.status["openunit"] = ps.ps2000aOpenUnit(ctypes.byref(self.chandle), serial.encode('utf-8'))
-        assert_pico_ok(self.status["openunit"])
+        self.openUnit()
 
-    def openUnit(self)
+    def openUnit(self):
+        """
+        Opens the picoscope
+        """
         self.status["openunit"] = ps.ps2000aOpenUnit(ctypes.byref(self.chandle), self.serial.encode('utf-8'))
         assert_pico_ok(self.status["openunit"])
     
+    def pingUnit(self):
+        """
+        Checks that already opened device is still connected to the USB port and communication is successful
+        """
+        self.status["pingunit"] = ps.ps2000aPingUnit(self.chandle)
+        assert_pico_ok(self.status["pingunit"])
+
+    def getUnitInfo(self, req_info, stringLength=10):
+        """
+        Retrieve information about the specified oscilloscope
+
+        :req_info: (str) requrested information. The options are: driver_version, usb_version, hardware_version, 
+            variant_info, batch_and_serial, cal_date (calibration date), kernel_version, digital_hardware_version, 
+            analogue_hardware_version, firmware_version_1, firmware_version_2
+        :stringLength: maximum number of chars that may be written to output string (info_out) --- c stuff
+        """
+        info_out = ctype.c_int8()
+        required_size = ctype.c_int(16)
+
+        req_info = req_info.upper()
+        info = ps.PICO_INFO[f'PICOC_{req_info}']
+        self.status["getUnitInfo"] = ps.ps2000aGetUnitInfo(self.chandle, ctypes.byref(info_out), stringLength, ctypes.byref(required_size), info)
+        assert_pico_ok(self.status["getUnitInfo"])
+
+        #print or something, idk yet
+
+    def flashLED(self, num_flashed):
+        """
+        Flashes the LED on the front of the scope without blocking the calling thread. runStreaming() and runBlock() 
+        cancels any flashing started by this function. Not possible to set LED to be constantly illuminated (indicates not initiated)
+
+        :num_flashed: 
+            < 0: flash LED indefinitely
+            0  : stop flashing
+            > 0: flash the LED given number of times. If already flashing at start of function, flash count reset to num_flashed
+        """
+        self.status["flashLED"] = ps.ps2000aFlashLed(self.chandle, num_flashed)
+        assert_pico_ok(self.status["flashLED"])
+    
+    def closeUnit(self)
+        """Closes the unit"""
+
+        self.status["closeUnit"] = ps.ps2000aCloseUnit(self.chandle)
+        assert_pico_ok(self.status["closeUnit"])
+
     def setChannel(self, channel_name, coupling_type='AC', input_range='20V'):
         """
         Sets/initiates a channel on the picoscope
