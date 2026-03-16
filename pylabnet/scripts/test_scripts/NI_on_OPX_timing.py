@@ -76,7 +76,6 @@ def experiment(**kwargs):
     N = 1000000
     #ramp = [1] * N
     ramp = np.linspace(ramp_min, ramp_max, N, dtype=np.float64)
-    voltages = ramp
     fs = 1000000
 
     while thread.running:

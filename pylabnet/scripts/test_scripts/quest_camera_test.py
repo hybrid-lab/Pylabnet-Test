@@ -4,8 +4,10 @@ from PyQt5 import QtCore
 # pylabnet imports (kept to match pylabnet script expectations)
 from pylabnet.scripts.data_center.take_data import ExperimentThread  # noqa: F401
 from pylabnet.scripts.data_center.datasets import (
-    SawtoothScan1D, ErrorBarGraph, InfiniteRollingLine, Dataset, SawtoothScan1D_array_update, Plot2D, Plot2DWithAvg  # noqa: F401
-)
+    Dataset,
+    Plot2D,
+    Plot2DWithAvg,
+)  # noqa: F401
 
 # Optional helpers (kept because your template imports them)
 from pylabnet.launchers.siv_py_functions import upload_sequence, load_config  # noqa: F401
@@ -21,6 +23,7 @@ if not hasattr(np, "bool"):
     np.bool = bool  # type: ignore[attr-defined]
 if not hasattr(np, "float"):
     np.float = float  # type: ignore[attr-defined]
+
 
 # -----------------------------
 # Qt-safe plotting infrastructure
@@ -45,11 +48,10 @@ def _plot_frame_mainthread(frame, vmin=0, vmax=4095):
     if frame is None:
         return
 
-    # Ensure interactive mode
     plt.ion()
 
     if _fig is None:
-        _fig = plt.figure("Most recent camera frame")
+        _fig = plt.figure("Most recent Hamamatsu frame")
         _im = plt.imshow(frame, cmap="gray", vmin=vmin, vmax=vmax)
         _cb = plt.colorbar()
         plt.axis("off")
@@ -57,12 +59,10 @@ def _plot_frame_mainthread(frame, vmin=0, vmax=4095):
         _im.set_data(frame)
         _im.set_clim(vmin, vmax)
 
-    # Non-blocking redraw
     _fig.canvas.draw_idle()
     _fig.canvas.flush_events()
 
 
-# Connect signal to plotting slot; Qt will execute slot in main thread context
 _plotter.frame_ready.connect(_plot_frame_mainthread)
 
 
@@ -71,119 +71,132 @@ _plotter.frame_ready.connect(_plot_frame_mainthread)
 # -----------------------------
 
 INIT_DICT = {
-    'readout_len': {'Readout Length (ns)': '1000'},
-    'blank1': {'filler': '0'},
-    'blank2': {'filler': '0'},
-    'blank3': {'filler': '0'},
-    'blank4': {'filler': '0'},
+    "timeout_ms": {"Get Frame Timeout (ms)": "5000"},
+    "blank1": {"filler": "0"},
+    "blank2": {"filler": "0"},
+    "blank3": {"filler": "0"},
+    "blank4": {"filler": "0"},
 }
 
 
 def define_dataset():
     """Specifies the type of plot to use for the data."""
-    return 'Dataset'
+    return "Dataset"
 
 
 def configure(**kwargs):
     """Sets up the hardware and the plot before the experiment runs."""
-    dataset = kwargs['dataset']
+    dataset = kwargs["dataset"]
     logger = dataset.log
 
     try:
-        # Pull the camera client from kwargs and stash it on the dataset for later use
-        camera_client = kwargs['fluorescence_imaging_camera_bfs_u3_51s5m']
+        # Replace this key if your launcher uses a different device name
+        camera_client = kwargs["fluorescence_imaging_camera_orca_quest"]
         dataset.camera_client = camera_client
+        logger.info("Hamamatsu camera client attached to dataset.")
 
-        logger.info("Camera client attached to dataset.")
-
+    except KeyError:
+        logger.error(
+            "Could not find camera client in kwargs under "
+            "'fluorescence_imaging_camera_orca_quest'. "
+            "Check your launcher/device name."
+        )
+        raise
     except Exception as e:
         logger.error(f"An error occurred in CONFIGURE: {e}")
         raise
 
-    #measure_length = int(dataset.get_input_parameter('readout_len'))
+    # Optional: if your camera driver supports a known fixed exposure, set it here
+    # try:
+    #     dataset.camera_client.set_exposure_time(0.01)  # 10 ms
+    # except Exception as e:
+    #     logger.warning(f"Could not set exposure time: {e}")
 
-    # dataset.add_child(
-    # name="Image",
-    # data_type=Plot2D,
-    # min_x=0, max_x=2448, pts_x=2448,
-    # min_y=0, max_y=2048, pts_y=2048,
-    # new_plot=True
-    # )
-
+    # Build a 2D image dataset.
+    # These dimensions are placeholders; the actual image will still be written
+    # as long as the plot object accepts the incoming frame shape.
     dataset.add_child(
         name="Image Average",
         data_type=Plot2DWithAvg,
-        min_x=0, max_x=2448, pts_x=2448,
-        min_y=0, max_y=2048, pts_y=2048,
-        new_plot=True
+        min_x=0,
+        max_x=4096,
+        pts_x=4096,
+        min_y=0,
+        max_y=2304,
+        pts_y=2304,
+        new_plot=True,
     )
 
-    # imgview = dataset.children["Image"].graph  # this is pg.ImageView
-    avgview = dataset.children["Image Average"].graph  # this is pg.ImageView
+    avgview = dataset.children["Image Average"].graph
     logger.info(f'CHILDREN: {dataset.children["Image Average"].children.keys()}')
-    avgview.setLevels(0, 300)
-    dataset.children["Image Average"].children["Image Averagecurrentavg"].graph.setLevels(0, 300)
-    # imgview.setLevels(0, 300)
 
-    #dataset.children["Image"].setLevels(min=0, max=300)
+    try:
+        avgview.setLevels(0, 300)
+        dataset.children["Image Average"].children["Image Averagecurrentavg"].graph.setLevels(0, 300)
+    except Exception as e:
+        logger.warning(f"Could not preset image display levels: {e}")
 
-    # dataset.add_child(
-    #     name='Image',
-    #     data_type= Plot2D,
-    #     data_length=measure_length,
-    #     new_plot=True
-    # )
     dataset.graph.hide()
 
 
 def experiment(**kwargs):
     """Main experiment entrypoint called by DataTaker."""
-    thread = kwargs['thread']   # noqa: F841 (kept for compatibility)
-    dataset = kwargs['dataset']
+    thread = kwargs["thread"]   # noqa: F841 (kept for compatibility)
+    dataset = kwargs["dataset"]
     logger = dataset.log
 
+    timeout_ms = int(dataset.get_input_parameter("timeout_ms"))
+
     def get_frame(timeout_ms=1000):
-        # get_frame_bytes() should return: (bytes, shape, dtype_str)
-        b, shape, dtype = dataset.camera_client.get_frame_bytes(timeout_ms)
-        logger.info(f"{shape}")
+        """
+        Camera client should return:
+            (bytes, shape, dtype_str)
+        """
+        b, shape, dtype = dataset.camera_client.get_frame_bytes(timeout_ms=timeout_ms)
+        logger.info(f"Frame shape reported by camera: {shape}, dtype={dtype}")
         return np.frombuffer(b, dtype=np.dtype(dtype)).reshape(shape)
 
-    # Always stop acquisition even if something fails
+    frame = None
+
     logger.info("Starting acquisition")
     dataset.camera_client.start_acquisition()
+
     try:
         logger.info("Requesting one frame")
-        frame = get_frame(timeout_ms=1000)
-        logger.info(f"Got frame: shape={frame.shape}, dtype={frame.dtype}, min={frame.min()}, max={frame.max()}")
+        frame = get_frame(timeout_ms=timeout_ms)
+
+        logger.info(
+            f"Got frame: shape={frame.shape}, dtype={frame.dtype}, "
+            f"min={frame.min()}, max={frame.max()}"
+        )
+
     finally:
         logger.info("Stopping acquisition")
         dataset.camera_client.stop_acquisition()
 
+    if frame is None:
+        raise RuntimeError("No frame was acquired.")
+
     measurements = frame
-    # logger.info(f"DATA: {frame}")
+
     # Parent Plot2DWithAvg
     img_ds = dataset.children["Image Average"]
 
     # Averaged child plot
     avg = img_ds.children["Image Averagecurrentavg"]
 
-    # -----------------------------
-    # Data + update
-    # -----------------------------
-
+    # Write data and update plots
     img_ds.set_data(measurements)
-    img_ds.update()        # updates both current + avg children
+    img_ds.update()
 
-    # -----------------------------
-    # Lock color scale on AVG image
-    # -----------------------------
+    # Lock color scale on average image
+    try:
+        avg.graph.setLevels(int(frame.min()), int(frame.max()))
+        avg.graph.ui.histogram.autoHistogramRange = False
+    except Exception as e:
+        logger.warning(f"Could not lock histogram levels: {e}")
 
-    avg.graph.setLevels(0, 255)
-    avg.graph.ui.histogram.autoHistogramRange = False
-    # time.sleep(3)
-
-    #dataset.children["Image"].update()
-    #Plot in the Qt main thread (prevents UI freezes / deadlocks)
-    # logger.info("Sending frame to UI thread for plotting")
+    # Optional matplotlib display in main Qt thread
     # _plotter.frame_ready.emit(frame)
-    # logger.info("Experiment complete")
+
+    logger.info("Single-image acquisition complete.")
