@@ -40,7 +40,7 @@ def configure(**kwargs):
     )
 
     imgview = dataset.children["Image"].graph  # pg.ImageView
-    imgview.setLevels(0, 300)
+    imgview.setLevels(-1.5, 1.5)
 
     dataset.graph.hide()
 
@@ -61,7 +61,7 @@ def experiment(**kwargs):
     high_n = int(high_s * sample_rate)
     low2_n = int(low2_s * sample_rate)
 
-    waveform = ([0] * low1_n) + ([1] * high_n) + ([0] * low2_n)
+    waveform = ([0] * low1_n) + ([1] * high_n) + ([0] * low2_n) + ([1] * high_n) + ([0] * low2_n)
 
     # Read trigger settings
     trigger_line = "Line0"
@@ -99,8 +99,10 @@ def experiment(**kwargs):
         # 3) Get ONE frame via bytes (RPyC-safe)
         logger.info("Requesting one triggered frame (bytes transport)")
         b, shape, dtype = cam.get_frame_bytes(timeout_ms=timeout_ms)
+        c, shape, dtype = cam.get_frame_bytes(timeout_ms=timeout_ms)
 
         frame = np.frombuffer(b, dtype=np.dtype(dtype)).reshape(shape)
+        frame2 = np.frombuffer(c, dtype=np.dtype(dtype)).reshape(shape)
 
         logger.info(
             f"Got frame: shape={frame.shape}, dtype={frame.dtype}, "
@@ -110,13 +112,14 @@ def experiment(**kwargs):
         logger.info("Stopping acquisition")
         cam.stop_acquisition()
 
+    diff = frame2.astype(np.int32) - frame.astype(np.int32)
     # 4) Push frame to Plot2D
     img_ds = dataset.children["Image"]
-    img_ds.set_data(frame)
+    img_ds.set_data(diff)
     img_ds.update()
 
     # Optional: lock color scale
-    img_ds.graph.setLevels(0, 255)
+    img_ds.graph.setLevels(-1.5, 1.5)
     img_ds.graph.ui.histogram.autoHistogramRange = False
 
-    #thread.running = False
+    thread.running = True

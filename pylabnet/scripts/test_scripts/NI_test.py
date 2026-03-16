@@ -75,7 +75,6 @@ def experiment(**kwargs):
 
     thread = kwargs['thread']
     dataset = kwargs['dataset']
-    ni = dataset.ni
     # Main loop to fetch and plot data
     while thread.running:
         ni = dataset.NI_client
