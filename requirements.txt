@@ -87,6 +87,7 @@ pyqt5==5.15.2
 pyqt5-sip==12.8.1
 pyqtgraph==0.11.1
 pyrsistent==0.17.3
+pysensorpush==0.1.8
 pyserial==3.5
 python-dateutil==2.8.1
 python-decouple==3.4
