@@ -828,6 +828,32 @@ class Driver:
                 trigger_edge=Edge.RISING
             )
 
+    def arm_clock(self, N, sample_rate, ao_channel="ao0"):
+        """
+        Create a dummy AO task that exports the master sample clock.
+
+        Parameters
+        ----------
+        N : int
+            Number of samples
+        sample_rate : float
+            Sample clock rate
+
+        """
+
+        self.build_stack()
+
+        # Dummy waveform (all zeros)
+        waveform = [0] * int(N)
+
+        self.set_ao_voltage(
+            ao_channel=ao_channel,
+            value=waveform,
+            sample_rate=sample_rate
+        )
+
+        self.arm()
+
 
 # -----------------------------
 # Compilation helpers
