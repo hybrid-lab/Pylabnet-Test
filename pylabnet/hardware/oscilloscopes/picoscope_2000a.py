@@ -53,8 +53,8 @@ class Driver:
             analogue_hardware_version, firmware_version_1, firmware_version_2
         :stringLength: maximum number of chars that may be written to output string (info_out) --- c stuff
         """
-        info_out = ctype.c_int8()
-        required_size = ctype.c_int(16)
+        info_out = ctypes.c_int8()
+        required_size = ctypes.c_int(16)
 
         req_info = req_info.upper()
         info = ps.PICO_INFO[f'PICOC_{req_info}']
@@ -91,7 +91,7 @@ class Driver:
 
         :nSegments: (int) number of segments required
         """
-        nMaxSamples = ctype.c_int32()
+        nMaxSamples = ctypes.c_int32()
         self.status["memorySegments"] = ps.ps2000aMemorySegments(self.chandle, nSegments, ctypes.byref(nMaxSamples))
         assert_pico_ok(self.status["memorySegments"])
         return nMaxSamples
@@ -121,12 +121,27 @@ class Driver:
         channel = ps.PS2000A_CHANNEL[f'PS2000A_CHANNEL_{channel_name}']
         coupling = ps.PS2000A_COUPLING[f'PS2000A_{coupling_type}']
         channel_range = ps.PS2000A_RANGE[f'PS2000A_{input_range}']
-        self.status[f"setCh{name}"] = ps.ps2000aSetChannel(self.chandle, channel, ENABLED, 
+        self.status[f"setCh{channel_name}"] = ps.ps2000aSetChannel(self.chandle, channel, ENABLED, 
                                                             coupling, channel_range, self.analog_offset)
-        assert_pico_ok(self.status[f"setCh{name}"])
+        assert_pico_ok(self.status[f"setCh{channel_name}"])
     
-    def getChannelInformation():
-        return
+    def getChannelInformation(self, req_info, channel_name):
+        """
+        Queries which ranges are available on a scope device
+        
+        :req_info: (str) requested information: currently, on CI_RANGES is supported
+        :channel_name: (str) The name of the channel being queried (A or B)
+        """ 
+        info = ps.PS2000A_CHANNEL_INFO["PS2000A_CI_RANGES"]
+        channel = ps.PS2000A_CHANNEL[f"PS2000A_CHANNEL_{channel_name}"]
+
+        ranges = ctypes.c_int32()
+        length = ctypes.c_int32()
+
+        self.status[f"getCh{channel_name}Info"] = ps.ps2000aGetChannelInformation(self.chandle, info, 0, ctypes.byref(ranges), 
+                                                                                ctypes.byref(length), channel)
+        assert_pico_ok(self.status[f"getCh{channel_name}Info"])
+        return ranges, length
 
     def setNoOfCaptures(self, nCaptures):
         """
@@ -152,25 +167,52 @@ class Driver:
         returns timeIntervalNanoseconds (float, time interval between readins at selected timebase), 
                 maxSamples (int, maximum number of samples available)
         """
-        timeIntervalNanoseconds = ctype.c_float()
-        maxSamples = ctype.c_int32()
+        timeIntervalNanoseconds = ctypes.c_float()
+        maxSamples = ctypes.c_int32()
         oversample = 0
         self.status["getTimebase"] = ps.ps2000aGetTimebase2(self.chandle, timebase, noSamples, 
                                                             ctypes.byref(timeIntervalNanoseconds), oversample,
                                                             ctypes.byref(maxSamples), segmentIndex)
+        assert_pico_ok(self.status["getTimebase"])
         return timeIntervalNanoseconds, maxSamples
     
-    def isReady():
+    def isReady(self):
+        """
+        May be used instead of a callback function to receive data from runBlock(). To use, pass NULL pointer as lpReady
+        argument to runBlock(). Then, poll driver to see if it has finisehd collected the requested samples.
+
+        If returns 0, device is still collecting. If non-zero, device has finished collecting and getValues() can be used to retrieve data
+        """
+        ready = ctypes.c_int16()
+        self.status["isReady"] = ps.ps2000aIsReady(self.chandle, ctypes.byref(ready))
+        assert_pico_ok(self.status["isReady"])
+        return ready
+    
+    def stop(self):
+        """
+        Stops the scope device while it is waiting for a trigger or capturing data
+        Block mode: terminates current capture. any data in buffer is invalid
+        Rapid block mode: terminates the sequence of captures. Any completed capptures will contain valid data
+        Streaming mode: terminates data capture. If called before trigger event, oscilloscope may not contain valid data.
+                        If capture has already started, buffer will contain valid data
+        """
+        self.status["stop"] = ps.ps2000aStop(self.chandle)
+        assert_pico_ok(self.status["stop"])
+    
+    def holdOff(): #reserved for future use
         return
     
-    def stop():
-        return
-    
-    def holdOff():
-        return
-    
-    def enumerateUnits():
-        return
+    def enumerateUnits(self, serialLth): 
+        """
+        counts the number of unopened units connected to the computer and returns a list of all serial numbers as a string. 
+        Does not detect units that already have a handle assigned to them by the driver.
+
+        :serialLth: length of the char buffer pointed to by serials
+        """
+        count = ctypes.c_int16()
+        serials = ctypes.c_int8()
+        serialLth_out = ctypes.c_int16() #lol idk how this works
+
     
     def maximumValue():
         return
