@@ -77,6 +77,9 @@ class Service(ServiceBase):
     def exposed_not_use_OPX_clock(self):
         return self._module.not_use_OPX_clock()
 
+    def exposed_arm_clock(self, length, sample_rate):
+        return self._module.arm_clock(N=length, sample_rate=sample_rate)
+
    # ---- Stack control ----
 
     def exposed_build_stack(self):
@@ -415,3 +418,6 @@ class Client(ClientBase):
 
     def not_use_OPX_clock(self):
         return self._service.exposed_not_use_OPX_clock()
+
+    def arm_clock(self, length, sample_rate):
+        return self._service.exposed_arm_clock(length=length, sample_rate=sample_rate)
