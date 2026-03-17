@@ -96,6 +96,15 @@ class Driver:
         assert_pico_ok(self.status["memorySegments"])
         return nMaxSamples
 
+    def getMaxSegments(self):
+        """
+        returns the maximum number of segments allowed for the opened variant
+        """
+        maxsegments = ctypes.c_uint32()
+        self.status["getMaxSegments"] = ps.ps2000aGetMaxSegments(self.chandle, ctypes.byref(maxsegments))
+        assert_pico_ok(self.status["getMaxSegments"])
+        return maxsegments
+
     def setChannel(self, channel_name, coupling_type='AC', input_range='20V'):
         """
         Sets/initiates a channel on the picoscope
@@ -212,19 +221,27 @@ class Driver:
         count = ctypes.c_int16()
         serials = ctypes.c_int8()
         serialLth_out = ctypes.c_int16() #lol idk how this works
+    
+    def getAnalogOffset(self, input_range, coupling_type):
+        """
+        Returns maximum and minimum allowable analog offset for specific voltage range
 
-    
-    def maximumValue():
-        return
-    
-    def minimumValue():
-        return
-    
-    def getAnalogOffset():
-        return
-    
-    def getMaxSegments():
-        return
+        :volt_range: (str) voltage range to be used when gathering min and max information
+            10mV, 20mV, 50mV, 100mV, 200 mV, 500 mV, 1V, 2V, 5V, 10V, 20V
+        :coupling_type: (str) AC or DC
+        """
+        input_range = input_range.upper()
+        ALLOWED_RANGES = ['10MV', '20MV', '50MV', '100MV', '200MV', '500MV', '1V', '2V', '5V', '10V', '20V']
+        if !(input_range in ALLOWED_RANGES):
+            return
+        
+        coupling = ps.PS2000A_COUPLING[f'PS2000A_{coupling_type}']
+        range = ps.PS2000A_RANGE[f'PS2000A_{input_range}']
+        max_volt = ctypes.c_float()
+        min_volt = ctypes.c_float()
+        self.status["getAnalogOffset"] = ps.ps2000aGetAnalogueOffset(self.chandle, range, coupling, ctypes.byref(max_volt), ctypes.byref(min_volt))
+        assert_pico_ok(self.status["getAnalogOffset"])
+        return max_volt, min_volt
 
 
     
@@ -274,6 +291,24 @@ class Driver:
     
     def getValuesOverlappedBulk():
         return
+
+    def maximumValue(self):
+        """
+        returns the maximum ADC count returned by calls to the getValues functions
+        """
+        value = ctypes.c_int16()
+        self.status["maxValue"] = ps.ps2000aMaximumValue(self.chandle, ctypes.byref(value))
+        assert_pico_ok(self.status["maxValue"])
+        return value
+    
+    def minimumValue(self):
+        """
+        returns the minimum ADC count returned by calls to the getValues functions
+        """
+        value = ctypes.c_int16()
+        self.status["minValue"] = ps.ps2000aMinimumValue(self.chandle, ctypes.byref(value))
+        assert_pico_ok(self.status["minValue"])
+        return value
 
 
     ### TRIGGER FUNCTIONS
