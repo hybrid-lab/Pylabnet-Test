@@ -61,7 +61,7 @@ class Driver:
         self.status["getUnitInfo"] = ps.ps2000aGetUnitInfo(self.chandle, ctypes.byref(info_out), stringLength, ctypes.byref(required_size), info)
         assert_pico_ok(self.status["getUnitInfo"])
 
-        return info_out, required_size
+        return info_out.value, required_size.value
 
     def flashLED(self, num_flashed):
         """
@@ -94,7 +94,7 @@ class Driver:
         nMaxSamples = ctypes.c_int32()
         self.status["memorySegments"] = ps.ps2000aMemorySegments(self.chandle, nSegments, ctypes.byref(nMaxSamples))
         assert_pico_ok(self.status["memorySegments"])
-        return nMaxSamples
+        return nMaxSamples.value
 
     def getMaxSegments(self):
         """
@@ -103,7 +103,7 @@ class Driver:
         maxsegments = ctypes.c_uint32()
         self.status["getMaxSegments"] = ps.ps2000aGetMaxSegments(self.chandle, ctypes.byref(maxsegments))
         assert_pico_ok(self.status["getMaxSegments"])
-        return maxsegments
+        return maxsegments.value
 
     def setChannel(self, channel_name, coupling_type='AC', input_range='20V'):
         """
@@ -150,7 +150,7 @@ class Driver:
         self.status[f"getCh{channel_name}Info"] = ps.ps2000aGetChannelInformation(self.chandle, info, 0, ctypes.byref(ranges), 
                                                                                 ctypes.byref(length), channel)
         assert_pico_ok(self.status[f"getCh{channel_name}Info"])
-        return ranges, length
+        return ranges.value, length.value
 
     def setNoOfCaptures(self, nCaptures):
         """
@@ -159,7 +159,7 @@ class Driver:
 
         :nCaptures: (int) the number of waveforms to capture in one run
         """
-        self.status["setNoOfCaptures"] = ps.ps2000aSetNoOfCaptures(self.chandle, nCapturese)
+        self.status["setNoOfCaptures"] = ps.ps2000aSetNoOfCaptures(self.chandle, nCaptures)
         assert_pico_ok(self.status["setNoOfCaptures"])
 
     def getTimebase(self, timebase, noSamples, segmentIndex):
@@ -183,7 +183,7 @@ class Driver:
                                                             ctypes.byref(timeIntervalNanoseconds), oversample,
                                                             ctypes.byref(maxSamples), segmentIndex)
         assert_pico_ok(self.status["getTimebase"])
-        return timeIntervalNanoseconds, maxSamples
+        return timeIntervalNanoseconds.value, maxSamples.value
     
     def isReady(self):
         """
@@ -195,7 +195,7 @@ class Driver:
         ready = ctypes.c_int16()
         self.status["isReady"] = ps.ps2000aIsReady(self.chandle, ctypes.byref(ready))
         assert_pico_ok(self.status["isReady"])
-        return ready
+        return ready.value
     
     def stop(self):
         """
@@ -232,24 +232,70 @@ class Driver:
         """
         input_range = input_range.upper()
         ALLOWED_RANGES = ['10MV', '20MV', '50MV', '100MV', '200MV', '500MV', '1V', '2V', '5V', '10V', '20V']
-        if !(input_range in ALLOWED_RANGES):
+        if input_range not in ALLOWED_RANGES:
             return
         
         coupling = ps.PS2000A_COUPLING[f'PS2000A_{coupling_type}']
-        range = ps.PS2000A_RANGE[f'PS2000A_{input_range}']
+        volt_range = ps.PS2000A_RANGE[f'PS2000A_{input_range}']
         max_volt = ctypes.c_float()
         min_volt = ctypes.c_float()
-        self.status["getAnalogOffset"] = ps.ps2000aGetAnalogueOffset(self.chandle, range, coupling, ctypes.byref(max_volt), ctypes.byref(min_volt))
+        self.status["getAnalogOffset"] = ps.ps2000aGetAnalogueOffset(self.chandle, volt_range, coupling, ctypes.byref(max_volt), ctypes.byref(min_volt))
         assert_pico_ok(self.status["getAnalogOffset"])
-        return max_volt, min_volt
+        return max_volt.value, min_volt.value
 
 
     
     ### SAMPLING MODES FUNCTIONS
 
-    def setEts():
-        """Equivalent-time sampling"""
-        return
+    #ETS (Equivalent-time sampling)
+    def ETSOff(self):
+        """
+        Disables ETS
+        """
+        sampleTimePicoseconds = ctypes.c_int32()
+        mode = ps.PS2000A_ETS_MODE['PS2000A_ETS_OFF']
+        self.status["ETSOff"] = ps.ps2000aSetEts(self.chandle, mode, 1, 1, ctypes.byref(sampleTimePicoseconds))
+        assert_pico_ok(self.status["ETSOff"])
+
+    def setETSFast(self, etsCycles=500, etsInterleave=40):
+        """
+        Enables Fast ETS. This mode provides etsCycles of data, which may contain data from previously returned cycles.
+        Returns the effective sampling interval of ETS data (captured sample time / etsInterleave)
+
+        :etsCycles: (int) number of cycles to store, maximum value is 500
+        :etsInterleave: (int) number of waveforms to combine into a single ETS capture. Maximum value is 40
+        """
+        sampleTimePicoseconds = ctypes.c_int32()
+        mode = ps.PS2000A_ETS_MODE['PS2000A_ETS_FAST']
+        self.status["ETSFast"] = ps.ps2000aSetEts(self.chandle, mode, etsCycles, etsInterleave, ctypes.byref(sampleTimePicoseconds))
+        assert_pico_ok(self.status["ETSFast"])
+        return sampleTimePicoseconds.value
+
+    def setETSSlow(self, etsCycles=500, etsInterleave=40):
+        """
+        Enables Slow ETS. This mode provides fresh data every etsCycles. Takes longer than fast mode, but the data sets
+        are more stable and are guaranteed to contain only new data.
+        Returns the effective sampling interval of ETS data (captured sample time / etsInterleave)
+
+        :etsCycles: (int) number of cycles to store, maximum value is 500
+        :etsInterleave: (int) number of waveforms to combine into a single ETS capture. Maximum value is 40
+        """
+        sampleTimePicoseconds = ctypes.c_int32()
+        mode = ps.PS2000A_ETS_MODE['PS2000A_ETS_SLOW']
+        self.status["ETSSlow"] = ps.ps2000aSetEts(self.chandle, mode, etsCycles, etsInterleave, ctypes.byref(sampleTimePicoseconds))
+        assert_pico_ok(self.status["ETSSlow"])
+        return sampleTimePicoseconds.value
+    
+    def setEtsTimeBuffer(self, buffers):
+        """
+        Tells the driver where to find application's ETS time buffers. Contains the 64-bit timing information 
+        for each ETS sample after running block-mode ETS capture
+
+        :buffers: (array) array of 64-bit words, each representing the time in femtoseconds (10^-15 s) 
+                at which the sample was captured
+        """
+        self.status["setEtsTimeBuffer"] = ps.ps2000aSetEtsTimeBuffer(self.chandle, buffers, len(buffers))
+        assert_pico_ok(self.status["setEtsTimeBuffer"])
     
     #Block
     def runBlock():
@@ -296,19 +342,19 @@ class Driver:
         """
         returns the maximum ADC count returned by calls to the getValues functions
         """
-        value = ctypes.c_int16()
-        self.status["maxValue"] = ps.ps2000aMaximumValue(self.chandle, ctypes.byref(value))
+        maxVal = ctypes.c_int16()
+        self.status["maxValue"] = ps.ps2000aMaximumValue(self.chandle, ctypes.byref(maxVal))
         assert_pico_ok(self.status["maxValue"])
-        return value
+        return maxVal.value
     
     def minimumValue(self):
         """
         returns the minimum ADC count returned by calls to the getValues functions
         """
-        value = ctypes.c_int16()
-        self.status["minValue"] = ps.ps2000aMinimumValue(self.chandle, ctypes.byref(value))
+        minVal = ctypes.c_int16()
+        self.status["minValue"] = ps.ps2000aMinimumValue(self.chandle, ctypes.byref(minVal))
         assert_pico_ok(self.status["minValue"])
-        return value
+        return minVal.value
 
 
     ### TRIGGER FUNCTIONS
@@ -367,9 +413,6 @@ class Driver:
         return
     
     def setDataBuffers():
-        return
-    
-    def setEtsTimeBuffer():
         return
 
     
