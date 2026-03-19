@@ -26,6 +26,7 @@ class Driver:
         self.serial = serial
         self.analog_offset = analog_offset
         self.isOpen = False
+        self.oversample = ctypes.c_int16(0)
 
         self.openUnit()
 
@@ -76,7 +77,7 @@ class Driver:
         self.status["flashLED"] = ps.ps2000aFlashLed(self.chandle, num_flashed)
         assert_pico_ok(self.status["flashLED"])
     
-    def closeUnit(self)
+    def closeUnit(self):
         """Closes the unit"""
 
         self.status["closeUnit"] = ps.ps2000aCloseUnit(self.chandle)
@@ -124,7 +125,7 @@ class Driver:
         
         input_range = input_range.upper()
         ALLOWED_RANGES = ['10MV', '20MV', '50MV', '100MV', '200MV', '500MV', '1V', '2V', '5V', '10V', '20V']
-        if !(input_range in ALLOWED_RANGES):
+        if input_range not in ALLOWED_RANGES:
             return
         
         channel = ps.PS2000A_CHANNEL[f'PS2000A_CHANNEL_{channel_name}']
@@ -178,9 +179,8 @@ class Driver:
         """
         timeIntervalNanoseconds = ctypes.c_float()
         maxSamples = ctypes.c_int32()
-        oversample = 0
         self.status["getTimebase"] = ps.ps2000aGetTimebase2(self.chandle, timebase, noSamples, 
-                                                            ctypes.byref(timeIntervalNanoseconds), oversample,
+                                                            ctypes.byref(timeIntervalNanoseconds), self.oversample,
                                                             ctypes.byref(maxSamples), segmentIndex)
         assert_pico_ok(self.status["getTimebase"])
         return timeIntervalNanoseconds.value, maxSamples.value
@@ -247,6 +247,72 @@ class Driver:
     
     ### SAMPLING MODES FUNCTIONS
 
+    def _setDataBuffer():
+        return
+    
+    def _setDataBuffers(self, channel, bufferMax, bufferMin, totalSamples, segmentIndex, mode):
+        """
+        Tells the driver the location of one or two buffers for receiving data.
+
+        :channel: (str) A or B
+        :bufferMax: user-allocated buffer to receive the maximum data values in aggregation mode, 
+                or the non-aggregated values otherwise. each value is a  16-bit ADC count scaled according to 
+                the selected voltage range.
+        :bufferMin: user-allocated buffer to receive the minimum data values in aggregation mode. Not normally 
+                used in other modes, but you can direct the driver to write non-aggregated values to this buffer by
+                setting bufferMax to NULL. To enable aggregation, the downsampling ratio and mode must be set 
+                appropriately when calling one of the ps2000aGetValues() functions.
+        :segmentIndex: (int) the number of the memory segment to be used
+        :mode: downsampling mode (none, aggregate, average, decimate)
+        """
+        source = ps.PS2000A_CHANNEL[f'PS2000A_CHANNEL_{channel.upper()}']
+        ratio_mode = ps.PS2000A_RATIO_MODE[f"PS2000A_RATIO_MODE_{mode.upper()}"]
+        self.status[f"setDataBuffers{channel}"] = ps.ps2000aSetDataBuffers(self.chandle, source, ctypes.byref(bufferMax), 
+                                                                           ctypes.byref(bufferMin), totalSamples, segmentIndex,
+                                                                           ratio_mode)
+        assert_pico_ok(self.status[f"setDataBuffers{channel}"])
+        
+
+    #Block
+    def runBlock(self, noOfPreTriggerSamples, noOfPostTriggerSamples, timebase, segmentIndex, lpReady=None):
+        """
+        Starts collecting data in block mode. Number of samples collected is determined by noOfPreTriggerSamples and
+        noOfPostTriggerSamples. Total number of samples must not be more than the size of the segment referred to by 
+        segmentIndex.
+
+        :noOfPreTriggerSamples: (int) number of samples to store before the trigger event
+        :noOfPostTriggerSamples: (int) number of samples to store after the trigger event
+        :timebase: (int) timebase to use (ignored in ETS mode where setETS selects the timebase)
+        :segmentIndex: (int) which memory segment to use
+        :lpReady: (ps2000aBlockReady) pointer to ps2000aBlockReady() function that driver will call when the data
+                has been collected. To use ps2000aIsReady() polling method instead of a callback function, set pointer
+                to NULL
+        """
+        totalSamples = noOfPostTriggerSamples + noOfPreTriggerSamples
+        
+        cFuncPtr = ps.BlockReadyType(self._blockready_callback)
+        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, noOfPreTriggerSamples, noOfPostTriggerSamples, timebase,
+                                                     self.oversample, None, segmentIndex, cFuncPtr, None)
+        assert_pico_ok(self.status["runBlock"])
+
+        while wasCalledBack == False:
+            time.sleep(0.01)
+        
+        #Create buffers ready for assigning pointers for data collection
+        bufferAMax = (ctypes.c_int16 * totalSamples)()
+        bufferAMin = (ctypes.c_int16 * totalSamples)() #used for downsampling --> need to figure out what this is
+        bufferBMax = (ctypes.c_int16 * totalSamples)()
+        bufferBMin = (ctypes.c_int16 * totalSamples)()
+
+        #set data buffer
+
+        
+    def _blockready_callback(handle, statusCode, param):
+        global wasCalledBack
+        wasCalledBack = True
+    
+
+
     #ETS (Equivalent-time sampling)
     def ETSOff(self):
         """
@@ -296,13 +362,6 @@ class Driver:
         """
         self.status["setEtsTimeBuffer"] = ps.ps2000aSetEtsTimeBuffer(self.chandle, buffers, len(buffers))
         assert_pico_ok(self.status["setEtsTimeBuffer"])
-    
-    #Block
-    def runBlock():
-        return
-    
-    def blockReady():  #different in ps2000a.py in picosdk-python-wrappers, idk why
-        return
     
     #Streaming
     def runStreaming():
@@ -407,12 +466,6 @@ class Driver:
         return
     
     def getNoOfProcessedCaptures():
-        return
-
-    def setDataBuffer():
-        return
-    
-    def setDataBuffers():
         return
 
     
