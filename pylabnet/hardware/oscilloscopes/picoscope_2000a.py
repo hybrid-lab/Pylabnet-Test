@@ -173,46 +173,91 @@ class Driver:
         
 
     ### BLOCK MODE
-    def setupBlock (self, isRapid, preTriggerSamples, postTriggerSamples, downsampling_mode=None):
-        """
-        Get Timebase and Setup Data buffers. If isRapid, set up for rapid block mode, which requires setting up 
-        number of captures and memory segments.
 
-        :isRapid: (bool) True if setting up for rapid block mode.
+    #Basic Block Setup
+    def setupBlock (self, preTriggerSamples, postTriggerSamples, downsampling_mode=None, nSegments=1):
+        """
+        Get Timebase and Setup Data buffers. 
+
         :preTriggerSamples: (int) number of samples to store before the trigger event
         :postTriggerSamples: (int) number of samples to store after the trigger event
         :downsampling_mode: (str) the downsampling mode used to store data
+        :nSegments: (int) the number of memory segments used (number of buffers to setup)
         """
         totalSamples = preTriggerSamples + postTriggerSamples
 
         #Timebase
         self.getTimebase(self.timebase, totalSamples, 0)
 
-        #Rapid Block Mode
-        if isRapid:
-            self.memorySegments()
-
-
-        #Create buffers ready for assigning pointers for data collection
-        buffersMax = []
-        buffersMin = []
-        for channel in self.channels:
-            buffersMax.append((ctypes.c_int16 * totalSamples)())
-            buffersMin.append((ctypes.c_int16 * totalSamples)()) #used for downsampling
-        
         downsampling_mode = downsampling_mode.upper()
         DOWNSAMPLING_MODES = ['NONE', 'AGGREGATE', 'AVERAGE', 'DECIMATE']
         if downsampling_mode not in DOWNSAMPLING_MODES:
             raise ValueError(f"{downsampling_mode} is not a valid downsampling mode")
         mode = ps.PS2000A_RATIO_MODE[f'PS2000A_RATIO_MODE_{downsampling_mode}']
 
-        #set data buffer
-        for index, name in enumerate(self.channels):
-            source = ps.PS2000A_CHANNEL[f'PS2000A_CHANNEL_{name.upper()}']
-            self.status[f"setDataBuffer{index}"] = ps.ps2000aSetDataBuffers(self.chandle, source, ctypes.byref(buffersMax[index]),
-                                                                            ctypes.byref(buffersMin[index]), totalSamples, segmentIndex, 
-                                                                            mode)
-            assert_pico_ok(self.status[f"setDataBuffer{index}"])
+        #Create and set buffers ready for assigning pointers for data collection
+        allBuffersMax = []
+        allBuffersMin = []
+        for channel in self.channels:
+            source = ps.PS2000A_CHANNEL[f'PS2000A_CHANNEL_{channel.upper()}']
+            buffersMax = []
+            buffersMin = []
+            for index in range(nSegments):
+                buffersMax.append((ctypes.c_int16 * totalSamples)())
+                buffersMin.append((ctypes.c_int16 * totalSamples)())
+                self.status[f"setDataBuffer{channel.upper()}{index}"] = ps.ps2000aSetDataBuffers(self.chandle, source,
+                                                                                                 ctypes.byref(buffersMax[-1]),
+                                                                                                 ctypes.byref(buffersMin[-1]),
+                                                                                                 totalSamples, index, mode)
+                assert_pico_ok(self.status[f"setDataBuffer{channel.upper()}{index}"])
+            allBuffersMax.append(buffersMax)
+            allBuffersMin.append(buffersMin)
+        return allBuffersMax, allBuffersMin
+
+
+    #Rapid Block Setup
+    def setupRapidBlock (self, preTriggerSamples, postTriggerSamples, nSegments=10, nCaptures=10, downsampling_mode=None):
+        """
+        Sets up additional rapid block requirements ontop of basic block set up stuff
+
+        :preTriggerSamples: (int) number of samples to store before the trigger event
+        :postTriggerSamples: (int) number of samples to store after the trigger event
+        :nSegments: (int) number of segments required
+        :nCaptures: (int) number of waveforms to capture in one run
+        :downsampling_mode: (str) the downsampling mode used to store data
+        """
+        totalSamples = preTriggerSamples + postTriggerSamples
+        self.memorySegments(totalSamples, nSegments)
+        self.setNoOfCaptures(nCaptures)
+        self.setupBlock(preTriggerSamples, postTriggerSamples, downsampling_mode, nSegments)
+        
+    
+    def memorySegments(self, maxSamples, nSegments=10):
+        """
+        Sets the number of memory segments (divides memory into a number of segments so scope can store several waveforms sequentially)
+        The max number of waveforms PicoScopee 2206B can handle is 32 MS (shared between channels). Returns the number of samples 
+        available in each segment (total number over the 2 channels)
+
+        :nSegments: (int) number of segments required
+        """
+        cMaxSamples = ctypes.c_int32(maxSamples)
+        self.status["memorySegments"] = ps.ps2000aMemorySegments(self.chandle, nSegments, ctypes.byref(cMaxSamples))
+        assert_pico_ok(self.status["memorySegments"])
+        return cMaxSamples.value
+    
+    def setNoOfCaptures(self, nCaptures=10):
+        """
+        Sets the number of captures to be collected in one run of rapid block mode. Must be called before a run, or else
+        driver will capture only one waveform. Value remains constant unless changed
+
+        :nCaptures: (int) the number of waveforms to capture in one run
+        """
+        self.status["setNoOfCaptures"] = ps.ps2000aSetNoOfCaptures(self.chandle, nCaptures)
+        assert_pico_ok(self.status["setNoOfCaptures"])
+
+    
+    #ETS (Equivalent Time Sampling) Setup
+
 
         
     def runBlock(self, noOfPreTriggerSamples, noOfPostTriggerSamples, segmentIndex, lpReady=None):
@@ -240,21 +285,19 @@ class Driver:
         global wasCalledBack
         wasCalledBack = True
 
-    #Rapid Block stuff
-    def memorySegments(self, nSegments=10):
-        """
-        Sets the number of memory segments (divides memory into a number of segments so scope can store several waveforms sequentially)
-        The max number of waveforms PicoScopee 2206B can handle is 32 MS (shared between channels). Returns the number of samples 
-        available in each segment (total number over the 2 channels)
 
-        :nSegments: (int) number of segments required
-        """
-        nMaxSamples = ctypes.c_int32()
-        self.status["memorySegments"] = ps.ps2000aMemorySegments(self.chandle, nSegments, ctypes.byref(nMaxSamples))
-        assert_pico_ok(self.status["memorySegments"])
-        return nMaxSamples.value
 
-    ### FUNCTIONS THAT COME IN DRIVER
+    ### STREAMING MODE
+
+
+
+
+    ### AWG (Arbitrary Wave Generator)
+    
+    
+    
+    
+    ### EXTRA FUNCTIONS THAT COME IN DRIVER
 
     def pingUnit(self):
         """
@@ -321,16 +364,6 @@ class Driver:
                                                                                 ctypes.byref(length), channel)
         assert_pico_ok(self.status[f"getCh{channel_name}Info"])
         return ranges.value, length.value
-
-    def setNoOfCaptures(self, nCaptures):
-        """
-        Sets the number of captures to be collected in one run of rapid block mode. Must be called before a run, or else
-        driver will capture only one waveform. Value remains constant unless changed
-
-        :nCaptures: (int) the number of waveforms to capture in one run
-        """
-        self.status["setNoOfCaptures"] = ps.ps2000aSetNoOfCaptures(self.chandle, nCaptures)
-        assert_pico_ok(self.status["setNoOfCaptures"])
     
     def isReady(self):
         """
