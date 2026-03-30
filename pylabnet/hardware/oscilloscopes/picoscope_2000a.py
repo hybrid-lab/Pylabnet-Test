@@ -165,10 +165,9 @@ class Driver:
         :mode: downsampling mode (none, aggregate, average, decimate)
         """
         source = ps.PS2000A_CHANNEL[f'PS2000A_CHANNEL_{channel.upper()}']
-        ratio_mode = ps.PS2000A_RATIO_MODE[f"PS2000A_RATIO_MODE_{mode.upper()}"]
         self.status[f"setDataBuffers{channel}"] = ps.ps2000aSetDataBuffers(self.chandle, source, ctypes.byref(bufferMax), 
                                                                            ctypes.byref(bufferMin), totalSamples, segmentIndex,
-                                                                           ratio_mode)
+                                                                           mode)
         assert_pico_ok(self.status[f"setDataBuffers{channel}"])
         
 
@@ -199,17 +198,12 @@ class Driver:
         allBuffersMax = []
         allBuffersMin = []
         for channel in self.channels:
-            source = ps.PS2000A_CHANNEL[f'PS2000A_CHANNEL_{channel.upper()}']
             buffersMax = []
             buffersMin = []
             for index in range(nSegments):
                 buffersMax.append((ctypes.c_int16 * totalSamples)())
                 buffersMin.append((ctypes.c_int16 * totalSamples)())
-                self.status[f"setDataBuffer{channel.upper()}{index}"] = ps.ps2000aSetDataBuffers(self.chandle, source,
-                                                                                                 ctypes.byref(buffersMax[-1]),
-                                                                                                 ctypes.byref(buffersMin[-1]),
-                                                                                                 totalSamples, index, mode)
-                assert_pico_ok(self.status[f"setDataBuffer{channel.upper()}{index}"])
+                self._setDataBuffers(channel, buffersMax[-1], buffersMin[-1], totalSamples, index, mode)
             allBuffersMax.append(buffersMax)
             allBuffersMin.append(buffersMin)
         return allBuffersMax, allBuffersMin
