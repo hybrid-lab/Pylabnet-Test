@@ -124,6 +124,8 @@ class Driver:
         self.time_interval_ns = timeIntervalns.value
         return timeIntervalns.value, maxSamples.value
 
+
+
     ### BLOCK MODE
 
     # Block Setup
@@ -337,6 +339,11 @@ class Driver:
         if mode not in DOWNSAMPLING_MODES:
             raise ValueError(f"{mode} is not a valid downsampling mode")
         return ps.PS2000A_RATIO_MODE[f'PS2000A_RATIO_MODE_{mode}']
+    
+    def _runBlock(self, preTriggerSamples, postTriggerSamples, segmentIndex):
+        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, preTriggerSamples, postTriggerSamples, self.timebase,
+                                                     self.oversample, None, segmentIndex, None, None)
+        assert_pico_ok(self.status["runBlock"])
     
     def _isReady(self):
         """
