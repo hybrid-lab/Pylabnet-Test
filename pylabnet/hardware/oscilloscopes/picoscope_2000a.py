@@ -24,7 +24,7 @@ class Driver:
         Also, sets up trigger according to trigger_param dictionary
 
         :serial: (str) serial number of picoscope to be opened (if None, opens first picoscope)
-        :channels: (dict) dictionary of channel setup parameters
+        :channels: (dict) dictionary of initial channel setup parameters
             - 'range': (str) Viewed voltage range of input. Options: 10mV, 20mV, 50mV, 100mV, 200 mV, 500 mV, 1V, 2V, 5V, 10V, 20V
             - 'offset': (float) Voltage added to input channel before digitization
             - 'coupling': (str) Coupling type, 'AC' or 'DC'. If None, coupling is set to 'AC'
@@ -52,14 +52,200 @@ class Driver:
                 coupling = param['coupling']
             else:
                 coupling = 'AC'
+                param['coupling'] = coupling
             volt_range = param['range']
             offset = param['offset']
 
-            maximum, minimum = self.getAnalogOffset(volt_range, coupling)
+            maximum, minimum = self._getAnalogOffset(volt_range, coupling)
             if offset > maximum or offset < minimum:
                 raise ValueError(f"{offset} offset is outside allowed range of {minimum} to {maximum}")
 
-            self.setChannel(name, input_range=volt_range, analog_offset=offset)
+            self._setChannel(name, input_range=volt_range, analog_offset=offset)
+
+    def setChannelCoupling(self, channel_name, coupling_type):
+        channel = self.channels[channel_name]
+        channel['coupling'] = coupling_type
+        self._setChannel(channel_name, coupling_type, channel['range'], channel['offset'])
+    
+    def setChannelRange(self, channel_name, volt_range):
+        channel = self.channels[channel_name]
+        channel['range'] = volt_range
+        self._setChannel(channel_name, channel['coupling'], volt_range, channel['offset'])
+
+    def setChannelOffset(self, channel_name, offset):
+        channel = self.channels[channel_name]
+        maximum, minimum = self._getAnalogOffset(channel['range'], channel['coupling'])
+        if offset > maximum or offset < minimum:
+            raise ValueError(f"{offset} offset is outside allowed range of {minimum} to {maximum}")
+        else: 
+            channel['offset'] = offset
+            self._setChannel(channel_name, channel['coupling'], channel['range'], offset)
+    
+    def closeUnit(self):
+        """Closes the unit"""
+
+        self.status["closeUnit"] = ps.ps2000aCloseUnit(self.chandle)
+        assert_pico_ok(self.status["closeUnit"])
+        self.isOpen = False
+    
+    def stop(self):
+        """
+        Stops the scope device while it is waiting for a trigger or capturing data
+        Block mode: terminates current capture. any data in buffer is invalid
+        Rapid block mode: terminates the sequence of captures. Any completed capptures will contain valid data
+        Streaming mode: terminates data capture. If called before trigger event, oscilloscope may not contain valid data.
+                        If capture has already started, buffer will contain valid data
+        """
+        self.status["stop"] = ps.ps2000aStop(self.chandle)
+        assert_pico_ok(self.status["stop"])
+
+
+    ### FINDING TIMEBASE
+    def getTimebase(self, timebase, noSamples, segmentIndex):
+        """
+        Calculates the sampling rate and maximum number of samples for a given timebase under specified conditions.
+        Depends on the number of channels enabled by the last call to setChannels().
+        Before using, estimate the timebase number that you require using timebase guide in Programmer's Guide
+        (linked above at start of this file)
+
+        :timebase: (int) 
+        :noSamples: (int) the number of samples required
+        :segmentIndex: (int) the idnex of the memory segment to use
+
+        returns timeIntervalNanoseconds (float, time interval between readins at selected timebase), 
+                maxSamples (int, maximum number of samples available)
+        """
+        timeIntervalns = ctypes.c_float()
+        maxSamples = ctypes.c_int32()
+        self.status["getTimebase"] = ps.ps2000aGetTimebase2(self.chandle, timebase, noSamples, 
+                                                            ctypes.byref(timeIntervalns), self.oversample,
+                                                            ctypes.byref(maxSamples), segmentIndex)
+        assert_pico_ok(self.status["getTimebase"])
+        self.time_interval_ns = timeIntervalns.value
+        return timeIntervalns.value, maxSamples.value
+
+    ### BLOCK MODE
+
+    # Block Setup
+    def setupBlock (self, preTriggerSamples, postTriggerSamples, downsampling_mode=None, nSegments=1):
+        """
+        Get Timebase and Setup Data buffers. 
+
+        :preTriggerSamples: (int) number of samples to store before the trigger event
+        :postTriggerSamples: (int) number of samples to store after the trigger event
+        :downsampling_mode: (str) the downsampling mode used to store data
+        :nSegments: (int) the number of memory segments used (number of buffers to setup)
+        """
+        totalSamples = preTriggerSamples + postTriggerSamples
+
+        mode = self._checkDownsampleMode(downsampling_mode)
+
+        #Create and set buffers ready for assigning pointers for data collection
+        for channel, param in self.channels:
+            if nSegments == 1:
+                param['buffersMax'] = (ctypes.c_int16 * totalSamples)()
+                param['buffersMin'] = (ctypes.c_int16 * totalSamples)()
+                self._setDataBuffers(channel, param['buffersMax'], param['buffersMin'], totalSamples, 0, mode)
+            else:
+                param['buffersMax'] = []
+                param['buffersMin'] = []
+                for index in range(nSegments):
+                    param['buffersMax'].append((ctypes.c_int16 * totalSamples)())
+                    param['buffersMin'].append((ctypes.c_int16 * totalSamples)())
+                    self._setDataBuffers(channel, param['buffersMax'][-1], param['buffersMin'][-1], totalSamples, index, mode)
+
+    #Run Block
+    def runBlock(self, preTriggerSamples, postTriggerSamples, segmentIndex, downsample_ratio=1, downsample_mode=None):
+        """
+        Starts collecting data in block mode. Number of samples collected is determined by noOfPreTriggerSamples and
+        noOfPostTriggerSamples. Total number of samples must not be more than the size of the segment referred to by 
+        segmentIndex.
+
+        Loop this
+        Returns the data to graph
+
+        :preTriggerSamples: (int) number of samples to store before the trigger event
+        :postTriggerSamples: (int) number of samples to store after the trigger event
+        :segmentIndex: (int) which memory segment to use
+        """
+        totalSamples = preTriggerSamples + postTriggerSamples
+        cTotalSamples = ctypes.c_int32(totalSamples)
+        overflow = ctypes.c_int16()
+
+        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, preTriggerSamples, postTriggerSamples, self.timebase,
+                                                     self.oversample, None, segmentIndex, None, None)
+        assert_pico_ok(self.status["runBlock"])
+        self._isReady()
+
+        #get values
+        mode = self._checkDownsampleMode(downsample_mode)
+        self._getValues(0, cTotalSamples, segmentIndex, overflow, mode, downsample_ratio)
+
+        time, data = self._getGraphValues(cTotalSamples)
+        return time, data
+
+
+
+
+
+    ### RAPID BLOCK MODE
+    def setupRapidBlock (self, preTriggerSamples, postTriggerSamples, nSegments=10, nCaptures=10, downsampling_mode=None):
+        """
+        Sets up additional rapid block requirements ontop of basic block set up stuff
+
+        :preTriggerSamples: (int) number of samples to store before the trigger event
+        :postTriggerSamples: (int) number of samples to store after the trigger event
+        :nSegments: (int) number of segments required
+        :nCaptures: (int) number of waveforms to capture in one run
+        :downsampling_mode: (str) the downsampling mode used to store data
+        """
+        totalSamples = preTriggerSamples + postTriggerSamples
+        self._memorySegments(totalSamples, nSegments)
+        self._setNoOfCaptures(nCaptures)
+        self.setupBlock(preTriggerSamples, postTriggerSamples, downsampling_mode, nSegments)
+
+
+    
+    ## Run Rapid Block
+
+    def runRapidBlock(self, preTriggerSamples, postTriggerSamples, segmentIndex, downsample_ratio=1, downsample_mode=None):
+        """
+        Starts collecting data in block mode. Number of samples collected is determined by noOfPreTriggerSamples and
+        noOfPostTriggerSamples. Total number of samples must not be more than the size of the segment referred to by 
+        segmentIndex.
+
+        Loop this
+
+        :preTriggerSamples: (int) number of samples to store before the trigger event
+        :postTriggerSamples: (int) number of samples to store after the trigger event
+        :segmentIndex: (int) which memory segment to use
+        """
+        totalSamples = preTriggerSamples + postTriggerSamples
+        cTotalSamples = ctypes.c_int32(totalSamples)
+        overflow = ctypes.c_int16()
+
+        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, preTriggerSamples, postTriggerSamples, self.timebase,
+                                                     self.oversample, None, segmentIndex, None, None)
+        assert_pico_ok(self.status["runBlock"])
+        self._isReady()
+
+        self._getValues(0, cTotalSamples, segmentIndex, overflow, downsample_ratio, downsample_mode)
+
+    
+
+    ### ETS MODE
+    
+
+
+    ### STREAMING MODE
+
+
+
+
+    ### AWG (Arbitrary Wave Generator)
+
+
+    #helper functions   
     
     def _openUnit(self, serial):
         """
@@ -68,8 +254,8 @@ class Driver:
         self.status["openunit"] = ps.ps2000aOpenUnit(ctypes.byref(self.chandle), serial.encode('utf-8'))
         assert_pico_ok(self.status["openunit"])
         self.isOpen = True
-
-    def setChannel(self, channel_name, coupling_type='AC', input_range='20V', analog_offset=0.0):
+    
+    def _setChannel(self, channel_name, coupling_type='AC', input_range='20V', analog_offset=0.0):
         """
         Sets/initiates a channel on the picoscope
 
@@ -97,8 +283,8 @@ class Driver:
         self.status[f"setCh{channel_name}"] = ps.ps2000aSetChannel(self.chandle, channel, ENABLED, 
                                                             coupling, channel_range, analog_offset)
         assert_pico_ok(self.status[f"setCh{channel_name}"])
-
-    def getAnalogOffset(self, input_range, coupling_type):
+    
+    def _getAnalogOffset(self, input_range, coupling_type):
         """
         Returns maximum and minimum allowable analog offset for specific voltage range
 
@@ -118,75 +304,6 @@ class Driver:
         self.status["getAnalogOffset"] = ps.ps2000aGetAnalogueOffset(self.chandle, volt_range, coupling, ctypes.byref(max_volt), ctypes.byref(min_volt))
         assert_pico_ok(self.status["getAnalogOffset"])
         return max_volt.value, min_volt.value 
-
-
-    ### BLOCK MODE
-
-    #Basic Block Setup
-    def setupBlock (self, preTriggerSamples, postTriggerSamples, downsampling_mode=None, nSegments=1):
-        """
-        Get Timebase and Setup Data buffers. 
-
-        :preTriggerSamples: (int) number of samples to store before the trigger event
-        :postTriggerSamples: (int) number of samples to store after the trigger event
-        :downsampling_mode: (str) the downsampling mode used to store data
-        :nSegments: (int) the number of memory segments used (number of buffers to setup)
-        """
-        totalSamples = preTriggerSamples + postTriggerSamples
-
-        #Timebase
-        self.getTimebase(self.timebase, totalSamples, 0)
-
-        if downsampling_mode is None:
-            downsampling_mode = 'NONE'
-        downsampling_mode = downsampling_mode.upper()
-        DOWNSAMPLING_MODES = ['NONE', 'AGGREGATE', 'AVERAGE', 'DECIMATE']
-        if downsampling_mode not in DOWNSAMPLING_MODES:
-            raise ValueError(f"{downsampling_mode} is not a valid downsampling mode")
-        mode = ps.PS2000A_RATIO_MODE[f'PS2000A_RATIO_MODE_{downsampling_mode}']
-
-        #Create and set buffers ready for assigning pointers for data collection
-        allBuffersMax = []
-        allBuffersMin = []
-        for channel in self.channels:
-            if nSegments == 1:
-                buffersMax = (ctypes.c_int16 * totalSamples)()
-                buffersMin = (ctypes.c_int16 * totalSamples)()
-                self._setDataBuffers(channel, allBuffersMax, allBuffersMin, totalSamples, 0, mode)
-            else:
-                buffersMax = []
-                buffersMin = []
-                for index in range(nSegments):
-                    buffersMax.append((ctypes.c_int16 * totalSamples)())
-                    buffersMin.append((ctypes.c_int16 * totalSamples)())
-                    self._setDataBuffers(channel, buffersMax[-1], buffersMin[-1], totalSamples, index, mode)
-            allBuffersMax.append(buffersMax)
-            allBuffersMin.append(buffersMin)
-        
-        return allBuffersMax, allBuffersMin
-    
-    def getTimebase(self, timebase, noSamples, segmentIndex):
-        """
-        Calculates the sampling rate and maximum number of samples for a given timebase under specified conditions.
-        Depends on the number of channels enabled by the last call to setChannels().
-        Before using, estimate the timebase number that you require using timebase guide in Programmer's Guide
-        (linked above at start of this file)
-
-        :timebase: (int) 
-        :noSamples: (int) the number of samples required
-        :segmentIndex: (int) the idnex of the memory segment to use
-
-        returns timeIntervalNanoseconds (float, time interval between readins at selected timebase), 
-                maxSamples (int, maximum number of samples available)
-        """
-        timeIntervalNanoseconds = ctypes.c_float()
-        maxSamples = ctypes.c_int32()
-        self.status["getTimebase"] = ps.ps2000aGetTimebase2(self.chandle, timebase, noSamples, 
-                                                            ctypes.byref(timeIntervalNanoseconds), self.oversample,
-                                                            ctypes.byref(maxSamples), segmentIndex)
-        assert_pico_ok(self.status["getTimebase"])
-        self.time_interval_ns = timeIntervalNanoseconds.value
-        return timeIntervalNanoseconds.value, maxSamples.value
     
     def _setDataBuffer():
         return
@@ -211,24 +328,67 @@ class Driver:
                                                                            ctypes.byref(bufferMin), totalSamples, segmentIndex,
                                                                            mode)
         assert_pico_ok(self.status[f"setDataBuffers{channel}"])
-
-
-    #Rapid Block Setup
-    def setupRapidBlock (self, preTriggerSamples, postTriggerSamples, nSegments=10, nCaptures=10, downsampling_mode=None):
+    
+    def _checkDownsampleMode(self, mode):
+        if mode is None:
+            mode = 'NONE'
+        mode = mode.upper()
+        DOWNSAMPLING_MODES = ['NONE', 'AGGREGATE', 'AVERAGE', 'DECIMATE']
+        if mode not in DOWNSAMPLING_MODES:
+            raise ValueError(f"{mode} is not a valid downsampling mode")
+        return ps.PS2000A_RATIO_MODE[f'PS2000A_RATIO_MODE_{mode}']
+    
+    def _isReady(self):
         """
-        Sets up additional rapid block requirements ontop of basic block set up stuff
-
-        :preTriggerSamples: (int) number of samples to store before the trigger event
-        :postTriggerSamples: (int) number of samples to store after the trigger event
-        :nSegments: (int) number of segments required
-        :nCaptures: (int) number of waveforms to capture in one run
-        :downsampling_mode: (str) the downsampling mode used to store data
+        Checks for data collection to finish using ps2000aIsReady
         """
-        totalSamples = preTriggerSamples + postTriggerSamples
-        self._memorySegments(totalSamples, nSegments)
-        self._setNoOfCaptures(nCaptures)
-        self.setupBlock(preTriggerSamples, postTriggerSamples, downsampling_mode, nSegments)
-        
+        ready = ctypes.c_int16(0)
+        check = ctypes.c_int16(0)
+        while ready.value == check.value:
+            self.status["isReady"] = ps.ps2000aIsReady(self.chandle, ctypes.byref(ready))
+
+    def _getValues(self, start_index, cTotalSamples, segmentIndex, overflow, mode, downsample_ratio=1):
+        """
+        Retrieves block-mode data, with or without downsampling, starting at the specified sample number. Used to get stored
+        data after data collection has stopped and store it in a user buffer previously passed to _setDataBuffer(). 
+        Blocks the calling function while retrieving data.
+        Sufficient to retrieve data for all channels at same time
+
+        :start_index: 
+        :cTotalSamples:
+        :segmentIndex:
+        :overflow:
+        :downsample_ratio:
+        :downsample_mode:
+        """
+        self.status["getValues"] = ps.ps2000aGetValues(self.chandle, start_index, ctypes.byref(cTotalSamples), 
+                                                       downsample_ratio, mode, 0, segmentIndex, ctypes.byref(overflow))
+        assert_pico_ok(self.status["getValues"])
+    
+    def _getValuesBulk(self, cTotalSamples, firstSegmentIndex, lastSegmentIndex, overflow, downsammple_ratio, downsample_mode=None):
+        """
+        Retrieves waveforms captured using RAPID BLOCK MODE. Waveforms must have been collected sequentially and in the same run.
+        Sufficient to retrieve data for all channels at the same time.
+        """
+        if downsample_mode is None:
+            downsample_mode = 'NONE'
+        downsample_mode = downsample_mode.upper()
+        DOWNSAMPLING_MODES = ['NONE', 'AGGREGATE', 'AVERAGE', 'DECIMATE']
+        if downsample_mode not in DOWNSAMPLING_MODES:
+            raise ValueError(f"{downsample_mode} is not a valid downsampling mode")
+        mode = ps.PS2000A_RATIO_MODE[f'PS2000A_RATIO_MODE_{downsample_mode}']
+    
+    def _getGraphValues(self, cTotalSamples):
+        time = np.linspace(0, ((cTotalSamples.value)-1) * self.time_interval_ns, cTotalSamples.value)
+
+        maxADC = self._maximumValue()
+        data = []
+        for channel, param in self.channels:
+            maxBuffer = param['buffersMax']
+            chRange = param['range']
+            data.append(adc2mV(maxBuffer, chRange, maxADC))
+
+        return time, data
     
     def _memorySegments(self, maxSamples, nSegments=10):
         """
@@ -252,71 +412,6 @@ class Driver:
         """
         self.status["setNoOfCaptures"] = ps.ps2000aSetNoOfCaptures(self.chandle, nCaptures)
         assert_pico_ok(self.status["setNoOfCaptures"])
-
-    
-    #ETS (Equivalent Time Sampling) Setup
-
-
-    
-    ## Run Block
-
-    def runBlock(self, preTriggerSamples, postTriggerSamples, segmentIndex):
-        """
-        Starts collecting data in block mode. Number of samples collected is determined by noOfPreTriggerSamples and
-        noOfPostTriggerSamples. Total number of samples must not be more than the size of the segment referred to by 
-        segmentIndex.
-
-        :noOfPreTriggerSamples: (int) number of samples to store before the trigger event
-        :noOfPostTriggerSamples: (int) number of samples to store after the trigger event
-        :segmentIndex: (int) which memory segment to use
-        :lpReady: (ps2000aBlockReady) pointer to ps2000aBlockReady() function that driver will call when the data
-                has been collected. To use ps2000aIsReady() polling method instead of a callback function, set pointer
-                to NULL
-        """
-        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, preTriggerSamples, postTriggerSamples, self.timebase,
-                                                     self.oversample, None, segmentIndex, None, None)
-        assert_pico_ok(self.status["runBlock"])
-        self._isReady()
-
-
-    def _isReady(self):
-        """
-        Checks for data collection to finish using ps2000aIsReady
-        """
-        ready = ctypes.c_int16(0)
-        check = ctypes.c_int16(0)
-        while ready.value == check.value:
-            self.status["isReady"] = ps.ps2000aIsReady(self.chandle, ctypes.byref(ready))
-
-
-    ### STREAMING MODE
-
-
-
-
-    ### AWG (Arbitrary Wave Generator)
-
-
-    #helper functions   
-    def closeUnit(self):
-        """Closes the unit"""
-
-        self.status["closeUnit"] = ps.ps2000aCloseUnit(self.chandle)
-        assert_pico_ok(self.status["closeUnit"])
-        self.isOpen = False
-    
-    def stop(self):
-        """
-        Stops the scope device while it is waiting for a trigger or capturing data
-        Block mode: terminates current capture. any data in buffer is invalid
-        Rapid block mode: terminates the sequence of captures. Any completed capptures will contain valid data
-        Streaming mode: terminates data capture. If called before trigger event, oscilloscope may not contain valid data.
-                        If capture has already started, buffer will contain valid data
-        """
-        self.status["stop"] = ps.ps2000aStop(self.chandle)
-        assert_pico_ok(self.status["stop"])
-    
-    
     
     
     ### EXTRA FUNCTIONS THAT COME IN DRIVER
@@ -401,9 +496,6 @@ class Driver:
         serials = ctypes.c_int8()
         serialLth_out = ctypes.c_int16() #lol idk how this works
 
-
-    
-    ### SAMPLING MODES FUNCTIONS
     
 
 
@@ -475,12 +567,6 @@ class Driver:
     
     def getMaxDownSampleRatio():
         return
-    
-    def getValues():
-        return
-    
-    def getValuesBulk():
-        return
         
     def getValuesAsync():
         return
@@ -491,23 +577,23 @@ class Driver:
     def getValuesOverlappedBulk():
         return
 
-    def maximumValue(self):
+    def _maximumValue(self):
         """
         returns the maximum ADC count returned by calls to the getValues functions
         """
         maxVal = ctypes.c_int16()
         self.status["maxValue"] = ps.ps2000aMaximumValue(self.chandle, ctypes.byref(maxVal))
         assert_pico_ok(self.status["maxValue"])
-        return maxVal.value
+        return maxVal
     
-    def minimumValue(self):
+    def _minimumValue(self):
         """
         returns the minimum ADC count returned by calls to the getValues functions
         """
         minVal = ctypes.c_int16()
         self.status["minValue"] = ps.ps2000aMinimumValue(self.chandle, ctypes.byref(minVal))
         assert_pico_ok(self.status["minValue"])
-        return minVal.value
+        return minVal
 
 
     ### TRIGGER FUNCTIONS
