@@ -18,20 +18,14 @@ DISABLED = 0
 
 class Driver:
     ### INITATION / GENERAL SETUP
-    def __init__(self, serial=None, channels=None, trigger_params=None, timebase=1):
+    def __init__(self, serial=None, logger=None):
         """
         Opens picoscope unit (specified by serial number) and sets up channels with given input_ranges and analog_offsets.
-        Also, sets up trigger according to trigger_param dictionary
 
         :serial: (str) serial number of picoscope to be opened (if None, opens first picoscope)
-        :channels: (dict) dictionary of initial channel setup parameters
-            - 'range': (str) Viewed voltage range of input. Options: 10mV, 20mV, 50mV, 100mV, 200 mV, 500 mV, 1V, 2V, 5V, 10V, 20V
-            - 'offset': (float) Voltage added to input channel before digitization
-            - 'coupling': (str) Coupling type, 'AC' or 'DC'. If None, coupling is set to 'AC'
-        :trigger_params: (dict) dictionary of trigger parameteres
-            - 'function': 
         :timebase: (int) An estimated timebase. See Programmer's guide p.28
         """
+        self.logger = logger
 
         #Create chandle and status ready for use
         self.chandle = ctypes.c_int16()
@@ -39,14 +33,29 @@ class Driver:
 
         self.isOpen = False
         self.oversample = ctypes.c_int16(0)
-        self.timebase = timebase
+
+        self.channels = None
+        self.timebase = 2
+        self.trigger_parms = None
+        self.preTriggerSamples = 0
+        self.postTriggerSamples = 0
+        self.totalSamples = 0
         self.time_interval_ns = 0
 
         #open unit
-        self._openUnit(serial)
+        self.status["openunit"] = ps.ps2000aOpenUnit(ctypes.byref(self.chandle), serial.encode('utf-8'))
+        assert_pico_ok(self.status["openunit"])
+        self.isOpen = True
 
-        #set channels
-        self.channels = channels
+    #set Channel stuff    
+    def setChannel(self, params):
+        """
+        :params: (dict) 2D dictionary of initial channel setup parameters
+            - 'range': (str) Viewed voltage range of input. Options: 10mV, 20mV, 50mV, 100mV, 200 mV, 500 mV, 1V, 2V, 5V, 10V, 20V
+            - 'offset': (float) Voltage added to input channel before digitization
+            - 'coupling': (str) Coupling type, 'AC' or 'DC'. If None, coupling is set to 'AC'
+        """
+        self.channels = params
         for name, param in self.channels:
             if 'coupling' in param:
                 coupling = param['coupling']
@@ -80,6 +89,43 @@ class Driver:
         else: 
             channel['offset'] = offset
             self._setChannel(channel_name, channel['coupling'], channel['range'], offset)
+    
+    #trigger stuff
+    def setTrigger(self, params):
+        """
+        :trigger_params: (dict) dictionary of trigger parameteres for simpleTrigger
+            - 'channel': (str) channel to trigger on 'A' or 'B'
+            - 'threshold': (int) ADC count at which trigger will fire (default = 1024)
+            - 'direction': (str) direction in which signal must move to cause a trigger (default = 'rising')
+                Options are 'Above', 'Below', Rising', 'Falling', and 'Rising_or_falling'
+            - 'delay': (int, ms) time between trigger occuring and first sample being taken (default = 0)
+            - 'autoTrigger_ms': (int, ms) number of ms the device will wait if no trigger occurs. If 0, scope will wait 
+                indefinitely for a trigger (default = 1000)
+        """
+        self.trigger_params = params
+        triggerChannel = self.trigger_params['channel']
+
+        if 'threshold' in self.trigger_params:
+            triggerThreshold = self.trigger_params['threshold']
+        else:
+            triggerThreshold = 1024
+
+        if 'direction' in self.trigger_params:
+            triggerDirection = self.trigger_params['direction']
+        else:
+            triggerDirection = 'RISING'
+        
+        if 'delay' in self.trigger_parms:
+            triggerDelay = self.trigger_parms['delay']
+        else:
+            triggerDelay = 0
+
+        if 'autoTrigger_ms' in self.trigger_params:
+            autoTrigger = self.trigger_parms['autoTrigger_ms']
+        else:
+            autoTrigger = 1000
+
+        self.simpleTrigger(triggerChannel, triggerThreshold, triggerDirection, triggerDelay, autoTrigger)
     
     def closeUnit(self):
         """Closes the unit"""
@@ -115,9 +161,10 @@ class Driver:
         returns timeIntervalNanoseconds (float, time interval between readins at selected timebase), 
                 maxSamples (int, maximum number of samples available)
         """
+        self.timebase = timebase
         timeIntervalns = ctypes.c_float()
         maxSamples = ctypes.c_int32()
-        self.status["getTimebase"] = ps.ps2000aGetTimebase2(self.chandle, timebase, noSamples, 
+        self.status["getTimebase"] = ps.ps2000aGetTimebase2(self.chandle, self.timebase, noSamples, 
                                                             ctypes.byref(timeIntervalns), self.oversample,
                                                             ctypes.byref(maxSamples), segmentIndex)
         assert_pico_ok(self.status["getTimebase"])
@@ -129,35 +176,40 @@ class Driver:
     ### BLOCK MODE
 
     # Block Setup
-    def setupBlock (self, preTriggerSamples, postTriggerSamples, downsampling_mode=None, nSegments=1):
+    def setupBlock (self, trigger_params, preTriggerSamples, postTriggerSamples, downsampling_mode=None, nSegments=1):
         """
-        Get Timebase and Setup Data buffers. 
+        Setup trigger with SimpleTrigger, and setup Data buffers. 
 
+        :trigger_params: see setTrigger()
         :preTriggerSamples: (int) number of samples to store before the trigger event
         :postTriggerSamples: (int) number of samples to store after the trigger event
         :downsampling_mode: (str) the downsampling mode used to store data
         :nSegments: (int) the number of memory segments used (number of buffers to setup)
         """
-        totalSamples = preTriggerSamples + postTriggerSamples
+        self.setTrigger(trigger_params)
+        
+        self.preTriggerSamples = preTriggerSamples
+        self.postTriggerSamples = postTriggerSamples
+        self.totalSamples = preTriggerSamples + postTriggerSamples
 
         mode = self._checkDownsampleMode(downsampling_mode)
 
         #Create and set buffers ready for assigning pointers for data collection
         for channel, param in self.channels:
             if nSegments == 1:
-                param['buffersMax'] = (ctypes.c_int16 * totalSamples)()
-                param['buffersMin'] = (ctypes.c_int16 * totalSamples)()
-                self._setDataBuffers(channel, param['buffersMax'], param['buffersMin'], totalSamples, 0, mode)
+                param['buffersMax'] = (ctypes.c_int16 * self.totalSamples)()
+                param['buffersMin'] = (ctypes.c_int16 * self.totalSamples)()
+                self._setDataBuffers(channel, param['buffersMax'], param['buffersMin'], self.totalSamples, 0, mode)
             else:
                 param['buffersMax'] = []
                 param['buffersMin'] = []
                 for index in range(nSegments):
-                    param['buffersMax'].append((ctypes.c_int16 * totalSamples)())
-                    param['buffersMin'].append((ctypes.c_int16 * totalSamples)())
-                    self._setDataBuffers(channel, param['buffersMax'][-1], param['buffersMin'][-1], totalSamples, index, mode)
+                    param['buffersMax'].append((ctypes.c_int16 * self.totalSamples)())
+                    param['buffersMin'].append((ctypes.c_int16 * self.totalSamples)())
+                    self._setDataBuffers(channel, param['buffersMax'][-1], param['buffersMin'][-1], self.totalSamples, index, mode)
 
     #Run Block
-    def runBlock(self, preTriggerSamples, postTriggerSamples, segmentIndex, downsample_ratio=1, downsample_mode=None):
+    def runBlock(self, segmentIndex, downsample_ratio=1, downsample_mode=None):
         """
         Starts collecting data in block mode. Number of samples collected is determined by noOfPreTriggerSamples and
         noOfPostTriggerSamples. Total number of samples must not be more than the size of the segment referred to by 
@@ -166,15 +218,12 @@ class Driver:
         Loop this
         Returns the data to graph
 
-        :preTriggerSamples: (int) number of samples to store before the trigger event
-        :postTriggerSamples: (int) number of samples to store after the trigger event
         :segmentIndex: (int) which memory segment to use
         """
-        totalSamples = preTriggerSamples + postTriggerSamples
-        cTotalSamples = ctypes.c_int32(totalSamples)
+        cTotalSamples = ctypes.c_int32(self.totalSamples)
         overflow = ctypes.c_int16()
 
-        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, preTriggerSamples, postTriggerSamples, self.timebase,
+        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, self.preTriggerSamples, self.postTriggerSamples, self.timebase,
                                                      self.oversample, None, segmentIndex, None, None)
         assert_pico_ok(self.status["runBlock"])
         self._isReady()
@@ -201,8 +250,10 @@ class Driver:
         :nCaptures: (int) number of waveforms to capture in one run
         :downsampling_mode: (str) the downsampling mode used to store data
         """
-        totalSamples = preTriggerSamples + postTriggerSamples
-        self._memorySegments(totalSamples, nSegments)
+        self.preTriggerSamples = preTriggerSamples
+        self.postTriggerSamples = postTriggerSamples
+        self.totalSamples = preTriggerSamples + postTriggerSamples
+        self._memorySegments(self.totalSamples, nSegments)
         self._setNoOfCaptures(nCaptures)
         self.setupBlock(preTriggerSamples, postTriggerSamples, downsampling_mode, nSegments)
 
@@ -210,7 +261,7 @@ class Driver:
     
     ## Run Rapid Block
 
-    def runRapidBlock(self, preTriggerSamples, postTriggerSamples, segmentIndex, downsample_ratio=1, downsample_mode=None):
+    def runRapidBlock(self, segmentIndex, downsample_ratio=1, downsample_mode=None):
         """
         Starts collecting data in block mode. Number of samples collected is determined by noOfPreTriggerSamples and
         noOfPostTriggerSamples. Total number of samples must not be more than the size of the segment referred to by 
@@ -222,11 +273,10 @@ class Driver:
         :postTriggerSamples: (int) number of samples to store after the trigger event
         :segmentIndex: (int) which memory segment to use
         """
-        totalSamples = preTriggerSamples + postTriggerSamples
-        cTotalSamples = ctypes.c_int32(totalSamples)
+        cTotalSamples = ctypes.c_int32(self.totalSamples)
         overflow = ctypes.c_int16()
 
-        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, preTriggerSamples, postTriggerSamples, self.timebase,
+        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, self.preTriggerSamples, self.postTriggerSamples, self.timebase,
                                                      self.oversample, None, segmentIndex, None, None)
         assert_pico_ok(self.status["runBlock"])
         self._isReady()
@@ -248,14 +298,6 @@ class Driver:
 
 
     #helper functions   
-    
-    def _openUnit(self, serial):
-        """
-        Opens the picoscope
-        """
-        self.status["openunit"] = ps.ps2000aOpenUnit(ctypes.byref(self.chandle), serial.encode('utf-8'))
-        assert_pico_ok(self.status["openunit"])
-        self.isOpen = True
     
     def _setChannel(self, channel_name, coupling_type='AC', input_range='20V', analog_offset=0.0):
         """
@@ -419,6 +461,92 @@ class Driver:
         """
         self.status["setNoOfCaptures"] = ps.ps2000aSetNoOfCaptures(self.chandle, nCaptures)
         assert_pico_ok(self.status["setNoOfCaptures"])
+    
+    ### TRIGGER FUNCTIONS
+
+    def _samplePeriod (self, msTime):
+        """Calculates number of sample periods from time input, using set timebase. msTime is in milliseconds"""
+        if self.timebase < 3:
+            interval = np.power(2, self.timebase) / 500000000
+        else:
+            interval = (self.timebase - 2) / 62500000
+        
+        #seconds to ms
+        interval = 1e6 * interval
+
+        return msTime / interval
+
+    def simpleTrigger(self, channel, threshold=1024, threshold_direction='RISING', delay=0, auto_trigger=1000):
+        """
+        Sets trigger on given channel, given trigger params
+        """
+        channel = channel.upper()
+        if channel != 'A' and channel!= 'B':
+            raise ValueError(f"Channel {channel} does not exist")
+        
+        threshold_direction = threshold_direction.upper()
+        DIRECTIONS = ['ABOVE', 'BELOW', 'RISING', 'FALLING', 'RISING_OR_FALLING']
+        if threshold_direction not in DIRECTIONS:
+            raise ValueError(f"Threshold Direction {threshold_direction} is not supported.")
+
+        source = ps.PS2000A_CHANNEL[f'PS2000A_CHANNEL_{channel}']
+        direction = ps.PS2000A_THRESHOLD_DIRECTION[f'PS2000A_{threshold_direction}']
+        delay = self._samplePeriod(delay)
+
+        self.status[f"trigger"] = ps.ps2000aSetSimpleTrigger(self.chandle, ENABLED, source, threshold, direction, delay, auto_trigger)
+        assert_pico_ok(self.status["trigger"])
+    
+    def triggerChannelConditions(): #idk how to implement this
+        return
+    
+    def triggerChannelDirections(self, channelA, channelB):
+        """
+        Sets the direction of the trigger for each channel.
+        
+        :channelA: (str) direction for channel A
+        :channelB: (str) direction for channel B
+
+        See p. 104 on Programmer's Guide for allowed directions
+        """
+        DIRECTIONS = ['ABOVE', 'ABOVE_LOWER', 'BELOW', 'BELOW_LOWER', 'RISING', 'RISING_LOWER', 'FALLING', 'FALLING_LOWER',
+                      'RISING_OR_FALLING', 'INSIDE', 'OUTSIDE', 'ENTER', 'EXIT', 'ENTER_OR_EXIT', 'NONE']
+        
+        channelA = channelA.upper()
+        channelB = channelB.upper()
+        if channelA not in DIRECTIONS:
+            raise ValueError(f"Threshold Direction {channelA} is not supported.")
+        if channelB not in DIRECTIONS:
+            raise ValueError(f"Threshold Direction {channelB} is not supported.")
+
+        A = ps.PS2000A_THRESHOLD_DIRECTION[f'PS2000A_{channelA}']
+        B = ps.PS2000A_THRESHOLD_DIRECTION[f'PS2000A_{channelB}']
+        self.status["triggerDirections"] = ps.ps2000aSetTriggerChannelDirections(self.chandle, A, B, None, None, None, None)
+        assert_pico_ok(self.status["triggerDirections"])
+
+    def triggerChannelProperties():
+        return
+    
+    def triggerDelay(self, delay):
+        """
+        Sets the post-trigger delay. Causes capture to start a defined time after the trigger event
+
+        :delay: (int) time between the trigger occuring and the first sample, milliseconds
+        """
+        delay = self._samplePeriod(delay)
+        self.status["TriggerDelay"] = ps.ps2000aSetTriggerDelay(self.chandle, delay)
+        assert_pico_ok(self.status["TriggerDelay"])
+
+    def setPulseWidthQualifier():
+        return
+    
+    def isTriggerOrPulseWidthQualifierEnabled():
+        return
+    
+    def getTriggerTimeOffset64():
+        return
+    
+    def getValuesTriggerTimeOffsetBulk64():
+        return
     
     
     ### EXTRA FUNCTIONS THAT COME IN DRIVER
@@ -602,100 +730,6 @@ class Driver:
         assert_pico_ok(self.status["minValue"])
         return minVal
 
-
-    ### TRIGGER FUNCTIONS
-
-    def _samplePeriod (self, msTime):
-        """Calculates number of sample periods from time input, using set timebase. msTime is in milliseconds"""
-        if self.timebase < 3:
-            interval = np.power(2, self.timebase) / 500000000
-        else:
-            interval = (self.timebase - 2) / 62500000
-        
-        #seconds to ms
-        interval = 1e6 * interval
-
-        return msTime / interval
-
-    def simpleTrigger(self, channel, threshold=1024, threshold_direction='RISING', delay=0, auto_trigger=1000):
-        """
-        Sets trigger on given channel
-
-        :channel: (str) The name of the channel being used as trigger source (A or B)
-        :threshold: (int) ADC counts 
-        :threshold_direction: (str) Direction which signal must move to cause a trigger
-            - supported directions: Above, Below, Rising, Falling, and Rising_or_falling
-        :delay: (int) Time between trigger occuring and the first sample being taken, milliseconds
-        :auto_trigger: (int, ms) number of ms the device will wait if no trigger occurs. If 0, scope will wait 
-            indefinitely for a trigger
-        """
-        channel = channel.upper()
-        if channel != 'A' and channel!= 'B':
-            raise ValueError(f"Channel {channel} does not exist")
-        
-        threshold_direction = threshold_direction.upper()
-        DIRECTIONS = ['ABOVE', 'BELOW', 'RISING', 'FALLING', 'RISING_OR_FALLING']
-        if threshold_direction not in DIRECTIONS:
-            raise ValueError(f"Threshold Direction {threshold_direction} is not supported.")
-
-        source = ps.PS2000A_CHANNEL[f'PS2000A_CHANNEL_{channel}']
-        direction = ps.PS2000A_THRESHOLD_DIRECTION[f'PS2000A_{threshold_direction}']
-        delay = self._samplePeriod(delay)
-
-        self.status[f"trigger"] = ps.ps2000aSetSimpleTrigger(self.chandle, ENABLED, source, threshold, direction, delay, auto_trigger)
-        assert_pico_ok(self.status["trigger"])
-    
-    def triggerChannelConditions(): #idk how to implement this
-        return
-    
-    def triggerChannelDirections(self, channelA, channelB):
-        """
-        Sets the direction of the trigger for each channel.
-        
-        :channelA: (str) direction for channel A
-        :channelB: (str) direction for channel B
-
-        See p. 104 on Programmer's Guide for allowed directions
-        """
-        DIRECTIONS = ['ABOVE', 'ABOVE_LOWER', 'BELOW', 'BELOW_LOWER', 'RISING', 'RISING_LOWER', 'FALLING', 'FALLING_LOWER',
-                      'RISING_OR_FALLING', 'INSIDE', 'OUTSIDE', 'ENTER', 'EXIT', 'ENTER_OR_EXIT', 'NONE']
-        
-        channelA = channelA.upper()
-        channelB = channelB.upper()
-        if channelA not in DIRECTIONS:
-            raise ValueError(f"Threshold Direction {channelA} is not supported.")
-        if channelB not in DIRECTIONS:
-            raise ValueError(f"Threshold Direction {channelB} is not supported.")
-
-        A = ps.PS2000A_THRESHOLD_DIRECTION[f'PS2000A_{channelA}']
-        B = ps.PS2000A_THRESHOLD_DIRECTION[f'PS2000A_{channelB}']
-        self.status["triggerDirections"] = ps.ps2000aSetTriggerChannelDirections(self.chandle, A, B, None, None, None, None)
-        assert_pico_ok(self.status["triggerDirections"])
-
-    def triggerChannelProperties():
-        return
-    
-    def triggerDelay(self, delay):
-        """
-        Sets the post-trigger delay. Causes capture to start a defined time after the trigger event
-
-        :delay: (int) time between the trigger occuring and the first sample, milliseconds
-        """
-        delay = self._samplePeriod(delay)
-        self.status["TriggerDelay"] = ps.ps2000aSetTriggerDelay(self.chandle, delay)
-        assert_pico_ok(self.status["TriggerDelay"])
-
-    def setPulseWidthQualifier():
-        return
-    
-    def isTriggerOrPulseWidthQualifierEnabled():
-        return
-    
-    def getTriggerTimeOffset64():
-        return
-    
-    def getValuesTriggerTimeOffsetBulk64():
-        return
     
 
     ### CAPTURES FUNCTIONS
