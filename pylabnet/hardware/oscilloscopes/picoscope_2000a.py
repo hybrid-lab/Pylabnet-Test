@@ -52,7 +52,7 @@ class Driver:
         """
         :params: (dict) 2D dictionary of initial channel setup parameters
             - 'range': (str) Viewed voltage range of input. Options: 10mV, 20mV, 50mV, 100mV, 200 mV, 500 mV, 1V, 2V, 5V, 10V, 20V
-            - 'offset': (float) Voltage added to input channel before digitization
+            - 'offset': (float, V) Voltage added to input channel before digitization. If None, offset set to 0.0
             - 'coupling': (str) Coupling type, 'AC' or 'DC'. If None, coupling is set to 'AC'
         """
         self.channels = params
@@ -62,9 +62,15 @@ class Driver:
             else:
                 coupling = 'AC'
                 param['coupling'] = coupling
-            volt_range = param['range']
-            offset = param['offset']
 
+            volt_range = param['range']
+            
+            if 'offset' in param:
+                offset = param['offset']
+            else:
+                offset = 0.0
+                param['offset'] = 0.0
+            
             maximum, minimum = self._getAnalogOffset(volt_range, coupling)
             if offset > maximum or offset < minimum:
                 raise ValueError(f"{offset} offset is outside allowed range of {minimum} to {maximum}")
@@ -89,6 +95,43 @@ class Driver:
         else: 
             channel['offset'] = offset
             self._setChannel(channel_name, channel['coupling'], channel['range'], offset)
+    
+    def closeChannel(self, channel_name):
+        channel_name = channel_name.upper()
+        if channel_name != 'A' and channel_name != 'B':
+            raise ValueError(f"Channel {channel_name} does not exist")
+        channel = ps.PS2000A_CHANNEL[f'PS2000A_CHANNEL_{channel_name}']
+        self.status[f"closeCh{channel_name}"] = ps.ps2000aSetChannel(self.chandle, channel, DISABLED, 0, 0, 0.0)
+        assert_pico_ok(self.status[f"closeCh{channel_name}"])
+
+    #timebase
+    def setNoSamples(self, preTriggerSamples=2500, postTriggerSamples=2500):
+        self.preTriggerSamples = preTriggerSamples
+        self.postTriggerSamples = postTriggerSamples
+        self.totalSamples = self.preTriggerSamples + self.postTriggerSamples
+
+    def getTimebase(self, timebase, segmentIndex):
+        """
+        Calculates the sampling rate and maximum number of samples for a given timebase under specified conditions.
+        Depends on the number of channels enabled by the last call to setChannels().
+        Before using, estimate the timebase number that you require using timebase guide in Programmer's Guide
+        (linked above at start of this file)
+
+        :timebase: (int) 
+        :segmentIndex: (int) the index of the memory segment to use
+
+        returns timeIntervalNanoseconds (float, time interval between readins at selected timebase), 
+                maxSamples (int, maximum number of samples available)
+        """
+        self.timebase = timebase
+        timeIntervalns = ctypes.c_float()
+        maxSamples = ctypes.c_int32()
+        self.status["getTimebase"] = ps.ps2000aGetTimebase2(self.chandle, self.timebase, self.totalSamples, 
+                                                            ctypes.byref(timeIntervalns), self.oversample,
+                                                            ctypes.byref(maxSamples), segmentIndex)
+        assert_pico_ok(self.status["getTimebase"])
+        self.time_interval_ns = timeIntervalns.value
+        return timeIntervalns.value, maxSamples.value
     
     #trigger stuff
     def setTrigger(self, params):
@@ -126,6 +169,7 @@ class Driver:
             autoTrigger = 1000
 
         self.simpleTrigger(triggerChannel, triggerThreshold, triggerDirection, triggerDelay, autoTrigger)
+        self.totalSamples = self.preTriggerSamples + self.postTriggerSamples
     
     def closeUnit(self):
         """Closes the unit"""
@@ -146,37 +190,12 @@ class Driver:
         assert_pico_ok(self.status["stop"])
 
 
-    ### FINDING TIMEBASE
-    def getTimebase(self, timebase, noSamples, segmentIndex):
-        """
-        Calculates the sampling rate and maximum number of samples for a given timebase under specified conditions.
-        Depends on the number of channels enabled by the last call to setChannels().
-        Before using, estimate the timebase number that you require using timebase guide in Programmer's Guide
-        (linked above at start of this file)
-
-        :timebase: (int) 
-        :noSamples: (int) the number of samples required
-        :segmentIndex: (int) the idnex of the memory segment to use
-
-        returns timeIntervalNanoseconds (float, time interval between readins at selected timebase), 
-                maxSamples (int, maximum number of samples available)
-        """
-        self.timebase = timebase
-        timeIntervalns = ctypes.c_float()
-        maxSamples = ctypes.c_int32()
-        self.status["getTimebase"] = ps.ps2000aGetTimebase2(self.chandle, self.timebase, noSamples, 
-                                                            ctypes.byref(timeIntervalns), self.oversample,
-                                                            ctypes.byref(maxSamples), segmentIndex)
-        assert_pico_ok(self.status["getTimebase"])
-        self.time_interval_ns = timeIntervalns.value
-        return timeIntervalns.value, maxSamples.value
-
 
 
     ### BLOCK MODE
 
     # Block Setup
-    def setupBlock (self, trigger_params, preTriggerSamples, postTriggerSamples, downsampling_mode=None, nSegments=1):
+    def setupBlock (self, trigger_params, downsampling_mode=None, nSegments=1):
         """
         Setup trigger with SimpleTrigger, and setup Data buffers. 
 
@@ -187,10 +206,6 @@ class Driver:
         :nSegments: (int) the number of memory segments used (number of buffers to setup)
         """
         self.setTrigger(trigger_params)
-        
-        self.preTriggerSamples = preTriggerSamples
-        self.postTriggerSamples = postTriggerSamples
-        self.totalSamples = preTriggerSamples + postTriggerSamples
 
         mode = self._checkDownsampleMode(downsampling_mode)
 
@@ -240,7 +255,7 @@ class Driver:
 
 
     ### RAPID BLOCK MODE
-    def setupRapidBlock (self, preTriggerSamples, postTriggerSamples, nSegments=10, nCaptures=10, downsampling_mode=None):
+    def setupRapidBlock (self, nSegments=10, nCaptures=10, downsampling_mode=None):
         """
         Sets up additional rapid block requirements ontop of basic block set up stuff
 
@@ -250,12 +265,9 @@ class Driver:
         :nCaptures: (int) number of waveforms to capture in one run
         :downsampling_mode: (str) the downsampling mode used to store data
         """
-        self.preTriggerSamples = preTriggerSamples
-        self.postTriggerSamples = postTriggerSamples
-        self.totalSamples = preTriggerSamples + postTriggerSamples
         self._memorySegments(self.totalSamples, nSegments)
         self._setNoOfCaptures(nCaptures)
-        self.setupBlock(preTriggerSamples, postTriggerSamples, downsampling_mode, nSegments)
+        self.setupBlock(self.preTriggerSamples, self.postTriggerSamples, downsampling_mode, nSegments)
 
 
     
@@ -414,6 +426,7 @@ class Driver:
                                                        downsample_ratio, mode, 0, segmentIndex, ctypes.byref(overflow))
         assert_pico_ok(self.status["getValues"])
     
+    """TODO"""
     def _getValuesBulk(self, cTotalSamples, firstSegmentIndex, lastSegmentIndex, overflow, downsammple_ratio, downsample_mode=None):
         """
         Retrieves waveforms captured using RAPID BLOCK MODE. Waveforms must have been collected sequentially and in the same run.

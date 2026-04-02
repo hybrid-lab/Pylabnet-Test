@@ -15,25 +15,31 @@ class Service(ServiceBase):
     def exposed_setChannelOffset(self, channel_name, offset):
         return self._module.setChannelOffset(channel_name, offset)
     
+    def exposed_closeChannel(self, channel_name):
+        return self._module.closeChannel(channel_name)
+    
+    
+    def exposted_setNoSamples(self, preTriggerSamples=2500, postTriggerSamples=2500):
+        return self._module.setNoSamples(preTriggerSamples, postTriggerSamples)
+
+    def exposed_getTimebase(self, timebase, segmentIndex=0):
+        return self._module.getTimebase(timebase, segmentIndex)
+    
 
     def exposed_setTrigger(self, params):
         return self._module.setTrigger(params)
-    
-
-    def exposed_getTimebase(self, timebase, noSamples, segmentIndex):
-        return self._module.getTimebase(timebase, noSamples, segmentIndex)
 
 
     #Block Mode
-    def exposed_setupBlock(self, trigger_params, preTriggerSamples, postTriggerSamples, downsampling_mode=None, nSegments=1):
-        return self._module.setupBlock(trigger_params, preTriggerSamples, postTriggerSamples, downsampling_mode, nSegments)
+    def exposed_setupBlock(self, trigger_params, downsampling_mode=None):
+        return self._module.setupBlock(trigger_params, downsampling_mode, 1)
     
     def exposed_runBlock(self, segmentIndex, downsample_ratio=1, downsample_mode=None):
         return self._module.runBlock(segmentIndex, downsample_ratio, downsample_mode)
     
     #Rapid Block Mode
-    def exposed_setupRapidBlock(self, preTriggerSamples, postTriggerSamples, nSegments=10, nCaptures=10, downsampling_mode=None):
-        return self._module.setupRapidBlock(preTriggerSamples, postTriggerSamples, nSegments, nCaptures, downsampling_mode)
+    def exposed_setupRapidBlock(self, nSegments=10, nCaptures=10, downsampling_mode=None):
+        return self._module.setupRapidBlock(nSegments, nCaptures, downsampling_mode)
     
     def exposed_runRapidBlock(self, segmentIndex, downsample_ratio=1, downsample_mode=None):
         return self._module.runRapidBlock(segmentIndex, downsample_ratio, downsample_mode)
@@ -59,25 +65,31 @@ class Client(ClientBase):
     def setChannelOffset(self, channel_name, offset):
         return self._module.exposed_setChannelOffset(channel_name, offset)
     
+    def closeChannel(self, channel_name):
+        return self._module.exposed_closeChannel(channel_name)
+    
+
+    def setNoSamples(self, preTriggerSamples=2500, postTriggerSamples=2500):
+        return self._module.exposed_setNoSamples(preTriggerSamples, postTriggerSamples)
+
+    def getTimebase(self, timebase, segmentIndex=0):
+        return self._module.exposed_getTimebase(timebase, segmentIndex)
+    
 
     def setTrigger(self, params):
         return self._module.exposed_setTrigger(params)
-    
-
-    def getTimebase(self, timebase, noSamples, segmentIndex):
-        return self._module.exposed_getTimebase(timebase, noSamples, segmentIndex)
 
 
     #Block Mode
-    def setupBlock(self, trigger_params, preTriggerSamples, postTriggerSamples, downsampling_mode=None, nSegments=1):
-        return self._module.exposed_setupBlock(trigger_params, preTriggerSamples, postTriggerSamples, downsampling_mode, nSegments)
+    def setupBlock(self, trigger_params, downsampling_mode=None):
+        return self._module.exposed_setupBlock(trigger_params, downsampling_mode)
     
-    def runBlock(self, segmentIndex, downsample_ratio=1, downsample_mode=None):
+    def runBlock(self, segmentIndex=0, downsample_ratio=1, downsample_mode=None):
         return self._module.exposed_runBlock(segmentIndex, downsample_ratio, downsample_mode)
     
     #Rapid Block Mode
-    def setupRapidBlock(self, preTriggerSamples, postTriggerSamples, nSegments=10, nCaptures=10, downsampling_mode=None):
-        return self._module.exposed_setupRapidBlock(preTriggerSamples, postTriggerSamples, nSegments, nCaptures, downsampling_mode)
+    def setupRapidBlock(self, nSegments=10, nCaptures=10, downsampling_mode=None):
+        return self._module.exposed_setupRapidBlock(nSegments, nCaptures, downsampling_mode)
     
     def runRapidBlock(self, segmentIndex, downsample_ratio=1, downsample_mode=None):
         return self._module.exposed_runRapidBlock(segmentIndex, downsample_ratio, downsample_mode)
