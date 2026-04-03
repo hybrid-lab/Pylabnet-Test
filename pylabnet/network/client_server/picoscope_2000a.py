@@ -19,7 +19,7 @@ class Service(ServiceBase):
         return self._module.closeChannel(channel_name)
     
     
-    def exposted_setNoSamples(self, preTriggerSamples=2500, postTriggerSamples=2500):
+    def exposted_setNoSamples(self, preTriggerSamples=500, postTriggerSamples=500):
         return self._module.setNoSamples(preTriggerSamples, postTriggerSamples)
 
     def exposed_getTimebase(self, timebase, segmentIndex=0):
@@ -69,7 +69,7 @@ class Client(ClientBase):
         return self._module.exposed_closeChannel(channel_name)
     
 
-    def setNoSamples(self, preTriggerSamples=2500, postTriggerSamples=2500):
+    def setNoSamples(self, preTriggerSamples=500, postTriggerSamples=500):
         return self._module.exposed_setNoSamples(preTriggerSamples, postTriggerSamples)
 
     def getTimebase(self, timebase, segmentIndex=0):

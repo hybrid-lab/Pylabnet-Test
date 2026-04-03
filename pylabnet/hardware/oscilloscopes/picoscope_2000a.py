@@ -105,7 +105,7 @@ class Driver:
         assert_pico_ok(self.status[f"closeCh{channel_name}"])
 
     #timebase
-    def setNoSamples(self, preTriggerSamples=2500, postTriggerSamples=2500):
+    def setNoSamples(self, preTriggerSamples=500, postTriggerSamples=500):
         self.preTriggerSamples = preTriggerSamples
         self.postTriggerSamples = postTriggerSamples
         self.totalSamples = self.preTriggerSamples + self.postTriggerSamples
@@ -441,7 +441,8 @@ class Driver:
         mode = ps.PS2000A_RATIO_MODE[f'PS2000A_RATIO_MODE_{downsample_mode}']
     
     def _getGraphValues(self, cTotalSamples):
-        time = np.linspace(0, ((cTotalSamples.value)-1) * self.time_interval_ns, cTotalSamples.value)
+        """Returns time axis in microseconds"""
+        time = np.linspace(0, ((cTotalSamples.value)-1) * self.time_interval_ns * 0.001, cTotalSamples.value)
 
         maxADC = self._maximumValue()
         data = []

@@ -44,11 +44,15 @@ scope.setupBlock(trigger_params)
 
 #run block
 fig, ax = plt.subplots()
+num = 0
 def update(frame):
+    global num
     plt.cla()
     time, data = scope.runBlock(0)
     for channel_data in data:
         ax.plot(time, channel_data)
+    print(f'cycle{num}')
+    num = num + 1
 ani = FuncAnimation(fig, update, interval=0.0001)
 plt.show()
 
