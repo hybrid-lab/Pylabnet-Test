@@ -84,7 +84,12 @@ def experiment(**kwargs):
         polarity="RisingEdge",
         active="EDGE",
         trigger_mode="NORMAL",
-        global_exposure="GLOBALRESET",
+    )
+
+    cam.set_output_trigger_exposure(
+        kind="EXPOSURE",
+        source="EXPOSURE",
+        polarity="POSITIVE",
     )
 
     # 2) Arm camera (start acquisition). This returns immediately.
