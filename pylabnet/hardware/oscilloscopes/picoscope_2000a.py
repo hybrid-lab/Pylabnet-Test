@@ -56,7 +56,7 @@ class Driver:
             - 'coupling': (str) Coupling type, 'AC' or 'DC'. If None, coupling is set to 'AC'
         """
         self.channels = params
-        for name, param in self.channels:
+        for name, param in self.channels.items():
             if 'coupling' in param:
                 coupling = param['coupling']
             else:
@@ -158,13 +158,13 @@ class Driver:
         else:
             triggerDirection = 'RISING'
         
-        if 'delay' in self.trigger_parms:
-            triggerDelay = self.trigger_parms['delay']
+        if 'delay' in self.trigger_params:
+            triggerDelay = self.trigger_params['delay']
         else:
             triggerDelay = 0
 
         if 'autoTrigger_ms' in self.trigger_params:
-            autoTrigger = self.trigger_parms['autoTrigger_ms']
+            autoTrigger = self.trigger_params['autoTrigger_ms']
         else:
             autoTrigger = 1000
 
@@ -210,7 +210,7 @@ class Driver:
         mode = self._checkDownsampleMode(downsampling_mode)
 
         #Create and set buffers ready for assigning pointers for data collection
-        for channel, param in self.channels:
+        for channel, param in self.channels.items():
             if nSegments == 1:
                 param['buffersMax'] = (ctypes.c_int16 * self.totalSamples)()
                 param['buffersMin'] = (ctypes.c_int16 * self.totalSamples)()
@@ -445,9 +445,9 @@ class Driver:
 
         maxADC = self._maximumValue()
         data = []
-        for channel, param in self.channels:
+        for channel, param in self.channels.items():
             maxBuffer = param['buffersMax']
-            chRange = param['range']
+            chRange = ps.PS2000A_RANGE[f'PS2000A_{param['range']}']
             data.append(adc2mV(maxBuffer, chRange, maxADC))
 
         return time, data
@@ -487,7 +487,7 @@ class Driver:
         #seconds to ms
         interval = 1e6 * interval
 
-        return msTime / interval
+        return int(msTime / interval)
 
     def simpleTrigger(self, channel, threshold=1024, threshold_direction='RISING', delay=0, auto_trigger=1000):
         """
