@@ -12,6 +12,7 @@ import pickle
 import pyqtgraph as pg
 import matplotlib.dates as mdates
 import pytz
+import time
 
 TEMP_INDEX = 0
 HUMIDITY_INDEX = 1
@@ -64,9 +65,11 @@ class RackMonitor:
 
         Can be stopped using the pause() method
         """
-
-        self._update_sensors()
-        self.gui.force_update()
+        try:
+            self._update_sensors()
+            self.gui.force_update()
+        except:
+            time.sleep(10)
 
     def reset(self, plot_index):
         """resets the plot back to initial framing"""
@@ -219,6 +222,7 @@ class Sensor:
         self.sensor_client = sensor_client
         self.log = log
         self.labels_updated = False  # Flag to check if we have updated all labels
+        self.display_pts = 0
 
         # Initialize relevant placeholders
         self.time = np.array([])
@@ -234,8 +238,9 @@ class Sensor:
 
         :param display_pts: number of points to display on the plot
         """
+        self.display_pts = display_pts
         if self.sensor_client != None:
-            data = self.sensor_client.get_data(display_pts)
+            data = self.sensor_client.get_data(1)
             self.time = data['datetime']
             self.temp = data['temperature']
             self.humidity = data['humidity']
@@ -248,9 +253,14 @@ class Sensor:
         """
         self.count = self.count + 1
         if self.count == 10:
-            self.time = np.append(time, self.time[:-1])
-            self.temp = np.append(temp, self.temp[:-1])
-            self.humidity = np.append(humidity, self.humidity[:-1])
+            if len(self.time) < self.display_pts:
+                self.time = np.append(time, self.time)
+                self.temp = np.append(temp, self.temp)
+                self.humidity = np.append(humidity, self.humidity)
+            else:
+                self.time = np.append(time, self.time[0:-1])
+                self.temp = np.append(temp, self.temp[0:-1])
+                self.humidity = np.append(humidity, self.humidity[0:-1])
             self.count = 0
 
 
