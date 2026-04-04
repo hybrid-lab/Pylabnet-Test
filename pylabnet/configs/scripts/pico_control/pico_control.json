@@ -1,0 +1,31 @@
+{
+    "servers" : [
+        {
+            "type" : "picoscope",
+            "config" : "pico1"
+        }
+    ],
+    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\picoscope_control.py",
+    "device_id" : "pico1",
+    "script_service" : "True",
+    "params" : {
+        "0" : {
+            "index" : 0,
+            "channels" : {
+                "A" : {
+                    "range" : "1V",
+                    "offset" : 0.0,
+                    "coupling" : "AC"
+                }, 
+                "B" : {
+                    "range" : "1V"
+                }
+            },
+            "trigger_params" : {
+                "channel" : "A",
+                "dirction" : "rising",
+                "delay" : 0
+            }
+        }
+    }
+}

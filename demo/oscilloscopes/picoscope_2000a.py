@@ -1,12 +1,11 @@
+from pylabnet.hardware.oscilloscopes.picoscope_2000a import Driver
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
 
 import sys
-sys.path.insert(0,'/usr/lib/python3/dist-packages')
+sys.path.insert(0, '/usr/lib/python3/dist-packages')
 sys.path.insert(0, '/home/porkpie/pylabnet')
-
-from pylabnet.hardware.oscilloscopes.picoscope_2000a import Driver
 
 
 #open driver
@@ -25,8 +24,8 @@ scope = Driver(serial='12459/0199', logger=None)
 }"""
 
 channel_params = {
-    'A' : {
-        'range' : '2V'
+    'A': {
+        'range': '2V'
     }
 }
 
@@ -34,17 +33,19 @@ scope.setChannel(channel_params) #set a default list. Implement other settings w
 
 #time axis stuff --> sommehow make more concise
 scope.setNoSamples() #need to adjust time axis in gui
-scope.getTimebase(2, 0) #add some type of setting to adjust this in gui
+scope.getTimebase(2) #add some type of setting to adjust this in gui
 
 #setup block
 trigger_params = {
-    'channel' : 'A'
+    'channel': 'A'
 }
 scope.setupBlock(trigger_params)
 
 #run block
 fig, ax = plt.subplots()
 num = 0
+
+
 def update(frame):
     global num
     plt.cla()
@@ -53,6 +54,8 @@ def update(frame):
         ax.plot(time, channel_data)
     print(f'cycle{num}')
     num = num + 1
+
+
 ani = FuncAnimation(fig, update, interval=0.0001)
 plt.show()
 
