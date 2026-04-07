@@ -19,9 +19,9 @@ INIT_DICT = {
     'imaging_AOM_start': {'Imaging AOM Start Time (us)': '1000'},
     'imaging_AOM_end': {'Imaging AOM End Time (us)': '2000'},
     'frame_1': {'Camera Frame 1 Time (us)': '1000'},
-    'frame_2': {'Camera Frame 2 Time (us)': '1000'},
+    'frame_2': {'Camera Frame 2 Time (us)': '2000'},
     'wait_time': {'Wait Time Between Cycles (s)': '3'},
-    'camera_trigger_do': {'Camera Trigger DO Channel': '0'},
+    'camera_trigger_do': {'Camera Trigger DO Channel': '1'},
     'imaging_AOM_do': {'Imaging AOM DO Channel': '0'},
     'opx_trigger_do': {'OPX Trigging DO Channel': '1'},
 }
@@ -87,7 +87,7 @@ def experiment(**kwargs):
     imaging_AOM_end = int(dataset.get_input_parameter("imaging_AOM_end"))
     frame_1 = int(dataset.get_input_parameter("frame_1"))
     frame_2 = int(dataset.get_input_parameter("frame_2"))
-    wait_time = int(dataset.get_input_parameter("wait_time"))
+    wait_time = float(dataset.get_input_parameter("wait_time"))
 
     opx_trigger_do = int(dataset.get_input_parameter("opx_trigger_do"))
     camera_trigger_do = "dio" + str(int(dataset.get_input_parameter("camera_trigger_do")))
@@ -99,10 +99,11 @@ def experiment(**kwargs):
 
     #Defines how long OPX will be producing a clock signal
     experiment_lenght_us = 10000
+    buffer = experiment_lenght_us // 10
 
     camera_ttl_up = 50
-    camera_trigger_pulse_1 = [0] * frame_1 + [1] * camera_ttl_up
-    camera_trigger_pulse_2 = [0] * frame_2 + [1] * camera_ttl_up
+    down_time = frame_2 - frame_1 - camera_ttl_up
+    camera_trigger_pulse = [0] * frame_1 + [1] * camera_ttl_up + [0] * down_time + [1] * camera_ttl_up
     imaging_AOM_pulse = [0] * imaging_AOM_start + [1] * (imaging_AOM_end - imaging_AOM_start)
 
     #Experimental Sequence:
@@ -117,13 +118,18 @@ def experiment(**kwargs):
         logger.info("Starting acquisition")
         dataset.camera_client.start_acquisition()
 
+        #NI card 1 needs to be used to get the clock from OPX
+        NI_card_1.arm_clock(length=experiment_lenght_us - buffer, sample_rate=ni_sample_rate)
+        logger.info("Clock configured")
+
         NI_card_2.build_stack()
-        #Camera trigger 1
-        NI_card_2.set_do_voltage(do_channel=camera_trigger_do, value=camera_trigger_pulse_1, sample_rate=ni_sample_rate)
-        #Camera trigger 2
-        NI_card_2.set_do_voltage(do_channel=camera_trigger_do, value=camera_trigger_pulse_2, sample_rate=ni_sample_rate)
+        #Camera trigger pulse
+        NI_card_2.set_do_voltage(do_channel=camera_trigger_do, value=camera_trigger_pulse, sample_rate=ni_sample_rate)
         #Imaging AOM pulse
         NI_card_2.set_do_voltage(do_channel=imaging_AOM_do, value=imaging_AOM_pulse, sample_rate=ni_sample_rate)
+
+        # NI_card_3.build_stack()
+        # NI_card_3.set_ao_voltage(ao_channel="ao0", voltages=camera_trigger_pulse, sample_rate=ni_sample_rate)
 
         #OPX sends digital pulses to NI to set NI's clock
         OPX_client.build_stack()
@@ -141,8 +147,11 @@ def experiment(**kwargs):
 
         #Starts NI and then OPX
         h1 = NI_card_2.arm()
+        # h2 = NI_card_3.arm()
         OPX_client.execute()
         NI_card_2.finalize(h1, timeout=120.0)
+        NI_card_1.finalize_clock()
+        # NI_card_3.finalize(h2, timeout=120.0)
 
         def get_frame(timeout_ms=1000):
             # get_frame_bytes() should return: (bytes, shape, dtype_str)
@@ -153,10 +162,10 @@ def experiment(**kwargs):
         # Always stop acquisition even if something fails
         try:
             logger.info("Requesting one frame")
-            frame_1 = get_frame(timeout_ms=1000)
-            frame_2 = get_frame(timeout_ms=1000)
-            logger.info(f"Got frame: shape={frame_1.shape}, dtype={frame_1.dtype}, min={frame_1.min()}, max={frame_1.max()}")
-            logger.info(f"Got frame: shape={frame_2.shape}, dtype={frame_2.dtype}, min={frame_2.min()}, max={frame_2.max()}")
+            frame1 = get_frame(timeout_ms=10000)
+            frame2 = get_frame(timeout_ms=100000)
+            logger.info(f"Got frame: shape={frame1.shape}, dtype={frame1.dtype}, min={frame1.min()}, max={frame1.max()}")
+            logger.info(f"Got frame: shape={frame2.shape}, dtype={frame2.dtype}, min={frame2.min()}, max={frame2.max()}")
 
         finally:
             logger.info("Stopping acquisition")
@@ -168,7 +177,7 @@ def experiment(**kwargs):
         avg = img_ds.children["Image Averagecurrentavg"]
 
         # Data + update
-        diff = frame_2.astype(np.int32) - frame_1.astype(np.int32)
+        diff = frame2.astype(np.int32) - frame1.astype(np.int32)
         img_ds.set_data(diff)
         img_ds.update()        # updates both current + avg children
 
@@ -176,3 +185,5 @@ def experiment(**kwargs):
         avg.graph.setLevels(-255, 255)
         avg.graph.ui.histogram.autoHistogramRange = False
         time.sleep(wait_time)
+
+        # thread.running = False
