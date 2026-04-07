@@ -12,6 +12,7 @@ import pickle
 import pyqtgraph as pg
 import matplotlib.dates as mdates
 import pytz
+import time
 
 TEMP_INDEX = 0
 HUMIDITY_INDEX = 1
@@ -20,7 +21,7 @@ HUMIDITY_INDEX = 1
 class RackMonitor:
     """ A script class for monitoring laser rack conditions and locking lasers based on the wavemeter """
 
-    def __init__(self, sensorpush_client, logger_client, gui='rack_monitor_v1', display_pts=1000, port=None):
+    def __init__(self, sensorpush_clients, logger_client, gui='sensorpush_only', display_pts=800, port=None):
         """ Instantiates WlmMonitor script object for monitoring wavemeter
 
         :param sensorpush_client: (obj) instance of sensorpush client
@@ -30,7 +31,7 @@ class RackMonitor:
         :param port: (int) port number for update server
         """
 
-        self.sensorpush_client = sensorpush_client
+        self.sensorpush_clients = sensorpush_clients
         self.display_pts = display_pts
         self.log = LogHandler(logger_client)
 
@@ -47,81 +48,97 @@ class RackMonitor:
 
         self.widgets = get_gui_widgets(
             gui=self.gui,
-            temp=1, humidity=1, graph=2
+            temp=2, humidity=2, graph=4, reset=4
         )
 
         # Configure plots
 
         self.widgets['curve'] = []
-
-        self.sensor = Sensor(self.sensorpush_client, log=self.log)
-        self._initialize_sensor()
+        self.sensors = []
+        for client in self.sensorpush_clients:
+            self.sensors.append(Sensor(client, log=self.log))
+        for n in range(len(self.sensors)):
+            self._initialize_sensor(n)
 
     def run(self):
         """Runs the WlmMonitor
 
         Can be stopped using the pause() method
         """
+        try:
+            self._update_sensors()
+            self.gui.force_update()
+        except:
+            time.sleep(10)
 
-        self._update_sensor()
-        self.gui.force_update()
+    def reset(self, plot_index):
+        """resets the plot back to initial framing"""
+
+        self.widgets['graph'][plot_index].getPlotItem().enableAutoRange(axis='xy', enable=True)
 
     # Technical methods
 
-    def _initialize_sensor(self):
+    def _initialize_sensor(self, index):
         """Initializes a channel and outputs to the GUI
 
         Should only be called in the beginning of channel use to assign physical GUI widgets
         """
-        self.sensor.initialize(self.display_pts)
+        self.sensors[index].initialize(self.display_pts)
 
         # Create curves
         # temperature
         axis1 = pg.DateAxisItem(orientation='bottom')
-        self.widgets['graph'][TEMP_INDEX].setAxisItems({'bottom': axis1})
-        self.widgets['curve'].append(self.widgets['graph'][TEMP_INDEX].plot(
+        self.widgets['graph'][2 * index + TEMP_INDEX].setAxisItems({'bottom': axis1})
+        self.widgets['curve'].append(self.widgets['graph'][2 * index + TEMP_INDEX].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
+        self.widgets['reset'][2 * index + TEMP_INDEX].clicked.connect(
+            lambda: self.reset(2 * index + TEMP_INDEX)
+        )
 
         # humidity
         axis2 = pg.DateAxisItem(orientation='bottom')
-        self.widgets['graph'][HUMIDITY_INDEX].setAxisItems({'bottom': axis2})
-        self.widgets['curve'].append(self.widgets['graph'][HUMIDITY_INDEX].plot(
+        self.widgets['graph'][2 * index + HUMIDITY_INDEX].setAxisItems({'bottom': axis2})
+        self.widgets['curve'].append(self.widgets['graph'][2 * index + HUMIDITY_INDEX].plot(
             pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
         ))
+        self.widgets['reset'][2 * index + HUMIDITY_INDEX].clicked.connect(
+            lambda: self.reset(2 * index + HUMIDITY_INDEX)
+        )
 
-    def _update_sensor(self):
+    def _update_sensors(self):
         """ Updates all channels + displays
 
         Called continuously inside run() method to refresh WLM data and output on GUI
         """
         # Update data with the new temperature and humidity
-        time = self.sensorpush_client.get_time()
-        temp = self.sensorpush_client.get_temperature()
-        humidity = self.sensorpush_client.get_humidity()
-        self.sensor.update(time, temp, humidity)
+        for index in range(len(self.sensorpush_clients)):
+            time = self.sensorpush_clients[index].get_time()
+            temp = self.sensorpush_clients[index].get_temperature()
+            humidity = self.sensorpush_clients[index].get_humidity()
+            self.sensors[index].update(time, temp, humidity)
 
-        times = [t.timestamp() for t in self.sensor.time]
+            times = [t.timestamp() for t in self.sensors[index].time]
 
-        # Update temperature
-        self.widgets['curve'][TEMP_INDEX].setData(x=times, y=self.sensor.temp)
-        self.widgets['temp'].setValue(self.sensor.temp[0])
+            # Update temperature
+            self.widgets['curve'][2 * index + TEMP_INDEX].setData(x=times, y=self.sensors[index].temp)
+            self.widgets['temp'][index].setValue(self.sensors[index].temp[0])
 
-        # Update humidity
-        self.widgets['curve'][HUMIDITY_INDEX].setData(x=times, y=self.sensor.humidity)
-        self.widgets['humidity'].setValue(self.sensor.humidity[0])
+            # Update humidity
+            self.widgets['curve'][2 * index + HUMIDITY_INDEX].setData(x=times, y=self.sensors[index].humidity)
+            self.widgets['humidity'][index].setValue(self.sensors[index].humidity[0])
 
-    def get_env_data(self, num_points=1):
-        return self.sensorpush_client.get_data(num_points)
+    def get_env_data(self, index, num_points=1):
+        return self.sensorpush_clients[index].get_data(num_points)
 
-    def get_time(self):
-        return self.sensorpush_client.get_time()
+    def get_time(self, index):
+        return self.sensorpush_clients[index].get_time()
 
-    def get_temperature(self):
-        return self.sensorpush_client.get_temperature()
+    def get_temperature(self, index):
+        return self.sensorpush_clients[index].get_temperature()
 
-    def get_humidity(self):
-        return self.sensorpush_client.get_humidity()
+    def get_humidity(self, index):
+        return self.sensorpush_clients[index].get_humidity()
 
 
 class Service(ServiceBase):
@@ -205,6 +222,7 @@ class Sensor:
         self.sensor_client = sensor_client
         self.log = log
         self.labels_updated = False  # Flag to check if we have updated all labels
+        self.display_pts = 0
 
         # Initialize relevant placeholders
         self.time = np.array([])
@@ -220,10 +238,12 @@ class Sensor:
 
         :param display_pts: number of points to display on the plot
         """
+        self.display_pts = display_pts
         if self.sensor_client != None:
-            self.time = self.sensor_client.get_data(display_pts)['datetime']
-            self.temp = self.sensor_client.get_data(display_pts)['temperature']
-            self.humidity = self.sensor_client.get_data(display_pts)['humidity']
+            data = self.sensor_client.get_data(1)
+            self.time = data['datetime']
+            self.temp = data['temperature']
+            self.humidity = data['humidity']
 
     def update(self, time, temp, humidity):
         """
@@ -233,9 +253,14 @@ class Sensor:
         """
         self.count = self.count + 1
         if self.count == 10:
-            self.time = np.append(time, self.time[:-1])
-            self.temp = np.append(temp, self.temp[:-1])
-            self.humidity = np.append(humidity, self.humidity[:-1])
+            if len(self.time) < self.display_pts:
+                self.time = np.append(time, self.time)
+                self.temp = np.append(temp, self.temp)
+                self.humidity = np.append(humidity, self.humidity)
+            else:
+                self.time = np.append(time, self.time[0:-1])
+                self.temp = np.append(temp, self.temp[0:-1])
+                self.humidity = np.append(humidity, self.humidity[0:-1])
             self.count = 0
 
 
@@ -250,17 +275,26 @@ def launch(**kwargs):
     )
 
     device_id = config['device_id']
+    client_configs = []
+    for server in config['servers']:
+        if server["type"] == 'sensorpush':
+            client_configs.append(server['config'])
 
-    sensorpush_client = find_client(
-        clients=kwargs['clients'],
-        settings=config,
-        client_type='sensorpush',
-        logger=logger
-    )
+    sensorpush_clients = []
+    for n in range(len(client_configs)):
+        sensorpush_clients.append(
+            find_client(
+                clients=kwargs['clients'],
+                settings=config,
+                client_type='sensorpush',
+                client_config=client_configs[n],
+                logger=logger
+            )
+        )
 
     # Instantiate Monitor script
     rack_monitor = RackMonitor(
-        sensorpush_client=sensorpush_client,
+        sensorpush_clients=sensorpush_clients,
         logger_client=logger
     )
 
@@ -272,5 +306,4 @@ def launch(**kwargs):
     # Run continuously
     # Note that the actual operation inside run() can be paused using the update server
     while True:
-
         rack_monitor.run()
