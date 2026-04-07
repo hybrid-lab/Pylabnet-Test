@@ -2,22 +2,14 @@
     "servers" : [
         {
             "type" : "sensorpush",
-            "config" : "Bob"
+            "config" : "atoms_rack"
         },
         {
-            "type" : "nidaqmx",
-            "config" : "ni_daq_1"
+            "type" : "sensorpush",
+            "config" : "atoms_MOT"
         }
     ],
-    "script" : "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\lasers\\rack_monitor.py",
+    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\rack_monitor_only_sensorpush.py",
     "device_id" : "Bob",
-    "script_service" : "True",
-    "channels" : {
-        "1" : {
-            "channel" : "ai0",
-            "index" : 0,
-            "name" : "test",
-            "voltage_monitor" : "True"
-        }
-    }
+    "script_service" : "True"
 }

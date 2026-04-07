@@ -7,11 +7,15 @@ from pylabnet.utils.helper_methods import (unpack_launcher, create_server,
                                            load_script_config, get_ip)
 from pylabnet.utils.logging.logger import LogClient, LogHandler
 
+from pylabnet.network.client_server.nidaqmx_card import Client as NI_Client
+
 import numpy as np
 import pickle
 import pyqtgraph as pg
 import matplotlib.dates as mdates
 import pytz
+
+import tracemalloc
 
 TEMP_INDEX = 0
 HUMIDITY_INDEX = 1
@@ -147,12 +151,15 @@ class RackMonitor:
         )
 
     def _update_channel(self, channel):
-        voltage = self.ni_client.get_ai_voltage(ai_channel=channel)
-        channel.update(voltage)
+        num = 2 #will crash if num=1 (don't know why)
+        channel.update(num_samples=num)
         index = channel.index + 2
 
         self.widgets['curve'][index].setData(channel.data)
-        self.widgets['voltage'][channel.index].setValue(channel.data[-1])
+        if len(self.channels) == 1:
+            self.widgets['voltage'].setValue(channel.data[-1])
+        else:
+            self.widgets['voltage'][channel.index].setValue(channel.data[-1])
 
     def get_env_data(self, num_points=1):
         return self.sensorpush_client.get_data(num_points)
@@ -294,7 +301,7 @@ class Sensor:
 class NI_channel:
     """Object containing all information regarding a single NI Channel"""
 
-    def __init__(self, params, NI_client=None, log: LogHandler = None):
+    def __init__(self, params, ni_client=None, log: LogHandler = None):
         """
         Initializes all parameters given, sets others to default. Also sets up some defaults + placeholders for data
 
@@ -307,7 +314,7 @@ class NI_channel:
 
         self.channel = params['channel']
         self.index = params['index']
-        self.NI_client = NI_client
+        self.ni_client = ni_client
         self.log = log
         self.labels_updated = False  # Flag to check if we have updated all labels
 
@@ -320,22 +327,26 @@ class NI_channel:
 
         :param display_pts: number of points to display on the plot
         """
-        if self.NI_client != None:
-            self.data = self.NI_client.get_ai_voltage(ai_channel=self.channel, num_samples=display_pts, sample_rate=1000)
+        self.log.info(f'NI_client is of type {type(self.ni_client)}')
+        if self.ni_client != None:
+            self.data = self.ni_client.get_ai_voltage(ai_channel=self.channel, num_samples=display_pts, sample_rate=1000)
 
-    def update(self, new_data):
+    def update(self, num_samples):
         """
         Updates the data
 
         :param value: (float) current value
         """
-        self.data = np.append(self.data[1:], new_data)
+        new_data = self.ni_client.get_ai_voltage(ai_channel=self.channel, num_samples=num_samples, sample_rate=1000)
+        self.data = np.append(self.data[num_samples:], new_data)
 
 
 def launch(**kwargs):
-    """ Launches the WLM monitor + lock script """
+    """ Launches the rack monitor script """
+    tracemalloc.start()
 
     logger = kwargs['logger']
+
     config = load_script_config(
         script='rack_monitor',
         config=kwargs['config'],

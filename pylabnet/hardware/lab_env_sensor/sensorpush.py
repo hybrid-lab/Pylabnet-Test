@@ -31,7 +31,7 @@ class Driver:
         for s, info in self.sensorpush.sensors.items():
             if info['name'] == sensor_name:
                 self.sensor_id = s
-                self.logger.info('sensor_name initiated')
+                self.logger.info(f'{sensor_name} initiated')
 
     def get_data(self, num_points=1):
         samples = self.sensorpush.samples(limit=num_points)
