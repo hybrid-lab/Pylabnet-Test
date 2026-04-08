@@ -208,7 +208,7 @@ class Client(ClientBase):
 
 
 def launch(**kwargs):
-    """ Launches the rack monitor script """
+    """ Launches the picoscope control script """
     tracemalloc.start()
 
     logger = kwargs['logger']
@@ -249,7 +249,7 @@ def launch(**kwargs):
     update_service = kwargs['service']
     update_service.assign_module(module=pico_control)
     logger.update_data(data=dict(device_id=device_id))
-    pico_control.gui.set_network_info(port=kwargs['server_port'])
+    #pico_control.gui.set_network_info(port=kwargs['server_port'])
 
     # Run continuously
     # Note that the actual operation inside run() can be paused using the update server
