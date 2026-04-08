@@ -5,7 +5,7 @@
             "config" : "pico1"
         }
     ],
-    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\picoscope_control.py",
+    "script" : "/home/porkpie/pylabnet/pylabnet/scripts/lasers/picoscope_control.py",
     "device_id" : "pico1",
     "script_service" : "True",
     "params" : {

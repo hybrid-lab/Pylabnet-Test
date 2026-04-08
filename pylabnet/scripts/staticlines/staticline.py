@@ -30,7 +30,7 @@ class StaticLineGUIGeneric():
         self.host = host
         #DEBUG
         debug_message = f"DEBUG: STATICLINE CLIENTS IN INIT: '{staticline_clients}'\n "
-        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+        with open("/home/porkpie/pylabnet/debug_log.txt", "a") as log_file:
             log_file.write(debug_message)
         #########
         self.port = port
@@ -58,7 +58,7 @@ class StaticLineGUIGeneric():
 
             #########DEBUG CODE
             debug_message = f"DEBUG: Staticline CLients: '{staticline_clients}. hardware_type: {hardware_type}'\n "
-            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            with open("/home/porkpie/pylabnet/debug_log.txt", "a") as log_file:
                 log_file.write(debug_message)
             ###############
 

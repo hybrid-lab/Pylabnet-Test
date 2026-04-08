@@ -33,7 +33,6 @@ class Driver:
         self.status = {}
 
         self.isOpen = False
-        self.oversample = ctypes.c_int16(0)
 
         self.channels = None
         self.timebase = 2
@@ -147,7 +146,7 @@ class Driver:
         timeIntervalns = ctypes.c_float()
         maxSamples = ctypes.c_int32()
         self.status["getTimebase"] = ps.ps2000aGetTimebase2(self.chandle, self.timebase, self.totalSamples,
-                                                            ctypes.byref(timeIntervalns), self.oversample,
+                                                            ctypes.byref(timeIntervalns), 0,
                                                             ctypes.byref(maxSamples), segmentIndex)
         assert_pico_ok(self.status["getTimebase"])
         self.time_interval_ns = timeIntervalns.value
@@ -256,21 +255,17 @@ class Driver:
         cTotalSamples = ctypes.c_int32(self.totalSamples)
         overflow = ctypes.c_int16()
 
-        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, self.preTriggerSamples, self.postTriggerSamples, self.timebase,
-                                                     self.oversample, None, segmentIndex, None, None)
-        assert_pico_ok(self.status["runBlock"])
+        self._runBlock()
         self._isReady()
 
         #get values
         mode = self._checkDownsampleMode(downsample_mode)
-        self._getValues(0, cTotalSamples, segmentIndex, overflow, mode, downsample_ratio)
-
-        time, data = self._getGraphValues(cTotalSamples)
+        time, data = self._getValues(0, cTotalSamples, segmentIndex, overflow, mode, downsample_ratio)
         return time, data
 
     ### RAPID BLOCK MODE
 
-    def setupRapidBlock(self, nSegments=10, nCaptures=10, downsampling_mode=None):
+    def setupRapidBlock(self, trigger_params, nSegments=10, nCaptures=10, downsampling_mode=None):
         """
         Sets up additional rapid block requirements ontop of basic block set up stuff
 
@@ -280,13 +275,18 @@ class Driver:
         :nCaptures: (int) number of waveforms to capture in one run
         :downsampling_mode: (str) the downsampling mode used to store data
         """
-        self._memorySegments(self.totalSamples, nSegments)
-        self._setNoOfCaptures(nCaptures)
-        self.setupBlock(self.preTriggerSamples, self.postTriggerSamples, downsampling_mode, nSegments)
+        cMaxSamples = ctypes.c_int32(self.totalSamples)
+        self.status["memorySegments"] = ps.ps2000aMemorySegments(self.chandle, nSegments, ctypes.byref(cMaxSamples))
+        assert_pico_ok(self.status["memorySegments"])
+
+        self.status["setNoOfCaptures"] = ps.ps2000aSetNoOfCaptures(self.chandle, nCaptures)
+        assert_pico_ok(self.status["setNoOfCaptures"])
+
+        self.setupBlock(trigger_params, downsampling_mode, nSegments)
 
     ## Run Rapid Block
 
-    def runRapidBlock(self, segmentIndex=0, downsample_ratio=1, downsample_mode=None):
+    def runRapidBlock(self, nSegments, segmentIndex=0, downsample_ratio=1, downsample_mode=None):
         """
         Starts collecting data in block mode. Number of samples collected is determined by noOfPreTriggerSamples and
         noOfPostTriggerSamples. Total number of samples must not be more than the size of the segment referred to by
@@ -301,12 +301,11 @@ class Driver:
         cTotalSamples = ctypes.c_int32(self.totalSamples)
         overflow = ctypes.c_int16()
 
-        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, self.preTriggerSamples, self.postTriggerSamples, self.timebase,
-                                                     self.oversample, None, segmentIndex, None, None)
-        assert_pico_ok(self.status["runBlock"])
+        self._runBlock(segmentIndex)
         self._isReady()
 
-        self._getValues(0, cTotalSamples, segmentIndex, overflow, downsample_ratio, downsample_mode)
+        time, offset, data = self._getValuesBulk(0, cTotalSamples, 0, nSegments - 1, overflow, downsample_ratio, downsample_mode)
+        return time, offset, data
 
     ### ETS MODE
 
@@ -399,9 +398,9 @@ class Driver:
             raise ValueError(f"{mode} is not a valid downsampling mode")
         return ps.PS2000A_RATIO_MODE[f'PS2000A_RATIO_MODE_{mode}']
 
-    def _runBlock(self, preTriggerSamples, postTriggerSamples, segmentIndex=0):
-        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, preTriggerSamples, postTriggerSamples, self.timebase,
-                                                     self.oversample, None, segmentIndex, None, None)
+    def _runBlock(self, segmentIndex=0):
+        self.status["runBlock"] = ps.ps2000aRunBlock(self.chandle, self.preTriggerSamples, self.postTriggerSamples, self.timebase,
+                                                     0, None, segmentIndex, None, None)
         assert_pico_ok(self.status["runBlock"])
 
     def _isReady(self):
@@ -430,27 +429,12 @@ class Driver:
         self.status["getValues"] = ps.ps2000aGetValues(self.chandle, start_index, ctypes.byref(cTotalSamples),
                                                        downsample_ratio, mode, 0, segmentIndex, ctypes.byref(overflow))
         assert_pico_ok(self.status["getValues"])
+        self.totalSamples = cTotalSamples.value
 
-    """TODO"""
-
-    def _getValuesBulk(self, cTotalSamples, firstSegmentIndex, lastSegmentIndex, overflow, downsammple_ratio, downsample_mode=None):
-        """
-        Retrieves waveforms captured using RAPID BLOCK MODE. Waveforms must have been collected sequentially and in the same run.
-        Sufficient to retrieve data for all channels at the same time.
-        """
-        if downsample_mode is None:
-            downsample_mode = 'NONE'
-        downsample_mode = downsample_mode.upper()
-        DOWNSAMPLING_MODES = ['NONE', 'AGGREGATE', 'AVERAGE', 'DECIMATE']
-        if downsample_mode not in DOWNSAMPLING_MODES:
-            raise ValueError(f"{downsample_mode} is not a valid downsampling mode")
-        mode = ps.PS2000A_RATIO_MODE[f'PS2000A_RATIO_MODE_{downsample_mode}']
-
-    def _getGraphValues(self):
-        """Returns time axis in microseconds"""
+        #graph values
         start = self.preTriggerSamples * self.time_interval_ns * 0.001
         end = self.postTriggerSamples * self.time_interval_ns * 0.001
-        time = np.linspace(start, end, self.totalSamples.value)
+        time = np.linspace(start, end, self.totalSamples)
 
         maxADC = self._maximumValue()
         data = []
@@ -461,28 +445,45 @@ class Driver:
 
         return time, data
 
-    def _memorySegments(self, maxSamples, nSegments=10):
+    def _getValuesBulk(self, cTotalSamples, firstSegmentIndex, lastSegmentIndex, overflow, downsample_ratio, downsample_mode=None):
         """
-        Sets the number of memory segments (divides memory into a number of segments so scope can store several waveforms sequentially)
-        The max number of waveforms PicoScopee 2206B can handle is 32 MS (shared between channels). Returns the number of samples
-        available in each segment (total number over the 2 channels)
+        Retrieves waveforms captured using RAPID BLOCK MODE. Waveforms must have been collected sequentially and in the same run.
+        Sufficient to retrieve data for all channels at the same time.
 
-        :nSegments: (int) number of segments required
+        returns values to be graphed. for each dataset in each channel, the corresponding time offset is found in offset[0] in seconds
         """
-        cMaxSamples = ctypes.c_int32(maxSamples)
-        self.status["memorySegments"] = ps.ps2000aMemorySegments(self.chandle, nSegments, ctypes.byref(cMaxSamples))
-        assert_pico_ok(self.status["memorySegments"])
-        return cMaxSamples.value
+        mode = self._checkDownsampleMode(downsample_mode)
+        self.status['getValuesBulk'] = ps.ps2000aGetValuesBulk(self.chandle, ctypes.byref(cTotalSamples), firstSegmentIndex, lastSegmentIndex,
+                                                               downsample_ratio, mode, ctypes.byref(overflow))
+        assert_pico_ok(self.status['getValuesBulk'])
+        self.totalSamples = cTotalSamples.value
 
-    def _setNoOfCaptures(self, nCaptures=10):
-        """
-        Sets the number of captures to be collected in one run of rapid block mode. Must be called before a run, or else
-        driver will capture only one waveform. Value remains constant unless changed
+        #Graphing values
+        timeOffset = (ctypes.c_int16 * 10)()
+        units = ctypes.c_int16()
+        self.status['GetValuesTriggerTimeOffsetBulk'] = ps.ps2000aGetValuesTriggerTimeOffsetBulk64(self.chandle, ctypes.byref(timeOffset), ctypes.byref(units),
+                                                                                                   firstSegmentIndex, lastSegmentIndex)
+        assert_pico_ok(self.status['GetValuesTriggerTimeOffsetBulk'])
+        offset = timeOffset.value
+        units = units.value
+        for n in range(len(offset)):
+            mag = -15 + 3 * units[n]
+            offset[n] = offset[n] * 10**mag
 
-        :nCaptures: (int) the number of waveforms to capture in one run
-        """
-        self.status["setNoOfCaptures"] = ps.ps2000aSetNoOfCaptures(self.chandle, nCaptures)
-        assert_pico_ok(self.status["setNoOfCaptures"])
+        maxADC = self._maximumValue()
+        data = []
+        for channel, param in self.channels.items():
+            chData = []
+            chRange = ps.PS2000A_RANGE[f'PS2000A_{param['range']}']
+            for buffer in param['buffersMax']:
+                chData.append(adc2mV(buffer, chRange, maxADC))
+            data.append(chData)
+
+        start = self.preTriggerSamples * self.time_interval_ns * 0.001
+        end = self.postTriggerSamples * self.time_interval_ns * 0.001
+        time = np.linspace(start, end, self.totalSamples)
+
+        return time, offset, data
 
     ### TRIGGER FUNCTIONS
 

@@ -17,8 +17,8 @@
             "config":"OPX"
         }
     ],
-    "script": "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\data_center\\take_data.py",
-    "exp_path" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\test_scripts",
-    "save_path": "C:\\Data\\Datataker",
+    "script": "/home/porkpie/pylabnet/pylabnet/scripts/data_center/take_data.py",
+    "exp_path" : "/home/porkpie/pylabnet/pylabnet/scripts/test_scripts",
+    "save_path": "/home/data/datataker",
     "auto_save": "False"
 }

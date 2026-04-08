@@ -11,6 +11,7 @@ from pylabnet.network.client_server.picoscope_2000a import Client as Pico_Client
 import numpy as np
 import pickle
 import pyqtgraph as pg
+from time import sleep
 
 import tracemalloc
 
@@ -75,6 +76,19 @@ class Pico_Control:
         self.pico_clients[n].stop()
         self.blockModeOn[n] = False
 
+    #Rapid Block Mode
+    def setupRapidBlock(self, n, nSegments=10):
+        """nSegments=nCaptures"""
+        trigger_params = self.trigger_params[n]
+        self.pico_clients[n].setupRapidBlock(trigger_params, nSegments, nSegments)
+
+    def runRapidBlock(self, n):
+        self.rapidBlockModeOn[n] = True
+
+    def stopRapidBlock(self, n):
+        self.pico_clients[n].stop()
+        self.rapidBlockModeOn = False
+
     #closing unit
     def closeUnit(self, n):
         self.pico_clients[n].closeUnit()
@@ -86,8 +100,10 @@ class Pico_Control:
     def run(self):
         """Runs the Pico Control. Can be paused with pause()"""
         for n in range(self.num_picos):
-            if self.blockModeOn[n] is True:
+            if self.blockModeOn[n]:
                 self._runBlock(n)
+            if self.rapidBlockModeOn[n]:
+                self._runRapidBlock(n)
 
     #Technical methods
     def _initiatePicos(self, params):
@@ -135,6 +151,18 @@ class Pico_Control:
 
         for d in range(len(data)):
             self.widgets['curve'][2 * n + d].setData(x=time, y=data[d])
+
+    def _runRapidBlock(self, n):
+        pico = self.pico_clients[n]
+        time, offset, data = pico.runRapidBlock()
+        dt_prev = 0
+        for ind in range(len(offset)):
+            for d in range(len(data)):
+                graph_data = data[d][ind]
+                self.widgets['curve'][2 * n + d].setData(x=time, y=graph_data)
+            dt = offset[ind]
+            sleep(dt - dt_prev)
+            dt_prev = dt
 
 
 class Service(ServiceBase):

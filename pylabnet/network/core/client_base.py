@@ -35,7 +35,7 @@ class ClientBase:
         """
         #########DEBUG CODE
         debug_message = f"DEBUG: HOST IN Client base class: {host}, port: {port}, key: {key}\n "
-        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+        with open("/home/porkpie/pylabnet/debug_log.txt", "a") as log_file:
             log_file.write(debug_message)
         ###############
 
@@ -76,7 +76,7 @@ class ClientBase:
 
                     #########DEBUG CODE
                 debug_message = f"DEBUG: Connection params: port: {self._port}, host: {self._host}, key: {key}\n "
-                with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                with open("/home/porkpie/pylabnet/debug_log.txt", "a") as log_file:
                     log_file.write(debug_message)
                 ###############
 
@@ -89,14 +89,14 @@ class ClientBase:
                 )
 
             debug_message = f"DEBUG: STOP 2\n "
-            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            with open("/home/porkpie/pylabnet/debug_log.txt", "a") as log_file:
                 log_file.write(debug_message)
             ###############
 
             self._service = self._connection.root
 
             debug_message = f"DEBUG: PASSED\n "
-            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            with open("/home/porkpie/pylabnet/debug_log.txt", "a") as log_file:
                 log_file.write(debug_message)
             ###############
 
@@ -121,7 +121,7 @@ class ClientBase:
 
             #########DEBUG CODE
             debug_message = f"DEBUG: Connection refused ERROR\n "
-            with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+            with open("/home/porkpie/pylabnet/debug_log.txt", "a") as log_file:
                 log_file.write(debug_message)
             ###############
             raise

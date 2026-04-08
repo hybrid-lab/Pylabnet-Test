@@ -36,8 +36,8 @@ class Service(ServiceBase):
         return self._module.runBlock(segmentIndex, downsample_ratio, downsample_mode)
 
     #Rapid Block Mode
-    def exposed_setupRapidBlock(self, nSegments=10, nCaptures=10, downsampling_mode=None):
-        return self._module.setupRapidBlock(nSegments, nCaptures, downsampling_mode)
+    def exposed_setupRapidBlock(self, trigger_params, nSegments=10, nCaptures=10, downsampling_mode=None):
+        return self._module.setupRapidBlock(trigger_params, nSegments, nCaptures, downsampling_mode)
 
     def exposed_runRapidBlock(self, segmentIndex, downsample_ratio=1, downsample_mode=None):
         return self._module.runRapidBlock(segmentIndex, downsample_ratio, downsample_mode)
@@ -85,8 +85,8 @@ class Client(ClientBase):
         return self._module.exposed_runBlock(segmentIndex, downsample_ratio, downsample_mode)
 
     #Rapid Block Mode
-    def setupRapidBlock(self, nSegments=10, nCaptures=10, downsampling_mode=None):
-        return self._module.exposed_setupRapidBlock(nSegments, nCaptures, downsampling_mode)
+    def setupRapidBlock(self, trigger_params, nSegments=10, nCaptures=10, downsampling_mode=None):
+        return self._module.exposed_setupRapidBlock(trigger_params, nSegments, nCaptures, downsampling_mode)
 
     def runRapidBlock(self, segmentIndex=0, downsample_ratio=1, downsample_mode=None):
         return self._module.exposed_runRapidBlock(segmentIndex, downsample_ratio, downsample_mode)

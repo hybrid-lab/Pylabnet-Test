@@ -37,7 +37,7 @@ BIN_NUMS = 100
 # CNOT_F_THRES = 0.9
 # CNOT_CHECK_T = 10
 
-CFG_DIR = Path(r"C:\\Users\\hybri\\pylabnet\\pylabnet\\configs")
+CFG_DIR = Path(r"/home/porkpie/pylabnet/pylabnet/configs")
 
 
 def load_local_config(name):
