@@ -37,13 +37,8 @@ class GenericServer:
             for authentication purposes. If None, a standard server (without secure
             authentication) will be used
         """
-        #########DEBUG CODE
-        debug_message = f"DEBUG:A SERVER IS CREATED\n "
-        with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
-            log_file.write(debug_message)
-        ###############
-
         self.operating_system = get_os()
+
         if key is None:
 
             # start a server without any authentication
@@ -80,6 +75,15 @@ class GenericServer:
                         key, key
                     )
                 )
+                #########DEBUG CODE
+                debug_message = f"DEBUG:A SERVER IS CREATED\n "
+                if self.operating_system == "Windows":
+                    with open("c:/users/hybri/pylabnet/debug_log.txt", "a") as log_file:
+                        log_file.write(debug_message)
+                elif self.operating_system == "Linux":
+                    with open("/home/porkpie/pylabnet/debug_log.txt", "a") as log_file:
+                        log_file.write(debug_message)
+                ###############
 
             else:
                 msg_str = f'\nNo keyfile found, please check that {key} exists.\n'
