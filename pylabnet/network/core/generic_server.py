@@ -58,7 +58,7 @@ class GenericServer:
             if self.operating_system == "Windows":
                 key = os.path.join(os.environ['WINDIR'], 'System32', key)
             elif self.operating_system == "Linux":
-                key = os.path.join('/etc/ssl/certs', 'pylabnet.pem')
+                key = os.path.join('/usr/local/share/ca-certificates', 'pylabnet.pem')
 
             if os.path.exists(key):
 
