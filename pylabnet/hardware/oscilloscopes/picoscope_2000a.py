@@ -440,7 +440,7 @@ class Driver:
         data = []
         for channel, param in self.channels.items():
             maxBuffer = param['buffersMax']
-            chRange = ps.PS2000A_RANGE[f'PS2000A_{param['range']}']
+            chRange = ps.PS2000A_RANGE[f"PS2000A_{param['range']}"]
             data.append(adc2mV(maxBuffer, chRange, maxADC))
 
         return time, data
@@ -474,7 +474,7 @@ class Driver:
         data = []
         for channel, param in self.channels.items():
             chData = []
-            chRange = ps.PS2000A_RANGE[f'PS2000A_{param['range']}']
+            chRange = ps.PS2000A_RANGE[f"PS2000A_{param['range']}"]
             for buffer in param['buffersMax']:
                 chData.append(adc2mV(buffer, chRange, maxADC))
             data.append(chData)

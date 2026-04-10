@@ -1,12 +1,12 @@
 {
     "servers" : [
         {
-            "type" : "picoscope",
+            "type" : "picoscope_2000a",
             "config" : "pico1"
         }
     ],
     "script" : "/home/porkpie/pylabnet/pylabnet/scripts/lasers/picoscope_control.py",
-    "device_id" : "pico1",
+    "device_id" : "12459/0199",
     "script_service" : "True",
     "params" : {
         "0" : {

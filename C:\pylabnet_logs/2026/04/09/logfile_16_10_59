@@ -1,0 +1,491 @@
+2026-04-09 16:10:59,918 - INFO - Started logging to file C:\pylabnet_logs/logfile_16_10_59.
+2026-04-09 16:11:03,634 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-09 16:11:03,637 - INFO -  logger_GUI: Cmd len: 230
+2026-04-09 16:11:03,638 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 1 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 16:11:04,357 - INFO - accepted ('127.0.0.1', 60564) with fd 44
+2026-04-09 16:11:04,413 - INFO - ('127.0.0.1', 60564) authenticated successfully
+2026-04-09 16:11:04,413 - INFO - welcome ('127.0.0.1', 60564)
+2026-04-09 16:11:04,414 - INFO - Client connected
+2026-04-09 16:11:04,461 - INFO -  pico_control: Started logging
+2026-04-09 16:11:04,464 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:11:04,469 - ERROR -  pico_control: Settings file /home/porkpie/pylabnet/pylabnet/configs/devices/picoscope_2000a/pico1.json not found.
+2026-04-09 16:11:04,471 - INFO -  pico_control: Optional Clients disabled
+2026-04-09 16:13:26,174 - DEBUG - Client disconnected
+2026-04-09 16:13:26,175 - INFO - goodbye ('127.0.0.1', 60564)
+2026-04-09 16:14:28,544 - INFO -  logger_GUI: Launching device picoscope with configuration pico1
+2026-04-09 16:14:28,548 - INFO -  logger_GUI: Cmd len: 237
+2026-04-09 16:14:28,570 - INFO -  logger_GUI: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 7426 --server picoscope --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-09 16:14:29,080 - INFO - accepted ('127.0.0.1', 39268) with fd 24
+2026-04-09 16:14:29,137 - INFO - ('127.0.0.1', 39268) authenticated successfully
+2026-04-09 16:14:29,137 - INFO - welcome ('127.0.0.1', 39268)
+2026-04-09 16:14:29,138 - INFO - Client connected
+2026-04-09 16:14:29,184 - INFO -  picoscope_server_12459/0199: Started logging
+2026-04-09 16:14:29,200 - ERROR -  picoscope_server_12459/0199: No module found in pylabnet.launchers.servers named picoscope.py
+2026-04-09 16:14:29,212 - ERROR -  picoscope_server_12459/0199: Uncaught exception bye: Traceback (most recent call last):
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 129, in <module>
+    main()
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 103, in main
+    mod_inst = importlib.import_module(f'servers.{server}')
+  File "/home/porkpie/.pyenv/versions/3.8.10/lib/python3.8/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1014, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 991, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 973, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'servers.picoscope'
+
+2026-04-09 16:14:29,346 - DEBUG - Client disconnected
+2026-04-09 16:14:29,346 - INFO - goodbye ('127.0.0.1', 39268)
+2026-04-09 16:15:23,279 - INFO -  logger_GUI: Launching device picoscope_2000a with configuration pico1
+2026-04-09 16:15:23,282 - INFO -  logger_GUI: Cmd len: 244
+2026-04-09 16:15:23,302 - INFO -  logger_GUI: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 28681 --server picoscope_2000a --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-09 16:15:23,807 - INFO - accepted ('127.0.0.1', 37642) with fd 24
+2026-04-09 16:15:23,862 - INFO - ('127.0.0.1', 37642) authenticated successfully
+2026-04-09 16:15:23,863 - INFO - welcome ('127.0.0.1', 37642)
+2026-04-09 16:15:23,863 - INFO - Client connected
+2026-04-09 16:15:23,909 - INFO -  picoscope_2000a_server_12459/0199: Started logging
+2026-04-09 16:15:23,946 - ERROR -  picoscope_2000a_server_12459/0199: Uncaught exception bye: Traceback (most recent call last):
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 129, in <module>
+    main()
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 103, in main
+    mod_inst = importlib.import_module(f'servers.{server}')
+  File "/home/porkpie/.pyenv/versions/3.8.10/lib/python3.8/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1014, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 991, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 975, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 671, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 848, in exec_module
+  File "<frozen importlib._bootstrap>", line 219, in _call_with_frames_removed
+  File "/home/porkpie/pylabnet/pylabnet/launchers/servers/picoscope_2000a.py", line 1, in <module>
+    from pylabnet.hardware.oscilloscopes.picoscope_2000a import Driver
+  File "/home/porkpie/pylabnet/pylabnet/hardware/oscilloscopes/picoscope_2000a.py", line 443
+    chRange = ps.PS2000A_RANGE[f'PS2000A_{param['range']}']
+                                                 ^
+SyntaxError: invalid syntax
+
+2026-04-09 16:15:24,071 - DEBUG - Client disconnected
+2026-04-09 16:15:24,071 - INFO - goodbye ('127.0.0.1', 37642)
+2026-04-09 16:15:30,904 - WARNING -  logger_GUI: Failed to shutdown server picoscope_server_12459/0199on host: 127.0.1.1, port: 7426
+2026-04-09 16:15:30,906 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:15:30,907 - WARNING -  logger_GUI: No matching client connected to LogServer: picoscope_server_12459/0199
+2026-04-09 16:15:30,909 - INFO -  logger_GUI: Hard kill of picoscope_server_12459/0199 successfull.
+2026-04-09 16:15:37,739 - WARNING -  logger_GUI: Failed to shutdown server picoscope_2000a_server_12459/0199on host: 127.0.1.1, port: 28681
+2026-04-09 16:15:37,741 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:15:37,743 - WARNING -  logger_GUI: No matching client connected to LogServer: picoscope_2000a_server_12459/0199
+2026-04-09 16:15:37,744 - INFO -  logger_GUI: Hard kill of picoscope_2000a_server_12459/0199 successfull.
+2026-04-09 16:15:40,160 - INFO -  logger_GUI: Launching device picoscope_2000a with configuration pico1
+2026-04-09 16:15:40,162 - INFO -  logger_GUI: Cmd len: 243
+2026-04-09 16:15:40,183 - INFO -  logger_GUI: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 3285 --server picoscope_2000a --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-09 16:15:40,688 - INFO - accepted ('127.0.0.1', 43446) with fd 24
+2026-04-09 16:15:40,743 - INFO - ('127.0.0.1', 43446) authenticated successfully
+2026-04-09 16:15:40,743 - INFO - welcome ('127.0.0.1', 43446)
+2026-04-09 16:15:40,743 - INFO - Client connected
+2026-04-09 16:15:40,790 - INFO -  picoscope_2000a_server_12459/0199: Started logging
+2026-04-09 16:15:40,816 - ERROR -  picoscope_2000a_server_12459/0199: Uncaught exception bye: Traceback (most recent call last):
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 129, in <module>
+    main()
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 103, in main
+    mod_inst = importlib.import_module(f'servers.{server}')
+  File "/home/porkpie/.pyenv/versions/3.8.10/lib/python3.8/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1014, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 991, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 975, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 671, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 848, in exec_module
+  File "<frozen importlib._bootstrap>", line 219, in _call_with_frames_removed
+  File "/home/porkpie/pylabnet/pylabnet/launchers/servers/picoscope_2000a.py", line 1, in <module>
+    from pylabnet.hardware.oscilloscopes.picoscope_2000a import Driver
+  File "/home/porkpie/pylabnet/pylabnet/hardware/oscilloscopes/picoscope_2000a.py", line 443
+    chRange = ps.PS2000A_RANGE[f'PS2000A_{param['range']}']
+                                                 ^
+SyntaxError: invalid syntax
+
+2026-04-09 16:15:40,942 - DEBUG - Client disconnected
+2026-04-09 16:15:40,942 - INFO - goodbye ('127.0.0.1', 43446)
+2026-04-09 16:20:17,793 - WARNING -  logger_GUI: Failed to shutdown server picoscope_2000a_server_12459/0199on host: 127.0.1.1, port: 3285
+2026-04-09 16:20:17,794 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:20:17,795 - WARNING -  logger_GUI: No matching client connected to LogServer: picoscope_2000a_server_12459/0199
+2026-04-09 16:20:17,797 - INFO -  logger_GUI: Hard kill of picoscope_2000a_server_12459/0199 successfull.
+2026-04-09 16:20:19,733 - INFO -  logger_GUI: Launching device picoscope_2000a with configuration pico1
+2026-04-09 16:20:19,735 - INFO -  logger_GUI: Cmd len: 244
+2026-04-09 16:20:19,756 - INFO -  logger_GUI: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 21965 --server picoscope_2000a --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-09 16:20:20,259 - INFO - accepted ('127.0.0.1', 58160) with fd 24
+2026-04-09 16:20:20,317 - INFO - ('127.0.0.1', 58160) authenticated successfully
+2026-04-09 16:20:20,318 - INFO - welcome ('127.0.0.1', 58160)
+2026-04-09 16:20:20,319 - INFO - Client connected
+2026-04-09 16:20:20,366 - INFO -  picoscope_2000a_server_12459/0199: Started logging
+2026-04-09 16:20:20,391 - ERROR -  picoscope_2000a_server_12459/0199: Uncaught exception bye: Traceback (most recent call last):
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 129, in <module>
+    main()
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 103, in main
+    mod_inst = importlib.import_module(f'servers.{server}')
+  File "/home/porkpie/.pyenv/versions/3.8.10/lib/python3.8/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1014, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 991, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 975, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 671, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 848, in exec_module
+  File "<frozen importlib._bootstrap>", line 219, in _call_with_frames_removed
+  File "/home/porkpie/pylabnet/pylabnet/launchers/servers/picoscope_2000a.py", line 1, in <module>
+    from pylabnet.hardware.oscilloscopes.picoscope_2000a import Driver
+  File "/home/porkpie/pylabnet/pylabnet/hardware/oscilloscopes/picoscope_2000a.py", line 443
+    chRange = ps.PS2000A_RANGE[f'PS2000A_{param['range']}']
+                                                 ^
+SyntaxError: invalid syntax
+
+2026-04-09 16:20:20,518 - DEBUG - Client disconnected
+2026-04-09 16:20:20,518 - INFO - goodbye ('127.0.0.1', 58160)
+2026-04-09 16:21:16,183 - WARNING -  logger_GUI: Failed to shutdown server picoscope_2000a_server_12459/0199on host: 127.0.1.1, port: 21965
+2026-04-09 16:21:16,185 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:21:16,187 - WARNING -  logger_GUI: No matching client connected to LogServer: picoscope_2000a_server_12459/0199
+2026-04-09 16:21:16,188 - INFO -  logger_GUI: Hard kill of picoscope_2000a_server_12459/0199 successfull.
+2026-04-09 16:21:19,138 - INFO -  logger_GUI: Launching device picoscope_2000a with configuration pico1
+2026-04-09 16:21:19,141 - INFO -  logger_GUI: Cmd len: 244
+2026-04-09 16:21:19,162 - INFO -  logger_GUI: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 35290 --server picoscope_2000a --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-09 16:21:19,672 - INFO - accepted ('127.0.0.1', 42028) with fd 24
+2026-04-09 16:21:19,730 - INFO - ('127.0.0.1', 42028) authenticated successfully
+2026-04-09 16:21:19,730 - INFO - welcome ('127.0.0.1', 42028)
+2026-04-09 16:21:19,730 - INFO - Client connected
+2026-04-09 16:21:19,776 - INFO -  picoscope_2000a_server_12459/0199: Started logging
+2026-04-09 16:21:19,797 - ERROR -  picoscope_2000a_server_12459/0199: Uncaught exception bye: Traceback (most recent call last):
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 129, in <module>
+    main()
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 103, in main
+    mod_inst = importlib.import_module(f'servers.{server}')
+  File "/home/porkpie/.pyenv/versions/3.8.10/lib/python3.8/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1014, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 991, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 975, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 671, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 848, in exec_module
+  File "<frozen importlib._bootstrap>", line 219, in _call_with_frames_removed
+  File "/home/porkpie/pylabnet/pylabnet/launchers/servers/picoscope_2000a.py", line 1, in <module>
+    from pylabnet.hardware.oscilloscopes.picoscope_2000a import Driver
+  File "/home/porkpie/pylabnet/pylabnet/hardware/oscilloscopes/picoscope_2000a.py", line 443
+    chRange = ps.PS2000A_RANGE[f'PS2000A_{param['range']}']
+                                                 ^
+SyntaxError: invalid syntax
+
+2026-04-09 16:21:19,926 - DEBUG - Client disconnected
+2026-04-09 16:21:19,926 - INFO - goodbye ('127.0.0.1', 42028)
+2026-04-09 16:21:33,207 - WARNING -  logger_GUI: Failed to shutdown server picoscope_2000a_server_12459/0199on host: 127.0.1.1, port: 35290
+2026-04-09 16:21:33,209 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:21:33,210 - WARNING -  logger_GUI: No matching client connected to LogServer: picoscope_2000a_server_12459/0199
+2026-04-09 16:21:33,212 - INFO -  logger_GUI: Hard kill of picoscope_2000a_server_12459/0199 successfull.
+2026-04-09 16:21:34,939 - INFO -  logger_GUI: Launching device picoscope_2000a with configuration pico1
+2026-04-09 16:21:34,942 - INFO -  logger_GUI: Cmd len: 244
+2026-04-09 16:21:34,963 - INFO -  logger_GUI: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 43283 --server picoscope_2000a --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-09 16:21:35,474 - INFO - accepted ('127.0.0.1', 48538) with fd 24
+2026-04-09 16:21:35,530 - INFO - ('127.0.0.1', 48538) authenticated successfully
+2026-04-09 16:21:35,531 - INFO - welcome ('127.0.0.1', 48538)
+2026-04-09 16:21:35,546 - INFO - Client connected
+2026-04-09 16:21:35,578 - INFO -  picoscope_2000a_server_12459/0199: Started logging
+2026-04-09 16:21:35,687 - ERROR -  picoscope_2000a_server_12459/0199: Settings file /home/porkpie/pylabnet/pylabnet/configs/devices/picoscope/pico1.json not found.
+2026-04-09 16:21:35,691 - ERROR -  picoscope_2000a_server_12459/0199: Uncaught exception bye: Traceback (most recent call last):
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 129, in <module>
+    main()
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 115, in main
+    mod_inst.launch(logger=server_logger, port=server_port, device_id=device_id, config=config)
+  File "/home/porkpie/pylabnet/pylabnet/launchers/servers/picoscope_2000a.py", line 20, in launch
+    sensor_name=config['device_id'],
+TypeError: 'NoneType' object is not subscriptable
+
+2026-04-09 16:21:35,826 - DEBUG - Client disconnected
+2026-04-09 16:21:35,827 - INFO - goodbye ('127.0.0.1', 48538)
+2026-04-09 16:23:04,970 - WARNING -  logger_GUI: Failed to shutdown server picoscope_2000a_server_12459/0199on host: 127.0.1.1, port: 43283
+2026-04-09 16:23:04,975 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:23:04,977 - WARNING -  logger_GUI: No matching client connected to LogServer: picoscope_2000a_server_12459/0199
+2026-04-09 16:23:04,985 - INFO -  logger_GUI: Hard kill of picoscope_2000a_server_12459/0199 successfull.
+2026-04-09 16:23:09,218 - INFO -  logger_GUI: Launching device picoscope_2000a with configuration pico1
+2026-04-09 16:23:09,227 - INFO -  logger_GUI: Cmd len: 243
+2026-04-09 16:23:09,249 - INFO -  logger_GUI: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 9137 --server picoscope_2000a --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-09 16:23:10,162 - INFO - accepted ('127.0.0.1', 60148) with fd 24
+2026-04-09 16:23:10,235 - INFO - ('127.0.0.1', 60148) authenticated successfully
+2026-04-09 16:23:10,236 - INFO - welcome ('127.0.0.1', 60148)
+2026-04-09 16:23:10,236 - INFO - Client connected
+2026-04-09 16:23:10,284 - INFO -  picoscope_2000a_server_12459/0199: Started logging
+2026-04-09 16:23:10,341 - ERROR -  picoscope_2000a_server_12459/0199: Settings file /home/porkpie/pylabnet/pylabnet/configs/devices/picoscope/pico1.json not found.
+2026-04-09 16:23:10,344 - ERROR -  picoscope_2000a_server_12459/0199: Uncaught exception bye: Traceback (most recent call last):
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 129, in <module>
+    main()
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 115, in main
+    mod_inst.launch(logger=server_logger, port=server_port, device_id=device_id, config=config)
+  File "/home/porkpie/pylabnet/pylabnet/launchers/servers/picoscope_2000a.py", line 20, in launch
+    serial=config['device_id'],
+TypeError: 'NoneType' object is not subscriptable
+
+2026-04-09 16:23:10,481 - DEBUG - Client disconnected
+2026-04-09 16:23:10,482 - INFO - goodbye ('127.0.0.1', 60148)
+2026-04-09 16:26:18,634 - WARNING -  logger_GUI: Failed to shutdown server picoscope_2000a_server_12459/0199on host: 127.0.1.1, port: 9137
+2026-04-09 16:26:18,636 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:26:18,638 - WARNING -  logger_GUI: No matching client connected to LogServer: picoscope_2000a_server_12459/0199
+2026-04-09 16:26:18,640 - INFO -  logger_GUI: Hard kill of picoscope_2000a_server_12459/0199 successfull.
+2026-04-09 16:26:20,670 - INFO -  logger_GUI: Launching device picoscope with configuration pico1
+2026-04-09 16:26:20,672 - INFO -  logger_GUI: Cmd len: 238
+2026-04-09 16:26:20,694 - INFO -  logger_GUI: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 33438 --server picoscope --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-09 16:26:21,705 - INFO - accepted ('127.0.0.1', 55828) with fd 24
+2026-04-09 16:26:21,763 - INFO - ('127.0.0.1', 55828) authenticated successfully
+2026-04-09 16:26:21,763 - INFO - welcome ('127.0.0.1', 55828)
+2026-04-09 16:26:21,764 - INFO - Client connected
+2026-04-09 16:26:21,810 - INFO -  picoscope_server_12459/0199: Started logging
+2026-04-09 16:26:21,821 - ERROR -  picoscope_server_12459/0199: No module found in pylabnet.launchers.servers named picoscope.py
+2026-04-09 16:26:21,833 - ERROR -  picoscope_server_12459/0199: Uncaught exception bye: Traceback (most recent call last):
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 129, in <module>
+    main()
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 103, in main
+    mod_inst = importlib.import_module(f'servers.{server}')
+  File "/home/porkpie/.pyenv/versions/3.8.10/lib/python3.8/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1014, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 991, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 973, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'servers.picoscope'
+
+2026-04-09 16:26:21,973 - DEBUG - Client disconnected
+2026-04-09 16:26:21,973 - INFO - goodbye ('127.0.0.1', 55828)
+2026-04-09 16:27:36,391 - WARNING -  logger_GUI: Failed to shutdown server picoscope_server_12459/0199on host: 127.0.1.1, port: 33438
+2026-04-09 16:27:36,393 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:27:36,394 - WARNING -  logger_GUI: No matching client connected to LogServer: picoscope_server_12459/0199
+2026-04-09 16:27:36,396 - INFO -  logger_GUI: Hard kill of picoscope_server_12459/0199 successfull.
+2026-04-09 16:27:38,979 - INFO -  logger_GUI: Launching device picoscope_2000a with configuration pico1
+2026-04-09 16:27:38,982 - INFO -  logger_GUI: Cmd len: 244
+2026-04-09 16:27:39,003 - INFO -  logger_GUI: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 12375 --server picoscope_2000a --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-09 16:27:39,513 - INFO - accepted ('127.0.0.1', 47696) with fd 24
+2026-04-09 16:27:39,569 - INFO - ('127.0.0.1', 47696) authenticated successfully
+2026-04-09 16:27:39,570 - INFO - welcome ('127.0.0.1', 47696)
+2026-04-09 16:27:39,570 - INFO - Client connected
+2026-04-09 16:27:39,616 - INFO -  picoscope_2000a_server_12459/0199: Started logging
+2026-04-09 16:27:39,688 - INFO -  picoscope_2000a_server_12459/0199: Successfully loaded settings from pico1.json.
+2026-04-09 16:27:43,626 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-09 16:27:43,629 - INFO -  logger_GUI: Cmd len: 230
+2026-04-09 16:27:43,630 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 3 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 16:27:44,605 - INFO - accepted ('127.0.0.1', 47710) with fd 25
+2026-04-09 16:27:44,662 - INFO - ('127.0.0.1', 47710) authenticated successfully
+2026-04-09 16:27:44,663 - INFO - welcome ('127.0.0.1', 47710)
+2026-04-09 16:27:44,663 - INFO - Client connected
+2026-04-09 16:27:44,709 - INFO -  pico_control: Started logging
+2026-04-09 16:27:44,712 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:27:44,720 - INFO -  pico_control: Successfully loaded settings from pico1.json.
+2026-04-09 16:27:44,730 - INFO -  pico_control: Optional Clients disabled
+2026-04-09 16:27:44,734 - INFO -  pico_control: Found exactly 1 match for picoscope_2000a.
+2026-04-09 16:27:44,738 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 12375
+2026-04-09 16:30:23,449 - DEBUG - Client disconnected
+2026-04-09 16:30:23,449 - INFO - goodbye ('127.0.0.1', 47710)
+2026-04-09 16:32:06,153 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-09 16:32:06,155 - INFO -  logger_GUI: Cmd len: 230
+2026-04-09 16:32:06,157 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 4 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 16:32:06,880 - INFO - accepted ('127.0.0.1', 54846) with fd 25
+2026-04-09 16:32:06,935 - INFO - ('127.0.0.1', 54846) authenticated successfully
+2026-04-09 16:32:06,936 - INFO - welcome ('127.0.0.1', 54846)
+2026-04-09 16:32:06,936 - INFO - Client connected
+2026-04-09 16:32:06,982 - INFO -  pico_control: Started logging
+2026-04-09 16:32:06,985 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:32:06,994 - INFO -  pico_control: Successfully loaded settings from pico1.json.
+2026-04-09 16:32:07,000 - INFO -  pico_control: Optional Clients disabled
+2026-04-09 16:32:07,005 - INFO -  pico_control: Found exactly 1 match for picoscope_2000a.
+2026-04-09 16:32:07,010 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 12375
+2026-04-09 16:32:12,449 - WARNING -  logger_GUI: No matching client connected to LogServer: pico_control
+2026-04-09 16:32:12,450 - INFO -  logger_GUI: Hard kill of pico_control successfull.
+2026-04-09 16:32:16,207 - WARNING -  logger_GUI: No matching client connected to LogServer: pico_control2
+2026-04-09 16:32:16,209 - INFO -  logger_GUI: Hard kill of pico_control2 successfull.
+2026-04-09 16:32:33,638 - DEBUG - Client disconnected
+2026-04-09 16:32:33,638 - INFO - goodbye ('127.0.0.1', 54846)
+2026-04-09 16:32:38,330 - INFO -  logger_GUI: Launching device rack_monitor with configuration sensorpush_test
+2026-04-09 16:32:38,333 - INFO -  logger_GUI: Cmd len: 233
+2026-04-09 16:32:38,335 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script rack_monitor --num_clients 3 --config sensorpush_test --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 16:32:39,049 - INFO - accepted ('127.0.0.1', 59020) with fd 25
+2026-04-09 16:32:39,105 - INFO - ('127.0.0.1', 59020) authenticated successfully
+2026-04-09 16:32:39,105 - INFO - welcome ('127.0.0.1', 59020)
+2026-04-09 16:32:39,106 - INFO - Client connected
+2026-04-09 16:32:39,152 - INFO -  rack_monitor: Started logging
+2026-04-09 16:32:39,155 - INFO -  rack_monitor: Successfully loaded settings from sensorpush_test.json.
+2026-04-09 16:32:39,170 - INFO -  rack_monitor: Successfully loaded settings from Bob.json.
+2026-04-09 16:32:39,179 - INFO -  rack_monitor: Optional Clients disabled
+2026-04-09 16:32:39,185 - INFO -  rack_monitor: No active servers matching module sensorpush were found. Instantiating a new server.
+2026-04-09 16:32:39,194 - INFO -  rack_monitor: Cmd len: 230
+2026-04-09 16:32:39,219 - INFO -  rack_monitor: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 15202 --server sensorpush --device_id "Bob" --config Bob --debug 0 --lab_name NO_LAB
+2026-04-09 16:32:39,223 - INFO -  rack_monitor: Trying to connect to active sensorpush server
+Host: 127.0.1.1
+Port: 15202
+2026-04-09 16:32:40,081 - INFO - accepted ('127.0.0.1', 59022) with fd 26
+2026-04-09 16:32:40,144 - INFO - ('127.0.0.1', 59022) authenticated successfully
+2026-04-09 16:32:40,144 - INFO - welcome ('127.0.0.1', 59022)
+2026-04-09 16:32:40,144 - INFO - Client connected
+2026-04-09 16:32:40,191 - INFO -  sensorpush_server_Bob: Started logging
+2026-04-09 16:32:40,214 - ERROR -  sensorpush_server_Bob: No module found in pylabnet.launchers.servers named sensorpush.py
+2026-04-09 16:32:40,220 - ERROR -  sensorpush_server_Bob: Uncaught exception bye: Traceback (most recent call last):
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 129, in <module>
+    main()
+  File "/home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py", line 103, in main
+    mod_inst = importlib.import_module(f'servers.{server}')
+  File "/home/porkpie/.pyenv/versions/3.8.10/lib/python3.8/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1014, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 991, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 975, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 671, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 848, in exec_module
+  File "<frozen importlib._bootstrap>", line 219, in _call_with_frames_removed
+  File "/home/porkpie/pylabnet/pylabnet/launchers/servers/sensorpush.py", line 1, in <module>
+    from pylabnet.hardware.lab_env_sensor.sensorpush import Driver
+  File "/home/porkpie/pylabnet/pylabnet/hardware/lab_env_sensor/sensorpush.py", line 3, in <module>
+    from pysensorpush import PySensorPush #if running first time, run 'pip3 install pysensorpush'
+ModuleNotFoundError: No module named 'pysensorpush'
+
+2026-04-09 16:32:40,374 - DEBUG - Client disconnected
+2026-04-09 16:32:40,375 - INFO - goodbye ('127.0.0.1', 59022)
+2026-04-09 16:33:02,924 - DEBUG - Client disconnected
+2026-04-09 16:33:02,925 - INFO - goodbye ('127.0.0.1', 59020)
+2026-04-09 16:33:08,285 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-09 16:33:08,292 - INFO -  logger_GUI: Cmd len: 230
+2026-04-09 16:33:08,294 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 5 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 16:33:09,051 - INFO - accepted ('127.0.0.1', 51352) with fd 25
+2026-04-09 16:33:09,108 - INFO - ('127.0.0.1', 51352) authenticated successfully
+2026-04-09 16:33:09,109 - INFO - welcome ('127.0.0.1', 51352)
+2026-04-09 16:33:09,109 - INFO - Client connected
+2026-04-09 16:33:09,155 - INFO -  pico_control: Started logging
+2026-04-09 16:33:09,158 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:33:09,164 - INFO -  pico_control: Successfully loaded settings from pico1.json.
+2026-04-09 16:33:09,166 - INFO -  pico_control: Optional Clients disabled
+2026-04-09 16:33:09,169 - INFO -  pico_control: Found exactly 1 match for picoscope_2000a.
+2026-04-09 16:33:09,174 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 12375
+2026-04-09 16:36:02,725 - DEBUG - Client disconnected
+2026-04-09 16:36:02,725 - INFO - goodbye ('127.0.0.1', 51352)
+2026-04-09 16:36:08,339 - WARNING -  logger_GUI: No matching client connected to LogServer: pico_control3
+2026-04-09 16:36:08,340 - INFO -  logger_GUI: Hard kill of pico_control3 successfull.
+2026-04-09 16:36:10,612 - WARNING -  logger_GUI: No matching client connected to LogServer: pico_control
+2026-04-09 16:36:10,614 - INFO -  logger_GUI: Hard kill of pico_control successfull.
+2026-04-09 16:36:12,046 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-09 16:36:12,048 - INFO -  logger_GUI: Cmd len: 230
+2026-04-09 16:36:12,050 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 4 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 16:36:12,776 - INFO - accepted ('127.0.0.1', 55326) with fd 25
+2026-04-09 16:36:12,830 - INFO - ('127.0.0.1', 55326) authenticated successfully
+2026-04-09 16:36:12,830 - INFO - welcome ('127.0.0.1', 55326)
+2026-04-09 16:36:12,831 - INFO - Client connected
+2026-04-09 16:36:12,876 - INFO -  pico_control: Started logging
+2026-04-09 16:36:12,880 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:36:12,889 - INFO -  pico_control: Successfully loaded settings from pico1.json.
+2026-04-09 16:36:12,896 - INFO -  pico_control: Optional Clients disabled
+2026-04-09 16:36:12,901 - INFO -  pico_control: Found exactly 1 match for picoscope_2000a.
+2026-04-09 16:36:12,907 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 12375
+2026-04-09 16:36:12,981 - INFO -  picoscope_2000a_server_12459/0199: Client connected
+2026-04-09 16:36:13,044 - INFO -  pico_control: Launching script pico_control
+2026-04-09 16:36:13,047 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:36:13,650 - ERROR -  pico_control: Confluence:.env does not have confluence key! Disable the confluence functions
+2026-04-09 16:36:22,935 - WARNING -  logger_GUI: Failed to shutdown server pico_controlon host: 127.0.1.1, port: 25010
+2026-04-09 16:36:22,936 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:36:22,937 - INFO -  logger_GUI: Client disconnected: pico_control
+2026-04-09 16:36:24,585 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-09 16:36:24,587 - INFO -  logger_GUI: Cmd len: 230
+2026-04-09 16:36:24,589 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 4 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 16:36:25,312 - INFO - accepted ('127.0.0.1', 42990) with fd 26
+2026-04-09 16:36:25,368 - INFO - ('127.0.0.1', 42990) authenticated successfully
+2026-04-09 16:36:25,369 - INFO - welcome ('127.0.0.1', 42990)
+2026-04-09 16:36:25,369 - INFO - Client connected
+2026-04-09 16:36:25,415 - INFO -  pico_control: Started logging
+2026-04-09 16:36:25,417 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:36:25,427 - INFO -  pico_control: Successfully loaded settings from pico1.json.
+2026-04-09 16:36:25,431 - INFO -  pico_control: Optional Clients disabled
+2026-04-09 16:36:25,439 - INFO -  pico_control: Found exactly 1 match for picoscope_2000a.
+2026-04-09 16:36:25,443 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 12375
+2026-04-09 16:36:25,515 - INFO -  picoscope_2000a_server_12459/0199: Client connected
+2026-04-09 16:36:25,564 - INFO -  pico_control: Launching script pico_control
+2026-04-09 16:36:25,567 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:36:25,968 - ERROR -  pico_control: Confluence:.env does not have confluence key! Disable the confluence functions
+2026-04-09 16:38:09,998 - WARNING -  logger_GUI: Failed to shutdown server sensorpush_server_Bobon host: 127.0.1.1, port: 15202
+2026-04-09 16:38:10,000 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:38:10,002 - WARNING -  logger_GUI: No matching client connected to LogServer: sensorpush_server_Bob
+2026-04-09 16:38:10,004 - INFO -  logger_GUI: Hard kill of sensorpush_server_Bob successfull.
+2026-04-09 16:38:12,644 - WARNING -  logger_GUI: No matching client connected to LogServer: rack_monitor
+2026-04-09 16:38:12,646 - INFO -  logger_GUI: Hard kill of rack_monitor successfull.
+2026-04-09 16:38:15,543 - WARNING -  logger_GUI: Failed to shutdown server pico_controlon host: 127.0.1.1, port: 22166
+2026-04-09 16:38:15,545 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:38:15,546 - INFO -  logger_GUI: Client disconnected: pico_control
+2026-04-09 16:38:16,768 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-09 16:38:16,770 - INFO -  logger_GUI: Cmd len: 230
+2026-04-09 16:38:16,772 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 2 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 16:38:17,488 - INFO - accepted ('127.0.0.1', 52672) with fd 27
+2026-04-09 16:38:17,541 - INFO - ('127.0.0.1', 52672) authenticated successfully
+2026-04-09 16:38:17,541 - INFO - welcome ('127.0.0.1', 52672)
+2026-04-09 16:38:17,542 - INFO - Client connected
+2026-04-09 16:38:17,588 - INFO -  pico_control: Started logging
+2026-04-09 16:38:17,591 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:38:17,598 - INFO -  pico_control: Successfully loaded settings from pico1.json.
+2026-04-09 16:38:17,601 - INFO -  pico_control: Optional Clients disabled
+2026-04-09 16:38:17,610 - INFO -  pico_control: Found exactly 1 match for picoscope_2000a.
+2026-04-09 16:38:17,614 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 12375
+2026-04-09 16:38:17,687 - INFO -  picoscope_2000a_server_12459/0199: Client connected
+2026-04-09 16:38:17,738 - INFO -  pico_control: Launching script pico_control
+2026-04-09 16:38:17,740 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:38:18,136 - ERROR -  pico_control: Confluence:.env does not have confluence key! Disable the confluence functions
+2026-04-09 16:55:35,163 - INFO -  logger_GUI: Launching device picoscope_2000a with configuration pico1
+2026-04-09 16:55:35,245 - INFO -  logger_GUI: Cmd len: 244
+2026-04-09 16:55:35,276 - INFO -  logger_GUI: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 22829 --server picoscope_2000a --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-09 16:55:36,868 - INFO - accepted ('127.0.0.1', 34046) with fd 44
+2026-04-09 16:55:36,938 - INFO - ('127.0.0.1', 34046) authenticated successfully
+2026-04-09 16:55:36,939 - INFO - welcome ('127.0.0.1', 34046)
+2026-04-09 16:55:36,940 - INFO - Client connected
+2026-04-09 16:55:36,992 - INFO -  picoscope_2000a_server_12459/0199: Started logging
+2026-04-09 16:55:37,077 - INFO -  picoscope_2000a_server_12459/0199: Successfully loaded settings from pico1.json.
+2026-04-09 16:55:45,557 - WARNING -  logger_GUI: Failed to shutdown server picoscope_2000a_server_12459/01992on host: 127.0.1.1, port: 22829
+2026-04-09 16:55:45,558 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:55:45,559 - INFO -  logger_GUI: Client disconnected: picoscope_2000a_server_12459/01992
+2026-04-09 16:55:46,774 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-09 16:55:46,776 - INFO -  logger_GUI: Cmd len: 230
+2026-04-09 16:55:46,778 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 3 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 16:55:47,653 - INFO - accepted ('127.0.0.1', 49772) with fd 45
+2026-04-09 16:55:47,703 - INFO - ('127.0.0.1', 49772) authenticated successfully
+2026-04-09 16:55:47,704 - INFO - welcome ('127.0.0.1', 49772)
+2026-04-09 16:55:47,704 - INFO - Client connected
+2026-04-09 16:55:47,749 - INFO -  pico_control: Started logging
+2026-04-09 16:55:47,751 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:55:47,755 - INFO -  pico_control: Successfully loaded settings from pico1.json.
+2026-04-09 16:55:47,757 - INFO -  pico_control: Optional Clients disabled
+2026-04-09 16:55:47,759 - INFO -  pico_control: Found exactly 1 match for picoscope_2000a.
+2026-04-09 16:55:47,760 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 12375
+2026-04-09 16:55:47,837 - INFO -  picoscope_2000a_server_12459/0199: Client connected
+2026-04-09 16:55:47,882 - INFO -  pico_control: Launching script pico_control
+2026-04-09 16:55:47,884 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:55:48,830 - ERROR -  pico_control: Confluence:.env does not have confluence key! Disable the confluence functions
+2026-04-09 16:55:55,498 - WARNING -  logger_GUI: Failed to shutdown server pico_control2on host: 127.0.1.1, port: 13462
+2026-04-09 16:55:55,500 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 16:55:55,502 - INFO -  logger_GUI: Client disconnected: pico_control2
+2026-04-09 17:49:59,976 - WARNING -  logger_GUI: Failed to shutdown server pico_controlon host: 127.0.1.1, port: 13963
+2026-04-09 17:49:59,979 - INFO -  logger_GUI: Attempting to remove from LogClients manually
+2026-04-09 17:49:59,980 - INFO -  logger_GUI: Client disconnected: pico_control
+2026-04-09 17:50:01,922 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-09 17:50:01,925 - INFO -  logger_GUI: Cmd len: 230
+2026-04-09 17:50:01,926 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 2 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 17:50:03,145 - INFO - accepted ('127.0.0.1', 39748) with fd 46
+2026-04-09 17:50:03,204 - INFO - ('127.0.0.1', 39748) authenticated successfully
+2026-04-09 17:50:03,204 - INFO - welcome ('127.0.0.1', 39748)
+2026-04-09 17:50:03,205 - INFO - Client connected
+2026-04-09 17:50:03,252 - INFO -  pico_control: Started logging
+2026-04-09 17:50:03,255 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 17:50:03,264 - INFO -  pico_control: Successfully loaded settings from pico1.json.
+2026-04-09 17:50:03,272 - INFO -  pico_control: Optional Clients disabled
+2026-04-09 17:50:03,276 - INFO -  pico_control: Found exactly 1 match for picoscope_2000a.
+2026-04-09 17:50:03,280 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 12375
+2026-04-09 17:50:03,356 - INFO -  picoscope_2000a_server_12459/0199: Client connected
+2026-04-09 17:50:03,408 - INFO -  pico_control: Launching script pico_control
+2026-04-09 17:50:03,411 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 17:50:04,143 - ERROR -  pico_control: Confluence:.env does not have confluence key! Disable the confluence functions

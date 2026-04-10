@@ -1,0 +1,17 @@
+2026-04-09 16:06:31,693 - INFO - Started logging to file C:\pylabnet_logs/logfile_16_06_31.
+2026-04-09 16:06:41,703 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-09 16:06:41,705 - INFO -  logger_GUI: Cmd len: 230
+2026-04-09 16:06:41,707 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 1 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-09 16:06:42,426 - INFO - accepted ('127.0.0.1', 49054) with fd 44
+2026-04-09 16:06:42,482 - INFO - ('127.0.0.1', 49054) authenticated successfully
+2026-04-09 16:06:42,482 - INFO - welcome ('127.0.0.1', 49054)
+2026-04-09 16:06:42,482 - INFO - Client connected
+2026-04-09 16:06:42,530 - INFO -  pico_control: Started logging
+2026-04-09 16:06:42,533 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-09 16:06:42,538 - ERROR -  pico_control: Settings file /home/porkpie/pylabnet/pylabnet/configs/devices/picoscope_2000a/pico1.json not found.
+2026-04-09 16:06:42,540 - INFO -  pico_control: Optional Clients disabled
+2026-04-09 16:08:12,031 - INFO - server has terminated
+2026-04-09 16:08:12,032 - INFO - listener closed
+2026-04-09 16:08:12,032 - INFO - listener closed
+2026-04-09 16:08:12,032 - INFO - listener closed
+2026-04-09 16:08:12,032 - INFO - server has terminated

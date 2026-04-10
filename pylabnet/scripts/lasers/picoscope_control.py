@@ -32,13 +32,16 @@ class Pico_Control:
             port=port,
             log=self.log
         )
+        self.log.info('gui assigned')
 
         self.gui.apply_stylesheet()
+        self.log.info('style sheet applied')
 
         self.widgets = get_gui_widgets(
             gui=self.gui,
             graph=self.num_picos
         )
+        self.log.info('widgets counted')
         self.widgets['curve'] = []
 
         #Pico stuff
@@ -50,7 +53,9 @@ class Pico_Control:
         self.ETSModeOn = []
         self.streamingModeOn = []
 
+        self.log.info('ready to initiate picos')
         self._initiatePicos(params)
+        self.log.info('pico_control object initated')
 
     def openUnit(self, n):
         """n is the index of the specific pico"""
@@ -117,7 +122,7 @@ class Pico_Control:
             self.trigger_params.append(trigger_params)
 
             #initiate modes
-            self.blockModeOn.append(False)
+            self.blockModeOn.append(True)
             self.rapidBlockModeOn.append(False)
             self.ETSModeOn.append(False)
             self.streamingModeOn.append(False)
@@ -224,7 +229,7 @@ def launch(**kwargs):
 
     client_configs = []
     for server in config['servers']:
-        if server['type'] == 'picoscope':
+        if server['type'] == 'picoscope_2000a':
             client_configs.append(server['config'])
 
     pico_clients = []
@@ -233,12 +238,13 @@ def launch(**kwargs):
             find_client(
                 clients=kwargs['clients'],
                 settings=config,
-                client_type='picoscope',
+                client_type='picoscope_2000a',
                 client_config=client_config,
                 logger=logger
             )
         )
 
+    logger.info('clients hopefully found')
     # Instantiate Monitor script
     pico_control = Pico_Control(
         pico_clients=pico_clients,
@@ -246,10 +252,12 @@ def launch(**kwargs):
         params=params
     )
 
+    logger.info('pico_control initiated')
+
     update_service = kwargs['service']
     update_service.assign_module(module=pico_control)
     logger.update_data(data=dict(device_id=device_id))
-    #pico_control.gui.set_network_info(port=kwargs['server_port'])
+    pico_control.gui.set_network_info(port=kwargs['server_port'])
 
     # Run continuously
     # Note that the actual operation inside run() can be paused using the update server

@@ -1400,7 +1400,7 @@ class Confluence_support_GraphPopup(QtWidgets.QWidget):
             self.setMinimumSize(*kwargs['size'])
 
         # Confluence handler and its button
-        enable_confluence = True
+        enable_confluence = False
 
         self.confluence_handler = None
 
@@ -1568,7 +1568,7 @@ class Confluence_Popping_Windows(QtWidgets.QMainWindow):
 
     def __init__(self, parent_wins, app, log_client=None, template="Confluence_info_window"):
         # handle the case that disables the confluence handler
-        self.enable = True
+        self.enable = False
 
         # diable if cannot use the log
         if (self.enable):

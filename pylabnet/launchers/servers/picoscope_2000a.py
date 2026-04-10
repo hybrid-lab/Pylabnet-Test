@@ -15,9 +15,9 @@ def launch(**kwargs):
 
     #Instantiate driver
     logger = kwargs['logger']
-    config = load_device_config('picoscope', kwargs['config'], logger)
+    config = load_device_config('picoscope_2000a', kwargs['config'], logger)
     driver = Driver(
-        sensor_name=config['device_id'],
+        serial=config['device_id'],
         logger=logger
     )
 
