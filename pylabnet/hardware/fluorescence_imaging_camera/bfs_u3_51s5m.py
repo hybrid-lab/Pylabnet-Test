@@ -21,17 +21,24 @@ class Driver:
             raise RuntimeError(f"Enum entry {entry_name} for {node_name} not readable")
         node.SetIntValue(entry.GetValue())
 
-    def _try_set_enum(self, nodemap, node_name: str, entry_name: str):
-        """Best-effort enum set (some cameras don't expose all nodes)."""
+    def _try_set_enum(self, node_name: str, entry_name: str):
+        """Best-effort enum set on the camera nodemap."""
         try:
-            self._set_enum(nodemap, node_name, entry_name)
+            if self.cam is None or not self.initialized:
+                raise RuntimeError("Camera not initialized")
+            nm = self.cam.GetNodeMap()
+            self._set_enum(nm, node_name, entry_name)
             return True
         except Exception:
             return False
 
-    def _try_set_float(self, nodemap, node_name: str, value: float):
+    def _try_set_float(self, node_name: str, value: float):
+        """Best-effort float set on the camera nodemap."""
         try:
-            node = PySpin.CFloatPtr(nodemap.GetNode(node_name))
+            if self.cam is None or not self.initialized:
+                raise RuntimeError("Camera not initialized")
+            nm = self.cam.GetNodeMap()
+            node = PySpin.CFloatPtr(nm.GetNode(node_name))
             if PySpin.IsAvailable(node) and PySpin.IsWritable(node):
                 node.SetValue(float(value))
                 return True
@@ -85,7 +92,7 @@ class Driver:
         self._set_enum(nm, "TriggerMode", "Off")
 
         # Set acquisition mode (continuous stream, but frames only happen on triggers)
-        self._try_set_enum(nm, "AcquisitionMode", acquisition_mode)
+        self._try_set_enum("AcquisitionMode", acquisition_mode)
 
         # Choose what the trigger starts
         self._set_enum(nm, "TriggerSelector", selector)
@@ -97,7 +104,7 @@ class Driver:
         self._set_enum(nm, "TriggerActivation", activation)
 
         # Optional performance-related setting (not present on all models)
-        self._try_set_enum(nm, "TriggerOverlap", overlap)
+        self._try_set_enum("TriggerOverlap", overlap)
 
         # Enable trigger
         self._set_enum(nm, "TriggerMode", "On")
@@ -128,31 +135,17 @@ class Driver:
                 raise RuntimeError(f"Requested camera not found: {self.serial}")
 
         self.cam.Init()
+        self.initialized = True
 
         nm = self.cam.GetNodeMap()
 
-        # ExposureAuto -> Off
-        exp_auto = PySpin.CEnumerationPtr(nm.GetNode("ExposureAuto"))
-        if PySpin.IsAvailable(exp_auto) and PySpin.IsWritable(exp_auto):
-            exp_off = exp_auto.GetEntryByName("Off")
-            exp_auto.SetIntValue(exp_off.GetValue())
+        # Turn off autos
+        self._set_enum(nm, "ExposureAuto", "Off")
+        self._set_enum(nm, "GainAuto", "Off")
 
-        # GainAuto -> Off
-        gain_auto = PySpin.CEnumerationPtr(nm.GetNode("GainAuto"))
-        if PySpin.IsAvailable(gain_auto) and PySpin.IsWritable(gain_auto):
-            gain_off = gain_auto.GetEntryByName("Off")
-            gain_auto.SetIntValue(gain_off.GetValue())
-
-        # (Optional) set fixed exposure time + gain after turning autos off
-        exp_time = PySpin.CFloatPtr(nm.GetNode("ExposureTime"))
-        if PySpin.IsAvailable(exp_time) and PySpin.IsWritable(exp_time):
-            exp_time.SetValue(5000.0)  # microseconds, example
-
-        gain = PySpin.CFloatPtr(nm.GetNode("Gain"))
-        if PySpin.IsAvailable(gain) and PySpin.IsWritable(gain):
-            gain.SetValue(0.0)         # dB, example
-
-        self.initialized = True
+        # Optional fixed exposure time + gain after turning autos off
+        self._try_set_float("ExposureTime", 5000.0)  # microseconds, example
+        self._try_set_float("Gain", 0.0)             # dB, example
 
     def disconnect(self):
         # Stop/DeInit first

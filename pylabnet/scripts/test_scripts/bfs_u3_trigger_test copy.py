@@ -59,7 +59,7 @@ def experiment(**kwargs):
     dataset = kwargs["dataset"]
     logger = dataset.log
 
-    do_channel = "dio1"
+    do_channel = "dio0"
     sample_rate = 100000
     low1_s = 0.1
     high_s = 0.010

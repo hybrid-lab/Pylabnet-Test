@@ -442,19 +442,16 @@ class Driver:
     def _append(self, op):
         """Append an operation node to the *current* active sub-stack."""
         self._current_stack[-1].append(op)
-        self.log.error(f"current stack {self._current_stack}")
 
     def _stack_push(self, new_stack):
         """Descend into a nested sub-stack (e.g. THEN or ELSE)."""
         self._current_stack.append(new_stack)
-        self.log.error(f"current stack {self._current_stack}")
 
     def _stack_pop(self):
         """Ascend back out of a nested sub-stack."""
         if len(self._current_stack) == 1:
             raise RuntimeError("Attempted to pop the root stack.")
         self._current_stack.pop()
-        self.log.error(f"current stack {self._current_stack}")
 
     def _get_reachable_if_node(self):
         """
