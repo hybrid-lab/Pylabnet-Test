@@ -1,3 +1,5 @@
+import tracemalloc
+from time import sleep
 from pylabnet.network.core.service_base import ServiceBase
 from pylabnet.network.core.client_base import ClientBase
 from pylabnet.gui.pyqt.external_gui import Window
@@ -11,9 +13,7 @@ from pylabnet.network.client_server.picoscope_2000a import Client as Pico_Client
 import numpy as np
 import pickle
 import pyqtgraph as pg
-from time import sleep
-
-import tracemalloc
+pg.setConfigOptions(useOpenGL=False)
 
 
 class Pico_Control:
@@ -24,24 +24,25 @@ class Pico_Control:
         self.pico_clients = pico_clients
         self.num_picos = len(pico_clients)
         self.log = LogHandler(logger_client)
+        self.log.debug('initiating gui')
 
         #setup GUI
         self.gui = Window(
             gui_template=gui,
             host=get_ip(),
             port=port,
-            log=self.log
+            log=self.log,
+            run=True
         )
-        self.log.info('gui assigned')
+        self.log.debug('gui initiated')
 
         self.gui.apply_stylesheet()
-        self.log.info('style sheet applied')
-
+        self.log.debug('ready to get widgets')
         self.widgets = get_gui_widgets(
             gui=self.gui,
-            graph=self.num_picos
+            graph=self.num_picos, legend=self.num_picos,
         )
-        self.log.info('widgets counted')
+        self.log.debug(f'collected widgets: {self.widgets}')
         self.widgets['curve'] = []
 
         #Pico stuff
@@ -53,9 +54,10 @@ class Pico_Control:
         self.ETSModeOn = []
         self.streamingModeOn = []
 
-        self.log.info('ready to initiate picos')
+        self.log.debug('ready to initiate picos')
+        for n in range(self.num_picos):
+            self.openUnit(n)
         self._initiatePicos(params)
-        self.log.info('pico_control object initated')
 
     def openUnit(self, n):
         """n is the index of the specific pico"""
@@ -96,6 +98,7 @@ class Pico_Control:
 
     #closing unit
     def closeUnit(self, n):
+        self.pico_clients[n].stop()
         self.pico_clients[n].closeUnit()
         self.blockModeOn[n] = False
         self.rapidBlockModeOn[n] = False
@@ -106,8 +109,10 @@ class Pico_Control:
         """Runs the Pico Control. Can be paused with pause()"""
         for n in range(self.num_picos):
             if self.blockModeOn[n]:
+                self.log.debug('running Block')
                 self._runBlock(n)
             if self.rapidBlockModeOn[n]:
+                self.log.info('running RapidBlock')
                 self._runRapidBlock(n)
 
     #Technical methods
@@ -125,34 +130,50 @@ class Pico_Control:
             self.blockModeOn.append(True)
             self.rapidBlockModeOn.append(False)
             self.ETSModeOn.append(False)
-            self.streamingModeOn.append(False)
+
+            self.log.debug('ready to settime')
 
             self.pico_clients[n].setTime()
 
+            self.log.debug('ready to create curves')
             # Create curves
             # Ch A
-            self.widgets['curve'].append(self.widgets['graph'][n].plot(
-                pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
-            ))
-            add_to_legend(
-                legend=self.widgets['legend'][n],
-                curve=self.widgets['curve'][2 * n],
-                curve_name=f'Picoscope {n} Channel A'
-            )
+            if self.num_picos == 1:
+                self.widgets['curve'].append(self.widgets['graph'].plot(
+                    pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
+                ))
+                self.log.debug('Ch A curve appended')
+                self.widgets['legend'].addItem(self.widgets['curve'][0])
+                self.log.debug('legend made for ChA')
+            else:
+                self.widgets['curve'].append(self.widgets['graph'][n].plot(
+                    pen=pg.mkPen(color=self.gui.COLOR_LIST[0])
+                ))
+                self.log.debug('Ch A curve appended')
+                self.widgets['legend'][n].addItem(self.widgets['curve'][2 * n])
+                self.log.debug('legend made for ChA')
 
             # Ch B
-            self.widgets['curve'].append(self.widgets['graph'][n].plot(
-                pen=pg.mkPen(color=self.gui.COLOR_LIST[1])
-            ))
-            add_to_legend(
-                legend=self.widgets['legend'][n],
-                curve=self.widgets['curve'][2 * n + 1],
-                curve_name=f'Picoscope {n} Channel B'
-            )
+            if self.num_picos == 1:
+                self.widgets['curve'].append(self.widgets['graph'].plot(
+                    pen=pg.mkPen(color=self.gui.COLOR_LIST[1])
+                ))
+                self.log.debug('Ch B curve appended')
+                self.widgets['legend'].addItem(self.widgets['curve'][1])
+                self.log.debug('legend made for ChB')
+            else:
+                self.widgets['curve'].append(self.widgets['graph'][n].plot(
+                    pen=pg.mkPen(color=self.gui.COLOR_LIST[1])
+                ))
+                self.log.debug('Ch B curve appended')
+                self.widgets['legend'][n].addItem(self.widgets['curve'][2 * n + 1])
+                self.log.debug('legend made for ChB')
 
     def _runBlock(self, n):
         pico = self.pico_clients[n]
+        self.log.debug('entered _runBlock')
         time, data = pico.runBlock()
+        self.log.debug('data gathered')
 
         for d in range(len(data)):
             self.widgets['curve'][2 * n + d].setData(x=time, y=data[d])
@@ -244,7 +265,7 @@ def launch(**kwargs):
             )
         )
 
-    logger.info('clients hopefully found')
+    logger.debug('clients hopefully found')
     # Instantiate Monitor script
     pico_control = Pico_Control(
         pico_clients=pico_clients,
@@ -252,7 +273,7 @@ def launch(**kwargs):
         params=params
     )
 
-    logger.info('pico_control initiated')
+    logger.debug('pico_control initiated')
 
     update_service = kwargs['service']
     update_service.assign_module(module=pico_control)

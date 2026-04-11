@@ -1,6 +1,6 @@
 {
-    "logger_path": "/pylabnet_logs",
-    "master_ip": "192.168.50.101",
+    "logger_path": "/home/porkpie/pylabnet_logs",
+    "master_ip": "192.168.0.207",
     "master_log_port": 12345,
     "master_gui_port": 12346
 }

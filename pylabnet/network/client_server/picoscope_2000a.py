@@ -21,7 +21,7 @@ class Service(ServiceBase):
     def exposed_closeChannel(self, channel_name):
         return self._module.closeChannel(channel_name)
 
-    def exposted_setTime(self, preTriggerTime, postTriggerTime, totalSamples):
+    def exposed_setTime(self, preTriggerTime, postTriggerTime, totalSamples):
         return self._module.setTime(preTriggerTime, postTriggerTime, totalSamples)
 
     def exposed_setTrigger(self, params):
@@ -33,6 +33,7 @@ class Service(ServiceBase):
         return self._module.setupBlock(trigger_params, downsampling_mode, 1)
 
     def exposed_runBlock(self, segmentIndex=0, downsample_ratio=1, downsample_mode=None):
+        print('entered Service.exposed_runBlock')
         return self._module.runBlock(segmentIndex, downsample_ratio, downsample_mode)
 
     #Rapid Block Mode
@@ -53,47 +54,48 @@ class Service(ServiceBase):
 
 class Client(ClientBase):
     def openUnit(self):
-        return self._service.exposed_oopenUnit()
+        return self._service.exposed_openUnit()
 
     def setChannel(self, params=None):
         return self._service.exposed_setChannel(params)
 
     def setChannelCoupling(self, channel_name, coupling_type):
-        return self._module.exposed_setChannelCoupling(channel_name, coupling_type)
+        return self._service.exposed_setChannelCoupling(channel_name, coupling_type)
 
     def setChannelRange(self, channel_name, volt_range):
-        return self._module.exposed_setChannelRange(channel_name, volt_range)
+        return self._service.exposed_setChannelRange(channel_name, volt_range)
 
     def setChannelOffset(self, channel_name, offset):
-        return self._module.exposed_setChannelOffset(channel_name, offset)
+        return self._service.exposed_setChannelOffset(channel_name, offset)
 
     def closeChannel(self, channel_name):
-        return self._module.exposed_closeChannel(channel_name)
+        return self._service.exposed_closeChannel(channel_name)
 
-    def setTime(self, preTriggerTime=1000, postTriggerTime=1000, totalSamples=500):
-        return self._module.exposed_setTime(preTriggerTime, postTriggerTime, totalSamples)
+    def setTime(self, preTriggerTime=5000, postTriggerTime=5000, totalSamples=500):
+        return self._service.exposed_setTime(preTriggerTime, postTriggerTime, totalSamples)
 
     def setTrigger(self, params):
-        return self._module.exposed_setTrigger(params)
+        return self._service.exposed_setTrigger(params)
 
     #Block Mode
 
     def setupBlock(self, trigger_params, downsampling_mode=None):
-        return self._module.exposed_setupBlock(trigger_params, downsampling_mode)
+        return self._service.exposed_setupBlock(trigger_params, downsampling_mode)
 
     def runBlock(self, segmentIndex=0, downsample_ratio=1, downsample_mode=None):
-        return self._module.exposed_runBlock(segmentIndex, downsample_ratio, downsample_mode)
+        print('entered Client.runBlock')
+        return self._service.exposed_runBlock(segmentIndex, downsample_ratio, downsample_mode)
 
     #Rapid Block Mode
     def setupRapidBlock(self, trigger_params, nSegments=10, nCaptures=10, downsampling_mode=None):
-        return self._module.exposed_setupRapidBlock(trigger_params, nSegments, nCaptures, downsampling_mode)
+        return self._service.exposed_setupRapidBlock(trigger_params, nSegments, nCaptures, downsampling_mode)
 
     def runRapidBlock(self, segmentIndex=0, downsample_ratio=1, downsample_mode=None):
-        return self._module.exposed_runRapidBlock(segmentIndex, downsample_ratio, downsample_mode)
+        return self._service.exposed_runRapidBlock(segmentIndex, downsample_ratio, downsample_mode)
 
     #Closing unit stuff
     def closeUnit(self):
-        return self._module.exposed_closeUnit()
+        return self._service.exposed_closeUnit()
 
     def stop(self):
-        return self._module.exposed_stop()
+        return self._service.exposed_stop()

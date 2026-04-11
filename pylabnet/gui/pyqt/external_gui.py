@@ -675,6 +675,7 @@ class Window(QtWidgets.QMainWindow):
         """Runs the GUI. Displays the main window"""
 
         self.show()
+        self.log.info('gui should be up')
 
     def _assign_plot(self, plot_widget, plot_label, legend_widget):
         """ Assigns a plot to a particular plot widget

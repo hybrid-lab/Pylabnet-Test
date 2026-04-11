@@ -1,0 +1,64 @@
+2026-04-10 12:21:21,487 - INFO - Started logging to file C:\pylabnet_logs/logfile_12_21_21.
+2026-04-10 12:22:11,173 - INFO -  logger_GUI: Launching device pico_control with configuration pico_control
+2026-04-10 12:22:11,175 - INFO -  logger_GUI: Cmd len: 230
+2026-04-10 12:22:11,177 - INFO -  logger_GUI: cmd = /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/launcher.py --logip 127.0.1.1 --logport 12345 --script pico_control --num_clients 1 --config pico_control --debug 0 --server_debug 0 --lab_name NO_LAB
+2026-04-10 12:22:11,934 - INFO - accepted ('127.0.0.1', 42300) with fd 24
+2026-04-10 12:22:11,986 - INFO - ('127.0.0.1', 42300) authenticated successfully
+2026-04-10 12:22:11,987 - INFO - welcome ('127.0.0.1', 42300)
+2026-04-10 12:22:11,988 - INFO - Client connected
+2026-04-10 12:22:12,032 - INFO -  pico_control: Started logging
+2026-04-10 12:22:12,036 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-10 12:22:12,045 - INFO -  pico_control: Successfully loaded settings from pico1.json.
+2026-04-10 12:22:12,057 - INFO -  pico_control: Optional Clients disabled
+2026-04-10 12:22:12,063 - INFO -  pico_control: No active servers matching module picoscope_2000a were found. Instantiating a new server.
+2026-04-10 12:22:12,072 - INFO -  pico_control: Cmd len: 244
+2026-04-10 12:22:12,104 - INFO -  pico_control: Cmd: /home/porkpie/pylabnet/env/bin/python /home/porkpie/pylabnet/pylabnet/launchers/pylabnet_server.py --logip 127.0.1.1 --logport 12345 --serverport 15202 --server picoscope_2000a --device_id "12459/0199" --config pico1 --debug 0 --lab_name NO_LAB
+2026-04-10 12:22:12,112 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 15202
+2026-04-10 12:22:12,306 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 15202
+2026-04-10 12:22:12,415 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 15202
+2026-04-10 12:22:12,529 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 15202
+2026-04-10 12:22:12,633 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 15202
+2026-04-10 12:22:12,742 - INFO - accepted ('127.0.0.1', 42316) with fd 25
+2026-04-10 12:22:12,744 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 15202
+2026-04-10 12:22:12,816 - INFO - ('127.0.0.1', 42316) authenticated successfully
+2026-04-10 12:22:12,816 - INFO - welcome ('127.0.0.1', 42316)
+2026-04-10 12:22:12,817 - INFO - Client connected
+2026-04-10 12:22:12,855 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 15202
+2026-04-10 12:22:12,874 - INFO -  picoscope_2000a_server_12459/0199: Started logging
+2026-04-10 12:22:12,926 - INFO -  picoscope_2000a_server_12459/0199: Successfully loaded settings from pico1.json.
+2026-04-10 12:22:12,961 - INFO -  pico_control: Trying to connect to active picoscope_2000a server
+Host: 127.0.1.1
+Port: 15202
+2026-04-10 12:22:13,021 - INFO -  picoscope_2000a_server_12459/0199: Client connected
+2026-04-10 12:22:13,074 - INFO -  pico_control: Launching script pico_control
+2026-04-10 12:22:13,076 - INFO -  pico_control: Successfully loaded settings from pico_control.json.
+2026-04-10 12:22:13,079 - INFO -  pico_control: clients hopefully found
+2026-04-10 12:22:13,600 - INFO -  pico_control: gui assigned
+2026-04-10 12:22:13,792 - INFO -  pico_control: style sheet applied
+2026-04-10 12:22:45,529 - INFO -  pico_control: Client connected
+2026-04-10 12:22:45,612 - DEBUG - Client disconnected
+2026-04-10 12:22:45,613 - INFO -  picoscope_2000a_server_12459/0199: Client disconnected
+2026-04-10 12:22:45,613 - INFO - goodbye ('127.0.0.1', 42300)
+2026-04-10 12:22:45,670 - INFO -  picoscope_2000a_server_12459/0199: Client connected
+2026-04-10 12:22:45,726 - DEBUG - Client disconnected
+2026-04-10 12:22:45,730 - INFO - goodbye ('127.0.0.1', 42316)
+2026-04-10 12:22:45,731 - INFO - server has terminated
+2026-04-10 12:22:45,731 - INFO - listener closed
+2026-04-10 12:22:45,731 - INFO - listener closed
+2026-04-10 12:22:45,731 - INFO - server has terminated
+2026-04-10 12:22:45,732 - INFO - listener closed
+2026-04-10 12:22:45,732 - INFO - listener closed

@@ -111,23 +111,34 @@ class Driver:
 
     #timebase
     def setTime(self, preTriggerTime, postTriggerTime, totalSamples):
+        """Time is in units of ns"""
+
+        self.logger.debug('entered driver.setTime')
+        preTriggerTime = preTriggerTime
+        postTriggerTime = postTriggerTime
         totalTime = preTriggerTime + postTriggerTime
-        ideal_ns = int(totalTime / totalSamples) * 1e9
+        self.logger.debug(f'total time is {totalTime} ns')
+        ideal_ns = int(totalTime / totalSamples)
+        self.logger.debug(f'ideal_ns is {ideal_ns} ns')
         preTriggerSamples = int(preTriggerTime / ideal_ns)
         postTriggerSamples = int(postTriggerTime / ideal_ns)
+        self.logger.debug(f'we have {preTriggerSamples} samples pre trigger and {postTriggerSamples} samples post trigger')
 
-        if ideal_ns < 9e-9:
-            timebase = int(np.log2(5e8 * ideal_ns))
-            if self.channels['A']['channelOn'] is True and self.channels['B']['channelOn'] is True and timebase is 1:
+        if ideal_ns < 9: #s
+            timebase = int(np.log2(0.5 * ideal_ns))
+            if self.channels['A']['channelOn'] == True and self.channels['B']['channelOn'] == True and timebase is 1:
                 timebase = 2
         else:
-            timebase = int(6.25e7 * ideal_ns)
+            timebase = int(6.25e-2 * ideal_ns + 2)
+        self.logger.debug(f'timebase is {timebase}')
         ns, maxSamples = self._getTimebase(timebase)
+        self.logger.debug(f'time interval is {ns} ns and maxSamples is {maxSamples}')
         if totalSamples < maxSamples:
             self.totalSamples = preTriggerSamples + postTriggerSamples
             self.time_interval_ns = ns
             self.preTriggerSamples = preTriggerSamples
             self.postTriggerSamples = postTriggerSamples
+        self.logger.debug('ran through driver.setTime')
 
     def _getTimebase(self, timebase, segmentIndex=0):
         """
@@ -145,10 +156,12 @@ class Driver:
         self.timebase = timebase
         timeIntervalns = ctypes.c_float()
         maxSamples = ctypes.c_int32()
+        self.logger.debug('ready to call pico to set Timebase')
         self.status["getTimebase"] = ps.ps2000aGetTimebase2(self.chandle, self.timebase, self.totalSamples,
                                                             ctypes.byref(timeIntervalns), 0,
                                                             ctypes.byref(maxSamples), segmentIndex)
         assert_pico_ok(self.status["getTimebase"])
+        self.logger.debug('called pico to get Timebase')
         self.time_interval_ns = timeIntervalns.value
         return timeIntervalns.value, maxSamples.value
 
@@ -252,11 +265,16 @@ class Driver:
 
         :segmentIndex: (int) which memory segment to use
         """
+        self.logger.debug(f'total samples is {self.totalSamples}')
         cTotalSamples = ctypes.c_int32(self.totalSamples)
+        self.logger.debug('setting up overflow variable')
         overflow = ctypes.c_int16()
 
+        self.logger.debug('ready to run _runBlock')
         self._runBlock()
+        self.logger.debug('block is ran, waiting for pico to be ready')
         self._isReady()
+        self.logger.debug('pico is ready')
 
         #get values
         mode = self._checkDownsampleMode(downsample_mode)
