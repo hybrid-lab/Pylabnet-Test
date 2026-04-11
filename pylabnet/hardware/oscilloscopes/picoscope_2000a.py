@@ -266,9 +266,8 @@ class Driver:
 
         :segmentIndex: (int) which memory segment to use
         """
-        self.logger.debug(f'total samples is {self.totalSamples}')
         cTotalSamples = ctypes.c_int32(self.totalSamples)
-        self.logger.debug('setting up overflow variable')
+        self.logger.debug(f'total samples is {cTotalSamples.value}')
         overflow = ctypes.c_int16()
 
         self.logger.debug('ready to run _runBlock')
@@ -278,9 +277,16 @@ class Driver:
         self.logger.debug('pico is ready')
 
         #get values
-        mode = self._checkDownsampleMode(downsample_mode)
-        time, data = self._getValues(0, cTotalSamples, segmentIndex, overflow, mode, downsample_ratio)
-        return time, data
+        try:
+            mode = self._checkDownsampleMode(downsample_mode)
+            self.logger.debug(f'downsample mode is {mode}')
+            time, data = self._getValues(0, cTotalSamples, segmentIndex, overflow, mode, downsample_ratio)
+            self.logger.debug(f'successfully gathered data')
+            return time, data
+        except:
+            self.logger.debug('closing unit')
+            self.closeUnit()
+            raise
 
     ### RAPID BLOCK MODE
 
@@ -445,10 +451,12 @@ class Driver:
         :downsample_ratio:
         :downsample_mode:
         """
+        self.logger.debug('entered _getValues')
         self.status["getValues"] = ps.ps2000aGetValues(self.chandle, start_index, ctypes.byref(cTotalSamples),
                                                        downsample_ratio, mode, 0, segmentIndex, ctypes.byref(overflow))
         assert_pico_ok(self.status["getValues"])
         self.totalSamples = cTotalSamples.value
+        self.logger.debug('retreived values')
 
         #graph values
         start = self.preTriggerSamples * self.time_interval_ns * 0.001
