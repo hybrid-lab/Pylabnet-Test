@@ -454,9 +454,9 @@ class Driver:
         self.logger.debug('entered _getValues')
         self.status["getValues"] = ps.ps2000aGetValues(self.chandle, start_index, ctypes.byref(cTotalSamples),
                                                        downsample_ratio, mode, 0, segmentIndex, ctypes.byref(overflow))
-        assert_pico_ok(self.status["getValues"])
-        self.totalSamples = cTotalSamples.value
+        self.logger.debug(assert_pico_ok(self.status["getValues"]))
         self.logger.debug('retreived values')
+        self.totalSamples = cTotalSamples.value
 
         #graph values
         start = self.preTriggerSamples * self.time_interval_ns * 0.001

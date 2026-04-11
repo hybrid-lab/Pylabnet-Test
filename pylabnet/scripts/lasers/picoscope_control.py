@@ -57,6 +57,7 @@ class Pico_Control:
         self.log.debug('ready to initiate picos')
         for n in range(self.num_picos):
             self.openUnit(n)
+        self.log.debug('pico is open')
         self._initiatePicos(params)
 
     def openUnit(self, n):
@@ -65,6 +66,7 @@ class Pico_Control:
 
     #channels
     def setChannels(self, n):
+        self.log.debug('entered setChannels')
         self.pico_clients[n].setChannel(self.channel_params[n])
 
     def setChannelCoupling(self, n, channel, coupling_type):
@@ -77,6 +79,8 @@ class Pico_Control:
         self.pico_clients[n].setupBlock(trigger_params)
 
     def runBlock(self, n):
+        trigger_params = self.trigger_params[n]
+        self.pico_clients[n].setupBlock(trigger_params)
         self.blockModeOn[n] = True
 
     def stopBlock(self, n):
@@ -107,33 +111,40 @@ class Pico_Control:
 
     def run(self):
         """Runs the Pico Control. Can be paused with pause()"""
-        for n in range(self.num_picos):
-            if self.blockModeOn[n]:
-                self.log.debug('running Block')
-                self._runBlock(n)
-            if self.rapidBlockModeOn[n]:
-                self.log.info('running RapidBlock')
-                self._runRapidBlock(n)
+        try:
+            for n in range(self.num_picos):
+                if self.blockModeOn[n]:
+                    self.log.debug('running Block')
+                    self._runBlock(n)
+                if self.rapidBlockModeOn[n]:
+                    self.log.info('running RapidBlock')
+                    self._runRapidBlock(n)
+        except:
+            self.log.info('closing unit')
+            self.closeUnit(n)
 
     #Technical methods
     def _initiatePicos(self, params):
+        self.log.debug('entered _initiatePicos')
         for n in range(self.num_picos):
             #set channels
             channel_params = params[f"{n}"]["channels"]
-            self.channel_params = channel_params
+            self.channel_params.append(channel_params)
+            self.setChannels(n)
+            self.log.debug('successfully set channels')
 
             #assign trigger_params
             trigger_params = params[f"{n}"]['trigger_params']
             self.trigger_params.append(trigger_params)
 
+            self.pico_clients[n].setTime()
+            self.log.debug('time as been set')
+
             #initiate modes
             self.blockModeOn.append(True)
+            self.setupBlock(n)
             self.rapidBlockModeOn.append(False)
             self.ETSModeOn.append(False)
-
-            self.log.debug('ready to settime')
-
-            self.pico_clients[n].setTime()
 
             self.log.debug('ready to create curves')
             # Create curves
@@ -177,6 +188,7 @@ class Pico_Control:
 
         for d in range(len(data)):
             self.widgets['curve'][2 * n + d].setData(x=time, y=data[d])
+            self.log.debug('data plotted')
 
     def _runRapidBlock(self, n):
         pico = self.pico_clients[n]
