@@ -43,9 +43,10 @@ class Driver:
         self.time_interval_ns = 0
 
     def openUnit(self):
+
         self.status["openunit"] = ps.ps2000aOpenUnit(ctypes.byref(self.chandle), self.serial.encode('utf-8'))
-        assert_pico_ok(self.status["openunit"])
         self.isOpen = True
+        return assert_pico_ok(self.status["openunit"])
 
     #set Channel stuff
     def setChannel(self, params):
