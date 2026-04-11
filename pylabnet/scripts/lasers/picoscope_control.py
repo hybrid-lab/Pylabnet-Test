@@ -13,7 +13,7 @@ from pylabnet.network.client_server.picoscope_2000a import Client as Pico_Client
 import numpy as np
 import pickle
 import pyqtgraph as pg
-pg.setConfigOptions(useOpenGL=False)
+pg.setConfigOptions(useOpenGL=False, enableExperimental=False)
 
 
 class Pico_Control:

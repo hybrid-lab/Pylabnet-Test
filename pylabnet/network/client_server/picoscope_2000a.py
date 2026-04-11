@@ -33,7 +33,6 @@ class Service(ServiceBase):
         return self._module.setupBlock(trigger_params, downsampling_mode, 1)
 
     def exposed_runBlock(self, segmentIndex=0, downsample_ratio=1, downsample_mode=None):
-        print('entered Service.exposed_runBlock')
         return self._module.runBlock(segmentIndex, downsample_ratio, downsample_mode)
 
     #Rapid Block Mode
@@ -83,7 +82,6 @@ class Client(ClientBase):
         return self._service.exposed_setupBlock(trigger_params, downsampling_mode)
 
     def runBlock(self, segmentIndex=0, downsample_ratio=1, downsample_mode=None):
-        print('entered Client.runBlock')
         return self._service.exposed_runBlock(segmentIndex, downsample_ratio, downsample_mode)
 
     #Rapid Block Mode
