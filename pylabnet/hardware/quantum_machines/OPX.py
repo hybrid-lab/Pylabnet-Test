@@ -10,6 +10,7 @@ from qm import QuantumMachinesManager
 #from pylabnet.hardware.quantum_machines.OPXdriverConfig import *
 from pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel import *
 import pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel as opx_cfg
+import time
 
 
 #from pylabnet.qua_practice.configuration import *
@@ -223,7 +224,9 @@ class Driver:
 
         return element
 
-    def execute(self):
+    def execute(self, wait=True, timeout=None):
+        self.log.info(f"Time OPX execute starts {time.perf_counter_ns()}")
+
         self.adding_to_stack = False
         self.simulating = False
 
@@ -343,8 +346,24 @@ class Driver:
                             out[label] = raw
             return out
         else:
+            self.log.info(f"Time OPX compilation local done {time.perf_counter_ns()}")
+
             qm = self.qmm.open_qm(config)
             job = qm.execute(curr_prog)
+
+            self.log.info(f"Time OPX job submitted to hardware {time.perf_counter_ns()}")
+
+            if wait:
+                if hasattr(job, "wait_until"):
+                    job.wait_until("Done", timeout=timeout)
+                elif hasattr(job, "_is_job_running"):
+                    start_time = time.perf_counter()
+                    while job._is_job_running():
+                        if timeout is not None and (time.perf_counter() - start_time) > timeout:
+                            raise TimeoutError(f"OPX job did not finish within {timeout} seconds")
+                        time.sleep(0.01)
+
+            return job
 
     def _emit_stack(self, stack, streams, measuring_flag, measure_counter):
         """Recursively emit QUA code."""

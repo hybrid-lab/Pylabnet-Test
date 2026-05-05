@@ -9,6 +9,10 @@
             "config": "ni_daq_2"
         },
         {
+            "type": "OPX",
+            "config": "OPX"
+        },
+        {
             "type": "nidaqmx",
             "config": "ni_daq_3"
         },
@@ -16,6 +20,7 @@
             "type": "fluorescence_imaging_camera",
             "config": "bfs_u3_51s5m"
         }
+
     ],
     "script": "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\data_center\\take_data.py",
     "exp_path" : "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\test_scripts",

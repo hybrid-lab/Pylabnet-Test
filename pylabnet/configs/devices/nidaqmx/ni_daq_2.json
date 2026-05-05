@@ -1,3 +1,4 @@
 {
-    "device_id": "PXI1Slot4_1"
+    "device_id": "PXI1Slot4_1",
+    "port": 15203
 }

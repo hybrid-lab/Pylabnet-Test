@@ -1,6 +1,6 @@
 {
     "logger_path": "C:\\pylabnet_logs",
-    "master_ip": "192.168.0.60",
+    "master_ip": "192.168.0.61",
     "master_log_port": 12345,
     "master_gui_port": 12346
 }

@@ -80,6 +80,9 @@ class Service(ServiceBase):
     def exposed_arm_clock(self, length, sample_rate):
         return self._module.arm_clock(N=length, sample_rate=sample_rate)
 
+    def exposed_finalize_clock(self):
+        return self._module.finalize_clock()
+
    # ---- Stack control ----
 
     def exposed_build_stack(self):
@@ -103,12 +106,12 @@ class Service(ServiceBase):
         return self._module.set_trigger(target=target, trig_line=trig_line, edge=edge_enum)
 
     # ---- Arm / Finalize ----
-    def exposed_arm(self):
+    def exposed_arm(self, retriggerable=False):
         """
         Arms the currently built stack and returns a pickled dict:
           {"handle_id": <uuid str or None>, "meta": <dict>}
         """
-        handle = self._module.arm()
+        handle = self._module.arm(retriggerable=bool(retriggerable))
         if not getattr(handle, "tasks", None):
             payload = {"handle_id": None, "meta": getattr(handle, "meta", {})}
             return pickle.dumps(payload)
@@ -290,12 +293,12 @@ class Client(ClientBase):
         return self._service.exposed_set_trigger(target=target, trig_line=trig_line, edge=edge)
 
     # ---- Arm / Finalize ----
-    def arm(self) -> Dict[str, Any]:
+    def arm(self, retriggerable: bool = False) -> Dict[str, Any]:
         """
         Arms the server-side stack. Returns:
           {"handle_id": str|None, "meta": dict}
         """
-        payload_pickle = self._service.exposed_arm()
+        payload_pickle = self._service.exposed_arm(retriggerable=retriggerable)
         return pickle.loads(payload_pickle)
 
     def finalize(self, handle_id: str, timeout: float = 30.0, close: bool = True) -> Dict[str, Any]:
@@ -421,3 +424,6 @@ class Client(ClientBase):
 
     def arm_clock(self, length, sample_rate):
         return self._service.exposed_arm_clock(length=length, sample_rate=sample_rate)
+
+    def finalize_clock(self):
+        return self._service.exposed_finalize_clock()

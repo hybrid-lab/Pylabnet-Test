@@ -18,19 +18,39 @@ AVG_DIFF_LEVELS = (0, 20)
 
 # -----------------------------
 # Experiment script settings
-# Same structure as original, but timing values are now in ms.
+# Timing values are now in microseconds (us)
 # -----------------------------
 
 INIT_DICT = {
-    'imaging_AOM_start': {'Imaging AOM Start Time (ms)': '1'},
-    'imaging_AOM_end': {'Imaging AOM End Time (ms)': '500'},
-    'frame_1': {'Camera Frame 1 Time (ms)': '400'},
-    'frame_2': {'Camera Frame 2 Time (ms)': '700'},
-    'wait_time': {'Wait Time Between Cycles (s)': '0.1'},
+    'imaging_AOM_start': {'Imaging AOM Start Time (us)': '1000'},
+    'imaging_AOM_end': {'Imaging AOM End Time (us)': '500000'},
+
+    # MOT coils:
+    # coils are OFF before mot_coils_start
+    # coils are ON from mot_coils_start to mot_coils_end
+    # coils are OFF after mot_coils_end
+    'mot_coils_start': {'MOT Coils ON Start Time (us)': '1000'},
+    'mot_coils_end': {'MOT Coils ON End Time (us)': '500000'},
+
+    'frame_1': {'Camera Frame 1 Time (us)': '400000'},
+    'frame_2': {'Camera Frame 2 Time (us)': '1000000'},
+    'wait_time': {'Wait Time Between Cycles (s)': '3'},
+
     'camera_trigger_do': {'Camera Trigger DO Channel': '0'},
     'imaging_AOM_do': {'Imaging AOM DO Channel': '1'},
     'imaging_AOM_ao': {'Imaging AOM AO Channel': '1'},
-    'opx_trigger_do': {'OPX Trigging DO Channel': '1'},
+
+    # MOT coils controls
+    'mot_coils_do': {'MOT Coils DO Channel': '2'},
+    'mot_coils_ao': {'MOT Coils AO Channel': '2'},
+    'mot_coils_on_voltage': {'MOT Coils ON Analog Voltage (V)': '5.0'},
+    'mot_coils_off_voltage': {'MOT Coils OFF Analog Voltage (V)': '0.0'},
+
+    'opx_trigger_do': {'OPX Triggering DO Channel': '1'},
+
+    # Camera / pulse widths in us
+    'camera_trigger_width_us': {'Camera Trigger Pulse Width (us)': '10'},
+    'camera_exposure_us': {'Camera Exposure Time (us)': '500'},
 }
 
 
@@ -43,9 +63,8 @@ def configure(**kwargs):
     """Sets up the hardware and the plot before the experiment runs."""
     dataset = kwargs['dataset']
     dataset.frame_viewer = QtMatplotlibFrameViewer("Most recent camera frame")
-    logger = dataset.log
 
-    # Get device clients:
+    # Get device clients
     camera_client = kwargs['fluorescence_imaging_camera_bfs_u3_51s5m']
     dataset.camera_client = camera_client
 
@@ -82,6 +101,7 @@ def configure(**kwargs):
         min_y=0, max_y=2048, pts_y=2048,
         new_plot=True
     )
+
     frame1_ds = dataset.children["Frame 1"]
     frame2_ds = dataset.children["Frame 2"]
     diff_ds = dataset.children["Image Difference"]
@@ -106,11 +126,11 @@ def experiment(**kwargs):
     thread = kwargs['thread']
     dataset = kwargs['dataset']
     logger = dataset.log
+
     dataset.NI_card_1 = kwargs["nidaqmx_ni_daq_1"]
     dataset.NI_card_2 = kwargs["nidaqmx_ni_daq_2"]
     dataset.NI_card_3 = kwargs["nidaqmx_ni_daq_3"]
     dataset.camera_client = kwargs["fluorescence_imaging_camera_bfs_u3_51s5m"]
-
     dataset.OPX_client = kwargs["OPX_OPX"]
 
     OPX_client = dataset.OPX_client
@@ -121,28 +141,97 @@ def experiment(**kwargs):
 
     imaging_AOM_start = int(dataset.get_input_parameter("imaging_AOM_start"))
     imaging_AOM_end = int(dataset.get_input_parameter("imaging_AOM_end"))
+
+    mot_coils_start = int(dataset.get_input_parameter("mot_coils_start"))
+    mot_coils_end = int(dataset.get_input_parameter("mot_coils_end"))
+
     frame_1 = int(dataset.get_input_parameter("frame_1"))
     frame_2 = int(dataset.get_input_parameter("frame_2"))
     wait_time = float(dataset.get_input_parameter("wait_time"))
+
+    camera_trigger_width_us = int(dataset.get_input_parameter("camera_trigger_width_us"))
+    camera_exposure_us = int(dataset.get_input_parameter("camera_exposure_us"))
 
     opx_trigger_do = int(dataset.get_input_parameter("opx_trigger_do"))
     camera_trigger_do = "dio" + str(int(dataset.get_input_parameter("camera_trigger_do")))
     imaging_AOM_do = "dio" + str(int(dataset.get_input_parameter("imaging_AOM_do")))
     imaging_AOM_ao = "ao" + str(int(dataset.get_input_parameter("imaging_AOM_ao")))
 
-    # 1 sample = 1 ms
-    ni_sample_rate = 1000
+    mot_coils_do = "dio" + str(int(dataset.get_input_parameter("mot_coils_do")))
+    mot_coils_ao = "ao" + str(int(dataset.get_input_parameter("mot_coils_ao")))
+    mot_coils_on_voltage = float(dataset.get_input_parameter("mot_coils_on_voltage"))
+    mot_coils_off_voltage = float(dataset.get_input_parameter("mot_coils_off_voltage"))
+
+    # 1 sample = 1 us
+    ni_sample_rate = 1_000_000
     trigger_line = "Line0"
     trigger_edge = "RisingEdge"
 
-    camera_ttl_up = 1
+    if frame_2 <= frame_1:
+        raise ValueError("frame_2 must be greater than frame_1")
 
-    down_time = frame_2 - frame_1 - camera_ttl_up
-    camera_trigger_pulse = [0] * frame_1 + [1] * camera_ttl_up + [0] * down_time + [1] * camera_ttl_up
-    imaging_AOM_pulse = [0] * imaging_AOM_start + [1] * (imaging_AOM_end - imaging_AOM_start) + [0] * 100
+    if imaging_AOM_end < imaging_AOM_start:
+        raise ValueError("imaging_AOM_end must be >= imaging_AOM_start")
 
-    experiment_lenght_ms = max(int(len(camera_trigger_pulse) * 1.01), int(len(imaging_AOM_pulse) * 1.01))
+    if mot_coils_end < mot_coils_start:
+        raise ValueError("mot_coils_end must be >= mot_coils_start")
+
+    if camera_trigger_width_us <= 0:
+        raise ValueError("camera_trigger_width_us must be > 0")
+
+    if frame_2 - frame_1 < camera_trigger_width_us:
+        raise ValueError("frame_2 - frame_1 must be >= camera_trigger_width_us")
+
+    # Total sequence length must cover everything
+    sequence_end_us = max(
+        frame_2 + camera_trigger_width_us + 100,
+        imaging_AOM_end + 100,
+        mot_coils_end + 100
+    )
+
+    # Camera trigger pulse: two pulses, one for each frame
+    down_time = frame_2 - frame_1 - camera_trigger_width_us
+    camera_trigger_pulse = (
+        [0] * frame_1 +
+        [1] * camera_trigger_width_us +
+        [0] * down_time +
+        [1] * camera_trigger_width_us +
+        [0] * max(0, sequence_end_us - frame_2 - camera_trigger_width_us)
+    )
+
+    # Imaging AOM digital + analog pulses
+    imaging_AOM_pulse = (
+        [0] * imaging_AOM_start +
+        [1] * max(0, imaging_AOM_end - imaging_AOM_start) +
+        [0] * max(0, sequence_end_us - imaging_AOM_end)
+    )
+
+    # MOT coils logic:
+    # TTL HIGH = coils OFF
+    # TTL LOW  = coils ON
+    #
+    # Desired behavior:
+    # before mot_coils_start -> OFF
+    # mot_coils_start to mot_coils_end -> ON
+    # after mot_coils_end -> OFF
+    mot_coils_do_pulse = (
+        [1] * mot_coils_start +
+        [0] * max(0, mot_coils_end - mot_coils_start) +
+        [1] * max(0, sequence_end_us - mot_coils_end)
+    )
+
+    mot_coils_ao_pulse = (
+        [mot_coils_off_voltage] * mot_coils_start +
+        [mot_coils_on_voltage] * max(0, mot_coils_end - mot_coils_start) +
+        [mot_coils_off_voltage] * max(0, sequence_end_us - mot_coils_end)
+    )
+
+    experiment_length_us = int(sequence_end_us * 1.01)
     buffer = 0
+
+    logger.info(f"Sequence length (us): {sequence_end_us}")
+    logger.info(f"Experiment length (samples): {experiment_length_us}")
+    logger.info(f"NI sample rate (Hz): {ni_sample_rate}")
 
     while thread.running:
         camera_client.set_hardware_trigger(
@@ -152,15 +241,17 @@ def experiment(**kwargs):
             overlap="ReadOut",
             acquisition_mode="Continuous",
         )
-        camera_client.set_exposure(501)
+        camera_client.set_exposure(camera_exposure_us)
         camera_client.try_set_float("Gain", 50.0)
+
         logger.info("Starting acquisition")
         dataset.camera_client.start_acquisition()
 
-        # NI card 1 needs to be used to get the clock from OPX
-        NI_card_1.arm_clock(length=experiment_lenght_ms + buffer, sample_rate=ni_sample_rate)
+        # NI card 1 used to get the clock from OPX
+        NI_card_1.arm_clock(length=experiment_length_us + buffer, sample_rate=ni_sample_rate)
         logger.info("Clock configured")
 
+        # NI digital outputs
         NI_card_2.build_stack()
         NI_card_2.set_do_voltage(
             do_channel=camera_trigger_do,
@@ -172,29 +263,38 @@ def experiment(**kwargs):
             value=imaging_AOM_pulse,
             sample_rate=ni_sample_rate
         )
+        NI_card_2.set_do_voltage(
+            do_channel=mot_coils_do,
+            value=mot_coils_do_pulse,
+            sample_rate=ni_sample_rate
+        )
 
+        # NI analog outputs
         NI_card_3.build_stack()
         NI_card_3.set_ao_voltage(
             ao_channel=imaging_AOM_ao,
             voltages=imaging_AOM_pulse,
             sample_rate=ni_sample_rate
         )
+        NI_card_3.set_ao_voltage(
+            ao_channel=mot_coils_ao,
+            voltages=mot_coils_ao_pulse,
+            sample_rate=ni_sample_rate
+        )
 
-        # OPX sends digital pulses to NI to set NI's clock
+        # OPX sends digital pulses to NI to set NI clock
         OPX_client.build_stack()
-
         clock_elem = OPX_client.create_new_do_elem(
             do_channel=opx_trigger_do,
             length=500
         )
-        N = experiment_lenght_ms
-        with OPX_client.for_("i", 0, N, 1):
-            OPX_client.set_digital_voltage(
-                element=clock_elem
-            )
-            OPX_client.delay(999500)
 
-        # Starts NI and then OPX
+        N = experiment_length_us
+        with OPX_client.for_("i", 0, N, 1):
+            OPX_client.set_digital_voltage(element=clock_elem)
+            OPX_client.delay(500)
+
+        # Start NI and then OPX
         h1 = NI_card_2.arm()
         h2 = NI_card_3.arm()
         OPX_client.execute()
@@ -208,9 +308,12 @@ def experiment(**kwargs):
             return np.frombuffer(b, dtype=np.dtype(dtype)).reshape(shape)
 
         try:
-            logger.info("Requesting one frame")
+            logger.info("Requesting frame 1")
             frame1 = get_frame(timeout_ms=10000)
+
+            logger.info("Requesting frame 2")
             frame2 = get_frame(timeout_ms=100000)
+
             logger.info(
                 f"Got frame1: shape={frame1.shape}, dtype={frame1.dtype}, "
                 f"min={frame1.min()}, max={frame1.max()}"
@@ -225,7 +328,7 @@ def experiment(**kwargs):
 
         diff = frame1.astype(np.int32) - frame2.astype(np.int32)
 
-        # Update individual frame plots
+        # Update plots
         frame1_ds = dataset.children["Frame 1"]
         frame2_ds = dataset.children["Frame 2"]
         diff_ds = dataset.children["Image Difference"]
@@ -239,10 +342,9 @@ def experiment(**kwargs):
         diff_ds.set_data(diff)
         diff_ds.update()
 
-        # Keep diff plot ranges fixed
-        diff_ds.graph.setLevels(*DIFF_LEVELS)
         frame1_ds.graph.setLevels(*FRAME1_LEVELS)
         frame2_ds.graph.setLevels(*FRAME2_LEVELS)
+        diff_ds.graph.setLevels(*DIFF_LEVELS)
 
         avg = diff_ds.children["Image Differencecurrentavg"]
         avg.graph.setLevels(*AVG_DIFF_LEVELS)

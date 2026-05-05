@@ -71,7 +71,7 @@ _plotter.frame_ready.connect(_plot_frame_mainthread)
 # -----------------------------
 
 INIT_DICT = {
-    "timeout_ms": {"Get Frame Timeout (ms)": "5000"},
+    "timeout_ms": {"Get Frame Timeout (ms)": "15000"},
     "blank1": {"filler": "0"},
     "blank2": {"filler": "0"},
     "blank3": {"filler": "0"},
@@ -91,7 +91,7 @@ def configure(**kwargs):
 
     try:
         # Replace this key if your launcher uses a different device name
-        camera_client = kwargs["fluorescence_imaging_camera_orca_quest"]
+        camera_client = kwargs["quest_camera_c15550"]
         dataset.camera_client = camera_client
         logger.info("Hamamatsu camera client attached to dataset.")
 
@@ -158,12 +158,26 @@ def experiment(**kwargs):
 
     frame = None
 
+    #logger.info("Ensuring camera connection")
+    #dataset.camera_client.connect_camera()
+
+    props = dataset.camera_client.list_properties()
+    for prop_id, name, value in props:
+        if "TRIGGER" in str(name).upper() or "EXPOSURE" in str(name).upper() or "READOUT" in str(name).upper():
+            logger.info(f"{prop_id} | {name} = {value}")
+
+    logger.info("Setting camera to internal trigger")
+    dataset.camera_client.disable_trigger()
+
     logger.info("Starting acquisition")
     dataset.camera_client.start_acquisition()
 
     try:
         logger.info("Requesting one frame")
         frame = get_frame(timeout_ms=timeout_ms)
+
+        #logger.info("Snapping one frame")
+        #frame = dataset.camera_client.snap(timeout_ms=15000)
 
         logger.info(
             f"Got frame: shape={frame.shape}, dtype={frame.dtype}, "
@@ -173,6 +187,7 @@ def experiment(**kwargs):
     finally:
         logger.info("Stopping acquisition")
         dataset.camera_client.stop_acquisition()
+        dataset.camera_client.disconnect()
 
     if frame is None:
         raise RuntimeError("No frame was acquired.")

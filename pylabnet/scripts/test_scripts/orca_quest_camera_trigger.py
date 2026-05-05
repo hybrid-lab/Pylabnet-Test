@@ -31,26 +31,31 @@ def configure(**kwargs):
     dataset = kwargs["dataset"]
     logger = dataset.log
 
-    camera_client = kwargs["quest_camera_orca_quest"]
 
-    dataset.camera_client = camera_client
-    ni = kwargs["nidaqmx_ni_daq_2"]
-    dataset.ni = ni
-    logger.info("Orca Quest camera client attached to dataset.")
+<< << << < Updated upstream
+camera_client = kwargs["quest_camera_orca_quest"]
+== == == =
+camera_client = kwargs["quest_camera_c15550"]
+>>>>>> > Stashed changes
 
-    # Single image plot (no averaging)
-    dataset.add_child(
-        name="Image",
-        data_type=Plot2D,
-        min_x=0, max_x=4096, pts_x=4096,
-        min_y=0, max_y=2304, pts_y=2304,
-        new_plot=True,
-    )
+dataset.camera_client = camera_client
+ni = kwargs["nidaqmx_ni_daq_2"]
+dataset.ni = ni
+logger.info("Orca Quest camera client attached to dataset.")
 
-    imgview = dataset.children["Image"].graph  # pg.ImageView
-    imgview.setLevels(0, 300)
+# Single image plot (no averaging)
+dataset.add_child(
+    name="Image",
+    data_type=Plot2D,
+    min_x=0, max_x=4096, pts_x=4096,
+    min_y=0, max_y=2304, pts_y=2304,
+    new_plot=True,
+)
 
-    dataset.graph.hide()
+imgview = dataset.children["Image"].graph  # pg.ImageView
+imgview.setLevels(0, 300)
+
+dataset.graph.hide()
 
 
 def experiment(**kwargs):

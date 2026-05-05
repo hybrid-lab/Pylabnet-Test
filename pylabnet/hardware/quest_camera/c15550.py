@@ -161,6 +161,9 @@ class Driver:
         self.device_count = dcamapi_init()
         if self.device_count <= 0:
             dcamapi_uninit()
+            self._log(
+                f"No camera(s) detected"
+            )
             raise RuntimeError("No Hamamatsu DCAM cameras detected")
 
         cam_index = self._find_camera_index()

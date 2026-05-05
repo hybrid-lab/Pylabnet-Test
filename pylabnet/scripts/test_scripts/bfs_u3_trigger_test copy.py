@@ -101,7 +101,7 @@ def experiment(**kwargs):
     )
     ni.not_use_OPX_clock()
     h = ni.arm()
-    ni.finalize(h, 30)
+    ni.finalize(h, timeout=30)
 
     try:
         # 3) Get ONE frame via bytes (RPyC-safe)

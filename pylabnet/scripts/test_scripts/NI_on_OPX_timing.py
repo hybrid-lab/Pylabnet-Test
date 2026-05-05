@@ -13,7 +13,7 @@ INIT_DICT = {
     # NI ramp
     "ni_ao_channel_num": {"NI AO channel number (0=ao0, 1=ao1)": "0"},
     "ramp_min_v": {"Ramp min (V)": "0.0"},
-    "ramp_max_v": {"Ramp max (V)": "3.0"},
+    "ramp_max_v": {"Ramp max (V)": "1.0"},
 
     # OPX digital outs (numeric)
     "opx_clock_do": {"OPX DO for clock": "7"},
@@ -83,8 +83,8 @@ def experiment(**kwargs):
         ni.build_stack()
         ni.set_ao_voltage(ao_channel=ni_ao, voltages=ramp, sample_rate=fs) #For future, make a set_timing function that will set the timing of a card to be an external clock
 
-        # ni_2.build_stack()
-        # ni_2.set_ao_voltage(ao_channel=ni_2_ao, voltages=ramp, sample_rate=fs)
+        ni_2.build_stack()
+        ni_2.set_ao_voltage(ao_channel=ni_2_ao, voltages=ramp, sample_rate=fs)
 
         opx.build_stack()
         clock_elem = opx.create_new_do_elem(
@@ -99,12 +99,13 @@ def experiment(**kwargs):
             )
             opx.delay(dataset.get_input_parameter("DELAY"), elements=[clock_elem])
         log.error("Check 2")
+        h2 = ni_2.arm()
         h1 = ni.arm()
         log.error("Check 3")
+        ni_2.finalize(h2, timeout=120.0)
 
-        # ni_2.execute()
-        opx.execute()
         ni.finalize(h1, timeout=120.0)
+        opx.execute()
 
         log.error("Check 4")
 

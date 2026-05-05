@@ -16,13 +16,17 @@ if not hasattr(np, "float"):
 # -----------------------------
 
 INIT_DICT = {
-    'imaging_AOM_start': {'Imaging AOM Start Time (us)': '1000'},
-    'imaging_AOM_end': {'Imaging AOM End Time (us)': '2000'},
-    'frame_1': {'Camera Frame 1 Time (us)': '1000'},
-    'frame_2': {'Camera Frame 2 Time (us)': '2000'},
+    'imaging_AOM_start': {'Imaging AOM Start Time (us)': '100'},
+    'imaging_AOM_end': {'Imaging AOM End Time (us)': '600'},
+    'frame_1': {'Camera Frame 1 Time (us)': '100'},
+    'frame_1_scan_start': {'Camera Frame 1 Scan Start (us)': '-1'},
+    'frame_1_scan_stop': {'Camera Frame 1 Scan Stop (us)': '-1'},
+    'frame_1_scan_step': {'Camera Frame 1 Scan Step (us)': '-1'},
+    'frame_2': {'Camera Frame 2 Time (us)': '1000'},
+    'camera_ttl_up': {'Camera TTL High Time (us)': '2'},
     'wait_time': {'Wait Time Between Cycles (s)': '3'},
-    'camera_trigger_do': {'Camera Trigger DO Channel': '1'},
-    'imaging_AOM_do': {'Imaging AOM DO Channel': '0'},
+    'camera_trigger_do': {'Camera Trigger DO Channel': '0'},
+    'imaging_AOM_do': {'Imaging AOM DO Channel': '1'},
     'opx_trigger_do': {'OPX Trigging DO Channel': '1'},
 }
 
@@ -30,6 +34,23 @@ INIT_DICT = {
 def define_dataset():
     """Specifies the type of plot to use for the data."""
     return 'Dataset'
+
+
+def _get_frame_1_values(dataset):
+    """Returns the list of frame_1 times to scan through."""
+    scan_start = int(dataset.get_input_parameter("frame_1_scan_start"))
+    scan_stop = int(dataset.get_input_parameter("frame_1_scan_stop"))
+    scan_step = int(dataset.get_input_parameter("frame_1_scan_step"))
+
+    if scan_start >= 0 or scan_stop >= 0 or scan_step >= 0:
+        if scan_start < 0 or scan_stop < 0 or scan_step <= 0:
+            raise ValueError("frame_1 scan requires non-negative start/stop and a positive step")
+        if scan_stop < scan_start:
+            raise ValueError("frame_1_scan_stop must be greater than or equal to frame_1_scan_start")
+
+        return list(range(scan_start, scan_stop + 1, scan_step))
+
+    return [int(dataset.get_input_parameter("frame_1"))]
 
 
 def configure(**kwargs):
@@ -85,8 +106,9 @@ def experiment(**kwargs):
 
     imaging_AOM_start = int(dataset.get_input_parameter("imaging_AOM_start"))
     imaging_AOM_end = int(dataset.get_input_parameter("imaging_AOM_end"))
-    frame_1 = int(dataset.get_input_parameter("frame_1"))
+    frame_1_values = _get_frame_1_values(dataset)
     frame_2 = int(dataset.get_input_parameter("frame_2"))
+    camera_ttl_up = int(dataset.get_input_parameter("camera_ttl_up"))
     wait_time = float(dataset.get_input_parameter("wait_time"))
 
     opx_trigger_do = int(dataset.get_input_parameter("opx_trigger_do"))
@@ -96,18 +118,37 @@ def experiment(**kwargs):
     ni_sample_rate = 1000000
     trigger_line = "Line0"
     trigger_edge = "RisingEdge"
+    if camera_ttl_up <= 0:
+        raise ValueError("camera_ttl_up must be greater than 0")
+    if imaging_AOM_end < imaging_AOM_start:
+        raise ValueError("imaging_AOM_end must be greater than or equal to imaging_AOM_start")
 
-    #Defines how long OPX will be producing a clock signal
-    experiment_lenght_us = 10000
-    buffer = experiment_lenght_us // 10
+    for frame_1 in frame_1_values:
+        if frame_1 < 0:
+            raise ValueError("frame_1 values must be non-negative")
+        if frame_2 <= frame_1 + camera_ttl_up:
+            raise ValueError("frame_2 must be greater than each frame_1 value + camera_ttl_up")
 
-    camera_ttl_up = 50
-    down_time = frame_2 - frame_1 - camera_ttl_up
-    camera_trigger_pulse = [0] * frame_1 + [1] * camera_ttl_up + [0] * down_time + [1] * camera_ttl_up
     imaging_AOM_pulse = [0] * imaging_AOM_start + [1] * (imaging_AOM_end - imaging_AOM_start)
+    buffer = 0
+    frame_1_idx = 0
 
     #Experimental Sequence:
     while thread.running:
+        frame_1 = frame_1_values[frame_1_idx % len(frame_1_values)]
+        frame_1_idx += 1
+        down_time = frame_2 - frame_1 - camera_ttl_up
+        camera_trigger_pulse = (
+            [0] * frame_1 +
+            [1] * camera_ttl_up +
+            [0] * down_time +
+            [1] * camera_ttl_up
+        )
+
+        #Defines how long OPX will be producing a clock signal
+        experiment_lenght_us = int(len(camera_trigger_pulse) * 1.01)
+        logger.info(f"Running sequence with frame_1={frame_1} us and frame_2={frame_2} us")
+
         camera_client.set_hardware_trigger(
             line=trigger_line,
             activation=trigger_edge,
@@ -115,11 +156,13 @@ def experiment(**kwargs):
             overlap="ReadOut",
             acquisition_mode="Continuous",
         )
+        camera_client.set_exposure(7)
+        camera_client.try_set_float("Gain", 10.0)
         logger.info("Starting acquisition")
         dataset.camera_client.start_acquisition()
 
         #NI card 1 needs to be used to get the clock from OPX
-        NI_card_1.arm_clock(length=experiment_lenght_us - buffer, sample_rate=ni_sample_rate)
+        NI_card_1.arm_clock(length=experiment_lenght_us + buffer, sample_rate=ni_sample_rate)
         logger.info("Clock configured")
 
         NI_card_2.build_stack()

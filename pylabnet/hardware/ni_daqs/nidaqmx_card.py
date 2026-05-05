@@ -287,6 +287,7 @@ class Driver:
     def _build_tasks_from_compiled(
         self,
         compiled: Dict[str, Dict[str, Any]],
+        retriggerable: bool = False,
     ):
         """
         Create DAQmx tasks for each non-empty subsystem stack, add channels,
@@ -308,7 +309,7 @@ class Driver:
                 for ch in info["channels"]:
                     task.ao_channels.add_ao_voltage_chan(self._gen_ch_path(ch))
                 self._cfg_timing_if_needed(task, info)
-                _cfg_trigger_if_needed(task, info)
+                _cfg_trigger_if_needed(task, info, dev=self.dev, retriggerable=retriggerable)
                 if info["write_buffer"] is not None:
                     task.write(info["write_buffer"], auto_start=False)
 
@@ -319,7 +320,7 @@ class Driver:
                         line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE,
                     )
                 self._cfg_timing_if_needed(task, info)
-                _cfg_trigger_if_needed(task, info)
+                _cfg_trigger_if_needed(task, info, dev=self.dev, retriggerable=retriggerable)
                 if info["write_buffer"] is not None:
                     task.write(info["write_buffer"], auto_start=False)
 
@@ -329,7 +330,7 @@ class Driver:
                     ai.ai_rng_high = float(info["max_range"])
                     ai.ai_rng_low = -float(info["max_range"])
                 self._cfg_timing_if_needed(task, info)
-                _cfg_trigger_if_needed(task, info)
+                _cfg_trigger_if_needed(task, info, dev=self.dev, retriggerable=retriggerable)
 
             elif key == "di":
                 for ch in info["channels"]:
@@ -338,7 +339,7 @@ class Driver:
                         line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE,
                     )
                 self._cfg_timing_if_needed(task, info)
-                _cfg_trigger_if_needed(task, info)
+                _cfg_trigger_if_needed(task, info, dev=self.dev, retriggerable=retriggerable)
 
             meta["compiled"][key] = {
                 "channels": info["channels"],
@@ -350,12 +351,11 @@ class Driver:
 
         return tasks, meta
 
-    def arm(self) -> _ArmedHandle:
+    def arm(self, retriggerable: bool = False) -> _ArmedHandle:
         """
         Compile stacks -> create tasks -> configure -> write buffers -> START tasks (arm them).
         Does NOT wait for completion and does NOT close tasks.
         """
-        # Leave stack mode
         self.adding_to_stack = False
 
         compiled = self._compile_stacks(self.stacks, self._triggers, dev=self.dev, log=self.log)
@@ -364,9 +364,7 @@ class Driver:
             self.clear_stack()
             return _ArmedHandle(tasks={}, compiled=compiled, meta={"compiled": {}})
 
-        tasks, meta = self._build_tasks_from_compiled(compiled)
-
-        # Start order: inputs first, then outputs (same intention as before)
+        tasks, meta = self._build_tasks_from_compiled(compiled, retriggerable=retriggerable)
         start_order = [k for k in ("ai", "di", "ao", "do") if k in tasks]
         for k in start_order:
             tasks[k].start()
@@ -812,11 +810,12 @@ class Driver:
                 kwargs["source"] = clk
                 task.timing.cfg_samp_clk_timing(**kwargs)
                 # Export sample clock onto chassis backplane
-                task.export_signals.samp_clk_output_term = "/PXI1Slot2_1/PXI_Trig0"
+                task.export_signals.samp_clk_output_term = "/PXI1Slot2_1/PXI_Trig7"
             else:
                 # Consume backplane clock
-                kwargs["source"] = f"/{self.dev}/PXI_Trig0"
+                kwargs["source"] = f"/{self.dev}/PXI_Trig7"
                 task.timing.cfg_samp_clk_timing(**kwargs)
+
         else:
             task.timing.cfg_samp_clk_timing(**kwargs)
 
@@ -840,7 +839,6 @@ class Driver:
             Sample clock rate
 
         """
-
         self.build_stack()
 
         # Dummy waveform (all zeros)
@@ -848,11 +846,14 @@ class Driver:
 
         self.set_ao_voltage(
             ao_channel=ao_channel,
-            value=waveform,
+            voltages=waveform,
             sample_rate=sample_rate
         )
 
-        self.arm()
+        self.clock_handle = self.arm(retriggerable=True)
+
+    def finalize_clock(self):
+        self.finalize(handle=self.clock_handle)
 
 
 # -----------------------------
@@ -873,14 +874,38 @@ def _to_bool_array(x: Union[bool, int, Sequence[Union[bool, int]]]) -> np.ndarra
     return arr
 
 
-def _cfg_trigger_if_needed(task: nidaqmx.Task, info: Dict[str, Any]) -> None:
+def _cfg_trigger_if_needed(
+    task: nidaqmx.Task,
+    info: Dict[str, Any],
+    dev: str,
+    retriggerable: bool = False,
+) -> None:
     cfg: Optional[_TriggerCfg] = info.get("trigger_cfg", None)
-    if cfg is None:
+    trigger_source = None
+    trigger_edge = Edge.RISING
+
+    if cfg is not None:
+        trigger_source = info["trigger_source"]
+        trigger_edge = cfg.edge
+    # elif retriggerable:
+    #     if dev == "PXI1Slot2_1":
+    #         # The master clock-export card cannot self-trigger from PXI_Trig7.
+    #         # When retriggering is enabled, default its start trigger to PFI0.
+    #         trigger_source = f"/{dev}/PFI1"
+        # else:
+        #     # Consumer PXI cards can use the shared backplane clock/trigger line
+        #     # as their start trigger for repeated finite runs.
+        #     trigger_source = f"/{dev}/PXI_Trig0"
+
+    if trigger_source is None:
         return
+
     task.triggers.start_trigger.cfg_dig_edge_start_trig(
-        trigger_source=info["trigger_source"],
-        trigger_edge=cfg.edge,
+        trigger_source=trigger_source,
+        trigger_edge=trigger_edge,
     )
+    if retriggerable:
+        task.triggers.start_trigger.retriggerable = True
 
 
 def _split_ai_results(raw: Any, info: Dict[str, Any]) -> Dict[str, Any]:
