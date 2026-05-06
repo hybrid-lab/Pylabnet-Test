@@ -224,7 +224,9 @@ class Driver:
 
         return element
 
-    def execute(self, wait=True, timeout=None):
+    def execute(self, wait=True, timeout=None, average_streams=None):
+        average_streams = average_streams or {} #Adding support for averaging. (Look at steps 3 and 4 in this function).
+
         self.log.info(f"Time OPX execute starts {time.perf_counter_ns()}")
 
         self.adding_to_stack = False
@@ -269,6 +271,9 @@ class Driver:
                         if var_name not in var_declarations:
                             var_declarations[var_name] = fixed
                         collect_vars(op[4]) # body
+                    elif kind == "measure_demod_iq":
+                        var_declarations[op[2]] = fixed
+                        var_declarations[op[3]] = fixed
 
             collect_vars(self.stack)
 
@@ -286,7 +291,9 @@ class Driver:
             if streams:
                 with stream_processing():
                     for s, input_idx, label in streams:
-                        if input_idx == 1:
+                        if label in average_streams:
+                            s.buffer(average_streams[label]).average().save(label)
+                        elif input_idx == 1:
                             s.input1().with_timestamps().save_all(label)
                         elif input_idx == 2:
                             s.input2().with_timestamps().save_all(label)
@@ -312,6 +319,9 @@ class Driver:
             # We now unpack input_idx to know how to parse the data
             for _, input_idx, label in streams:
                 raw = res.get(label).fetch_all()
+                if label in average_streams:
+                    out[label] = np.asarray(raw)
+                    continue
 
                 # Case A: Variables (input_idx == -1) -> Needs flattening
                 if input_idx == -1:
@@ -457,6 +467,28 @@ class Driver:
 
                 with while_(cond):
                     self._emit_stack(body, streams, measuring_flag, measure_counter)
+
+            elif kind == "update_freq":
+                update_frequency(op[1], self._qua_vars[op[2]])
+
+            elif kind == "align":
+                align(*op[1])
+
+            elif kind == "measure_demod_iq":
+                _, element, var_I, var_Q = op
+                measuring_flag["value"] = True
+                measure_counter["value"] += 1
+                I = self._qua_vars[var_I]
+                Q = self._qua_vars[var_Q]
+                I_stream = declare_stream()
+                Q_stream = declare_stream()
+                measure("readout", element, None,
+                        demod.full("cos", I),
+                        demod.full("sin", Q))
+                save(I, I_stream)
+                save(Q, Q_stream)
+                streams.append((I_stream, -1, var_I))
+                streams.append((Q_stream, -1, var_Q))
 
     def _append(self, op):
         """Append an operation node to the *current* active sub-stack."""
@@ -782,6 +814,27 @@ class Driver:
         else:
             #True of False is infinite or not infinite
             self._append(["wait", cycles, elements])
+
+    #Dynamically update the frequency of the oscillator associated with a given element. (Ex: for readout/qubit spectroscopy)
+    def update_frequency(self, element, var_name):
+        """Schedule update_frequency(element, var) inside the stack."""
+        if not self.adding_to_stack:
+            raise RuntimeError("update_frequency must be inside build_stack/execute")
+        self._append(["update_freq", element, var_name])
+
+    #For synchronizing operations (Ex: First do saturation pulse, then align the readout with the end of the saturation pulse, then do the measurement)
+    def align(self, *elements):
+        """Schedule align(...) inside the stack."""
+        if not self.adding_to_stack:
+            raise RuntimeError("align must be inside build_stack/execute")
+        self._append(["align", list(elements)])
+
+    #For simple demodulated readout.
+    def measure_demod_iq(self, element, var_I, var_Q):
+        """Dual-quadrature demodulated readout. Stores I and Q into named QUA vars."""
+        if not self.adding_to_stack:
+            raise RuntimeError("measure_demod_iq must be inside build_stack/execute")
+        self._append(["measure_demod_iq", element, var_I, var_Q])
 
 
 class _IfContext:

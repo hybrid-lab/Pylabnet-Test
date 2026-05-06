@@ -94,17 +94,56 @@ hard_coded_config = {
     },
 
     "elements": {
+        "resonator": {
+            "mixInputs": {
+                "I": ("con1", 3),
+                "Q": ("con1", 4),
+                "lo_frequency": int(7.2e9),       # informational; OPX doesn't generate this
+                "mixer": "mixer_resonator",
+            },
+            "intermediate_frequency": int(50e6),
+            "operations": {"readout": "readout_pulse"},
+            "outputs": {"out1": ("con1", 1), "out2": ("con1", 2)},
+            "time_of_flight": 200,
+            "smearing": 0,
+        },
 
+        "qubit": {
+            "mixInputs": {
+                "I": ("con1", 1),
+                "Q": ("con1", 2),
+                "lo_frequency": int(5.1e9),
+                "mixer": "mixer_qubit",
+            },
+            "intermediate_frequency": int(100e6),
+            "operations": {"saturation": "saturation_pulse"},
+        },
     },
 
     "pulses": {
-
+        "readout_pulse": {
+            "operation": "measurement",
+            "length": 2000,
+            "waveforms": {"I": "readout_wf", "Q": "zero_wf"},
+            "integration_weights": {
+                "cos": "cos", "sin": "sin", "minus_sin": "minus_sin",
+            },
+            "digital_marker": "ON",
+        },
+        "saturation_pulse": {
+            "operation": "control",
+            "length": 20000,
+            "waveforms": {"I": "saturation_wf", "Q": "zero_wf"},
+        },
     },
 
     "waveforms": {
         # ---------- Your hardcoded waveforms
         "square_wf": {"type": "constant", "sample": square_amp_single},
         "gaussian_wf": {"type": "arbitrary", "samples": gauss_wf_single},
+        "readout_wf": {"type": "constant", "sample": 0.1},
+        "saturation_wf": {"type": "constant", "sample": 0.05},
+        "zero_wf": {"type": "constant", "sample": 0.0},
     },
 
     "digital_waveforms": {
@@ -115,6 +154,19 @@ hard_coded_config = {
         "cos": {"cosine": [(4.0, 500)], "sine": [(0.0, 500)]},
         "sin": {"cosine": [(0.0, 500)], "sine": [(4.0, 500)]},
         "minus_sin": {"cosine": [(0.0, 20)], "sine": [(-4.0, 20)]},
+    },
+
+    "mixers": {
+        "mixer_resonator": [{
+            "intermediate_frequency": int(50e6),
+            "lo_frequency": int(7.2e9),
+            "correction": (1.0, 0.0, 0.0, 1.0),
+        }],
+        "mixer_qubit": [{
+            "intermediate_frequency": int(100e6),
+            "lo_frequency": int(5.1e9),
+            "correction": (1.0, 0.0, 0.0, 1.0),
+        }],
     },
 }
 
