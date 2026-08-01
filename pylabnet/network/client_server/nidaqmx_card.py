@@ -106,12 +106,12 @@ class Service(ServiceBase):
         return self._module.set_trigger(target=target, trig_line=trig_line, edge=edge_enum)
 
     # ---- Arm / Finalize ----
-    def exposed_arm(self, retriggerable=False):
+    def exposed_arm(self, regeneration=False):
         """
         Arms the currently built stack and returns a pickled dict:
           {"handle_id": <uuid str or None>, "meta": <dict>}
         """
-        handle = self._module.arm(retriggerable=bool(retriggerable))
+        handle = self._module.arm(regeneration=bool(regeneration))
         if not getattr(handle, "tasks", None):
             payload = {"handle_id": None, "meta": getattr(handle, "meta", {})}
             return pickle.dumps(payload)
@@ -121,7 +121,7 @@ class Service(ServiceBase):
         payload = {"handle_id": hid, "meta": getattr(handle, "meta", {})}
         return pickle.dumps(payload)
 
-    def exposed_finalize(self, handle_id, timeout=60.0, close=True):
+    def exposed_finalize(self, handle_id, timeout=60.0, close=True, force_finish=False):
         # Convert RPyC netrefs to local python objects when possible
         try:
             handle_id_local = obtain(handle_id)
@@ -142,7 +142,7 @@ class Service(ServiceBase):
         if handle is None:
             raise KeyError(f"Unknown handle_id: {handle_id_local!r}")
 
-        out = self._module.finalize(handle, timeout=timeout, close=close)
+        out = self._module.finalize(handle, timeout=timeout, close=close, force_finish=force_finish)
 
         # If tasks were closed, drop the stored handle
         if close:
@@ -293,15 +293,21 @@ class Client(ClientBase):
         return self._service.exposed_set_trigger(target=target, trig_line=trig_line, edge=edge)
 
     # ---- Arm / Finalize ----
-    def arm(self, retriggerable: bool = False) -> Dict[str, Any]:
+    def arm(self, regeneration: bool = False) -> Dict[str, Any]:
         """
         Arms the server-side stack. Returns:
           {"handle_id": str|None, "meta": dict}
         """
-        payload_pickle = self._service.exposed_arm(retriggerable=retriggerable)
+        payload_pickle = self._service.exposed_arm(regeneration=regeneration)
         return pickle.loads(payload_pickle)
 
-    def finalize(self, handle_id: str, timeout: float = 30.0, close: bool = True) -> Dict[str, Any]:
+    def finalize(
+        self,
+        handle_id: str,
+        timeout: float = 30.0,
+        close: bool = True,
+        force_finish: bool = False,
+    ) -> Dict[str, Any]:
         """
         Finalizes a previously armed handle_id.
         You may pass either:
@@ -311,7 +317,12 @@ class Client(ClientBase):
         if isinstance(handle_id, dict):
             handle_id = handle_id.get("handle_id", None)
 
-        out_pickle = self._service.exposed_finalize(handle_id, timeout=timeout, close=close)
+        out_pickle = self._service.exposed_finalize(
+            handle_id,
+            timeout=timeout,
+            close=close,
+            force_finish=force_finish,
+        )
         return pickle.loads(out_pickle)
 
     # ---- AO / DO ----

@@ -144,7 +144,7 @@ class Service(ServiceBase):
     def build_stack(self):
         return self._module.build_stack()
 
-    def execute(self, wait=True, timeout=None):
+    def execute(self, wait=False, timeout=None):
         return self._module.execute(wait=wait, timeout=timeout)
 
     def exposed_delay(self, length, elements=None):
@@ -334,7 +334,7 @@ class Client(ClientBase):
     def build_stack(self):
         return self._service.build_stack()
 
-    def execute(self, wait=True, timeout=None):
+    def execute(self, wait=False, timeout=None):
         return self._service.execute(wait=wait, timeout=timeout)
 
     def delay(self, length, elements=None):

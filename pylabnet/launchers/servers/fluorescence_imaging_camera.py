@@ -11,32 +11,42 @@ def launch(**kwargs):
         :logger: instance of LogClient for logging purposes
         :port: (int) port number for the fluorescence imaging camera server
         :device_id: (str) device identifier (optional if config provided)
+        :serial: (str) camera serial number for selecting a specific camera
         :config: (str) path/name of config file (optional if device_id provided)
     """
 
     logger = kwargs.get("logger", None)
+    config = None
+    serial = kwargs.get("serial", None)
 
-    # Instantiate driver
+    if "config" in kwargs:
+        try:
+            config = load_device_config("fluorescence_imaging_camera", kwargs["config"], logger)
+        except Exception:
+            config = None
+
+    if serial is None and config is not None:
+        serial = config.get("serial", config.get("device_serial", None))
+
+    device_name = kwargs.get("device_id", None)
+    if device_name is None and config is not None:
+        device_name = config.get("device", config.get("device_id", None))
+
+    if device_name is None:
+        if logger:
+            logger.error("Please provide a valid config file or device_id")
+        raise KeyError("device_id")
+
     try:
         fluorescence_imaging_camera_driver = bfs_u3_51s5m.Driver(
-            device_name=kwargs["device_id"],
-            logger=logger
+            device_name=device_name,
+            logger=logger,
+            serial=serial
         )
-    except (KeyError, AttributeError):
-        try:
-            config = load_config(kwargs["config"])
-            fluorescence_imaging_camera_driver = bfs_u3_51s5m.Driver(
-                device_name=config["device"],
-                logger=logger
-            )
-        except (KeyError, AttributeError):
-            if logger:
-                logger.error("Please provide a valid config file or device_id")
-            raise
-        except OSError:
-            if logger:
-                logger.error(f'Did not find camera device {config.get("device")}')
-            raise
+    except OSError:
+        if logger:
+            logger.error(f"Did not find camera device {device_name}")
+        raise
 
     # Instantiate server
     fluorescence_imaging_camera_service = Service()

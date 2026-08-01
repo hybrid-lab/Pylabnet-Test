@@ -15,6 +15,10 @@
         {
             "type": "nidaqmx",
             "config": "ni_daq_3"
+        },
+        {
+            "type": "fluorescence_imaging_camera",
+            "config": "bfs_u3_51s5m_top_chamber"
         }
     ],
     "script": "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\data_center\\take_data.py",

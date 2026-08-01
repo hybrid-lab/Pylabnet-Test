@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 class Driver:
     def __init__(self, device_name, logger=None, dummy=False, serial=None):
+        self.logger = logger
         self.serial = str(serial) if serial is not None else None
         self.system = None
         self.cam_list = None
@@ -117,6 +118,12 @@ class Driver:
             self.disconnect()
             raise RuntimeError("No cameras detected")
 
+        if self.logger:
+            self.logger.info(
+                f"Fluorescence camera connect requested: serial={self.serial}, "
+                f"detected_cameras={self.cam_list.GetSize()}"
+            )
+
         if self.serial is None:
             self.cam = self.cam_list.GetByIndex(0)
         else:
@@ -133,6 +140,15 @@ class Driver:
             if self.cam is None:
                 self.disconnect()
                 raise RuntimeError(f"Requested camera not found: {self.serial}")
+
+        if self.logger:
+            try:
+                tl = self.cam.GetTLDeviceNodeMap()
+                sn_node = PySpin.CStringPtr(tl.GetNode("DeviceSerialNumber"))
+                actual_serial = sn_node.GetValue() if PySpin.IsReadable(sn_node) else "unknown"
+                self.logger.info(f"Fluorescence camera attaching to serial={actual_serial}")
+            except Exception:
+                self.logger.info("Fluorescence camera attached, but serial could not be read")
 
         self.cam.Init()
         self.initialized = True

@@ -224,7 +224,7 @@ class Driver:
 
         return element
 
-    def execute(self, wait=True, timeout=None):
+    def execute(self, wait=False, timeout=None):
         self.log.info(f"Time OPX execute starts {time.perf_counter_ns()}")
 
         self.adding_to_stack = False
@@ -359,6 +359,7 @@ class Driver:
                 elif hasattr(job, "_is_job_running"):
                     start_time = time.perf_counter()
                     while job._is_job_running():
+                        self.log.info("Checking to see if OPX job is finsihed")
                         if timeout is not None and (time.perf_counter() - start_time) > timeout:
                             raise TimeoutError(f"OPX job did not finish within {timeout} seconds")
                         time.sleep(0.01)
