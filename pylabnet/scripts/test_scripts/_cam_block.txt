@@ -1,0 +1,14 @@
+# Bottom-chamber camera: datataker client key and the NI card 2 line wired to
+# its Line0. Same as camera B in fastMOT_twoCameras.py.
+CAMERA_CLIENT = 'fluorescence_imaging_camera_bfs_u3_51s5m_bottom_chamber'
+CAMERA_TRIGGER_DO = 'dio8'
+PIXEL_FORMAT = 'Mono16'
+
+
+def get_camera_client(kwargs):
+    client = kwargs.get(CAMERA_CLIENT)
+    if client is None:
+        raise RuntimeError(
+            f"Bottom camera client '{CAMERA_CLIENT}' is not connected to this "
+            f"datataker. Add its server to the datataker config.")
+    return client

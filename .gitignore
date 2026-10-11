@@ -165,3 +165,4 @@ temp/*
 pylabnet/YOUR_PYRPL_DESTINATION_FOLDER/*
 
 *.ttbin
+*.raw

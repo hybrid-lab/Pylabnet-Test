@@ -77,6 +77,44 @@ class Service(ServiceBase):
     def exposed_not_use_OPX_clock(self):
         return self._module.not_use_OPX_clock()
 
+    def exposed_set_clock(self, master_dev=None, source=None, export_line=None):
+        return self._module.set_clock(
+            master_dev=master_dev,
+            source=source,
+            export_line=export_line,
+        )
+
+    def exposed_reset_clock(self):
+        return self._module.reset_clock()
+
+    def exposed_abort_all(self):
+        """Close every task this server still holds, and reset the card.
+
+        Recovery for a leaked task: a crash between arm() and finalize() leaves
+        the handle registered and its DAQmx task open, and DAQmx then refuses
+        those lines to every later arm() with -200597. Returns how many handles
+        were dropped.
+        """
+        handles = self._handles()
+        n = len(handles)
+        for handle in list(handles.values()):
+            try:
+                self._module.finalize(handle, timeout=0.1, close=True,
+                                      force_finish=True)
+            except Exception:
+                pass
+        handles.clear()
+        self._module.reset_device()
+        return n
+
+    def exposed_reset_device(self):
+        return self._module.reset_device()
+
+    def exposed_write_static(self, ao_pickle=None, do_pickle=None):
+        ao = pickle.loads(ao_pickle) if ao_pickle else None
+        do = pickle.loads(do_pickle) if do_pickle else None
+        return self._module.write_static(ao=ao, do=do)
+
     def exposed_arm_clock(self, length, sample_rate):
         return self._module.arm_clock(N=length, sample_rate=sample_rate)
 
@@ -432,6 +470,55 @@ class Client(ClientBase):
 
     def not_use_OPX_clock(self):
         return self._service.exposed_not_use_OPX_clock()
+
+    def set_clock(
+        self,
+        master_dev: Optional[str] = None,
+        source: Optional[str] = None,
+        export_line: Optional[str] = None,
+    ):
+        """Choose which card produces the sample clock and where it comes from.
+
+        Only the arguments you pass are changed. Call it on every card taking
+        part, with the same master_dev and export_line, before build_stack().
+        Pass source="internal" to have the master use its own on-board clock.
+        """
+        return self._service.exposed_set_clock(
+            master_dev=master_dev,
+            source=source,
+            export_line=export_line,
+        )
+
+    def reset_clock(self):
+        """Restore the default routing (OPX -> NI card 1 -> PXI_Trig7)."""
+        return self._service.exposed_reset_clock()
+
+    def abort_all(self):
+        """Close every task this card's server still holds and reset it.
+
+        Use when arm() fails with -200597 ("lines currently in use by another
+        output operation"): a leaked task from an earlier run is still holding
+        the channels. Returns the number of stale handles dropped.
+        """
+        return self._service.exposed_abort_all()
+
+    def reset_device(self):
+        """Abort everything on the card. Invalidates all outstanding handles."""
+        return self._service.exposed_reset_device()
+
+    def write_static(self, ao=None, do=None):
+        """Park channels at fixed levels immediately.
+
+        Call after finalize(), to leave the hardware in a defined state instead
+        of frozen at whatever sample the buffered task stopped on.
+
+        :param ao: {"ao3": 0.0, ...}
+        :param do: {"dio2": 1, ...}
+        """
+        return self._service.exposed_write_static(
+            ao_pickle=pickle.dumps(ao) if ao else None,
+            do_pickle=pickle.dumps(do) if do else None,
+        )
 
     def arm_clock(self, length, sample_rate):
         return self._service.exposed_arm_clock(length=length, sample_rate=sample_rate)

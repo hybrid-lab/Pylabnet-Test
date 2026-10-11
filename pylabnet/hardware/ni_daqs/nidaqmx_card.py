@@ -87,13 +87,29 @@ class Driver:
 
     STACK_KEYS = ("ao", "ai", "do", "di")
 
+    # -- Default clock routing -------------------------------------------------
+    # One card is the "clock master": it produces the sample clock and exports it
+    # onto the chassis backplane; every other card consumes that backplane line,
+    # which is what keeps cards sample-locked to each other.
+    #
+    # Out of the box the master is NI card 1 (PXI1Slot2_1), which does not
+    # generate the clock itself but receives it from the OPX on its own PFI0 and
+    # re-exports it as PXI_Trig7. Changing these three values (see set_clock)
+    # moves that role to another card and/or drops the external source, without
+    # affecting any script that leaves them alone.
+    DEFAULT_CLOCK_MASTER_DEV = "PXI1Slot2_1"
+    DEFAULT_CLOCK_SOURCE = "/PXI1Slot2_1/PFI0"
+    DEFAULT_CLOCK_EXPORT_LINE = "PXI_Trig7"
+
     def __init__(self, device_name: str, logger=None, dummy: bool = False):
         self.dev = device_name
         self.log = LogHandler(logger=logger)
         self.dummy = dummy
 
         # Defaults used inside _compile_stacks and _cfg_timing_if_needed
-        self.default_clock_source = "/PXI1Slot2_1/PFI0"
+        self.clock_master_dev = self.DEFAULT_CLOCK_MASTER_DEV
+        self.default_clock_source = self.DEFAULT_CLOCK_SOURCE
+        self.clock_export_line = self.DEFAULT_CLOCK_EXPORT_LINE
         # NOTE: APFI0 is not a digital trigger terminal. Kept for compatibility with your existing file,
         # but NOT used by _cfg_trigger_if_needed (which uses set_trigger()).
         self.default_start_trigger = "/PXI1Slot2_1/APFI0"
@@ -145,7 +161,78 @@ class Driver:
     # Stack control
     # ---------------------------------------------------------------------
     def not_use_OPX_clock(self):
+        """Time this card off its own on-board clock, ignoring the backplane.
+
+        Cards configured this way are NOT synchronised with each other -- each
+        free-runs on its own oscillator. Use set_clock() instead when several
+        cards have to stay sample-locked.
+        """
         self.not_OPX_clock = True
+
+    def set_clock(
+        self,
+        master_dev: Optional[str] = None,
+        source: Optional[str] = None,
+        export_line: Optional[str] = None,
+    ) -> None:
+        """Choose which card produces the sample clock and where it comes from.
+
+        Only the arguments you pass are changed; the rest keep whatever they
+        were, so the class defaults (NI card 1 taking the OPX clock on PFI0 and
+        re-exporting it as PXI_Trig7) survive untouched for every script that
+        never calls this.
+
+        Call it on EVERY card taking part, with the same master_dev and
+        export_line, before build_stack()/arm(). A card whose own name equals
+        master_dev becomes the master and exports its sample clock; every other
+        card consumes that backplane line.
+
+        Example -- make NI card 2 the master, running off its own on-board
+        clock, with card 3 slaved to it:
+
+            card2.set_clock(master_dev="PXI1Slot4_1", source="internal")
+            card3.set_clock(master_dev="PXI1Slot4_1")
+
+        :param master_dev: (str) device name of the clock master, e.g.
+            "PXI1Slot4_1". Compared against this driver's own device name.
+        :param source: (str) terminal the MASTER derives its clock from, e.g.
+            "/PXI1Slot2_1/PFI0" for the OPX clock. Pass "internal" (or an empty
+            string) to have the master use its own on-board timebase instead.
+            Ignored by cards that are not the master.
+        :param export_line: (str) backplane line the master exports onto and the
+            slaves read from, e.g. "PXI_Trig7".
+        """
+        if master_dev is not None:
+            self.clock_master_dev = str(master_dev)
+        if source is not None:
+            s = str(source).strip()
+            self.default_clock_source = None if s.lower() in ("", "internal", "onboard") else s
+        if export_line is not None:
+            self.clock_export_line = str(export_line)
+
+        # set_clock() and not_use_OPX_clock() express opposite intents, so the
+        # newer call wins rather than silently losing to a stale flag.
+        self.not_OPX_clock = False
+
+        role = "master" if self.dev == self.clock_master_dev else "slave"
+        self.log.info(
+            f"[NI] {self.dev} clock: {role}, master={self.clock_master_dev}, "
+            f"source={self.default_clock_source or 'on-board'}, "
+            f"line={self.clock_export_line}"
+        )
+
+    def reset_clock(self) -> None:
+        """Restore the default clock routing (OPX -> card 1 -> PXI_Trig7).
+
+        Driver instances live for the whole server session, so a set_clock() or
+        not_use_OPX_clock() from one script would otherwise still be in effect
+        for the next one. Call this to hand the card back in its stock state.
+        """
+        self.clock_master_dev = self.DEFAULT_CLOCK_MASTER_DEV
+        self.default_clock_source = self.DEFAULT_CLOCK_SOURCE
+        self.clock_export_line = self.DEFAULT_CLOCK_EXPORT_LINE
+        self.not_OPX_clock = False
+        self.log.info(f"[NI] {self.dev} clock routing reset to defaults")
 
     def build_stack(self) -> None:
         """Enable stack mode and clear existing stacks + triggers."""
@@ -211,6 +298,49 @@ class Driver:
             return
         self._ao_write_now(ao_channel, voltages, sample_rate=sample_rate, max_range=max_range)
 
+    @staticmethod
+    def _map_do_channel(do_channel):
+        """Allow user-friendly "dioX" naming: DIO n -> port{n//8}/line{n%8}."""
+        if isinstance(do_channel, str):
+            m = re.fullmatch(r"dio(\d+)", do_channel.strip().lower())
+            if m:
+                dio = int(m.group(1))
+                return f"port{dio // 8}/line{dio % 8}"
+        return do_channel
+
+    def write_static(
+        self,
+        ao: Optional[Dict[str, float]] = None,
+        do: Optional[Dict[str, Union[bool, int]]] = None,
+    ) -> None:
+        """Drive channels to fixed levels right now, bypassing any stack.
+
+        This is how you park the hardware when a sequence ends. Closing a
+        buffered task does NOT return its channels to a defined level -- the
+        outputs simply hold whatever sample was last generated, and for a
+        regenerating task that is an arbitrary point in the cycle. Stopping a
+        MOT sequence can therefore leave the coils at full current or a VCO at
+        its imaging detuning, differently every time.
+
+        Call it only AFTER finalize() has closed the buffered tasks: until then
+        those tasks still own the lines and these writes are refused.
+
+        :param ao: {"ao3": 0.0, ...} analog channels and their idle voltages
+        :param do: {"dio2": 1, ...} digital lines and their idle levels
+        """
+        # Forced, not assumed: if the caller reached here from a failure after
+        # build_stack() but before arm(), stack mode is still on and these
+        # writes would be silently queued into a stack nobody will ever arm.
+        self.adding_to_stack = False
+        self.clear_stack()
+
+        for ch, v in (ao or {}).items():
+            self._ao_write_now(ch, float(v), sample_rate=None, max_range=10.0)
+        for ch, v in (do or {}).items():
+            self._do_write_now(self._map_do_channel(ch), bool(v), sample_rate=None)
+
+        self.log.info(f"[NI] {self.dev} parked: ao={ao or {}}, do={do or {}}")
+
     def set_do_voltage(
         self,
         do_channel: str,
@@ -221,16 +351,7 @@ class Driver:
         """
         Queue or immediately output digital value(s).
         """
-        # Allow user-friendly "dioX" naming (e.g., "dio0", "DIO18")
-        # Maps DIO index -> port{index//8}/line{index%8}
-        if isinstance(do_channel, str):
-            s = do_channel.strip().lower()
-            m = re.fullmatch(r"dio(\d+)", s)
-            if m:
-                dio = int(m.group(1))
-                port = dio // 8
-                line = dio % 8
-                do_channel = f"port{port}/line{line}"
+        do_channel = self._map_do_channel(do_channel)
 
         if self.adding_to_stack:
             self._append("do", ["do_write", do_channel, _to_bool_array(value), sample_rate])
@@ -297,6 +418,21 @@ class Driver:
         tasks: Dict[str, nidaqmx.Task] = {}
         meta: Dict[str, Any] = {"compiled": {}}
 
+        try:
+            self._populate_tasks(compiled, tasks, meta, regeneration)
+        except Exception:
+            # Every task created before the failure still holds its channel
+            # reservations, and those outlive the exception. Leave them open and
+            # the NEXT arm() dies with -200597 ("lines currently in use by
+            # another output operation") on the same lines, leaks another task,
+            # and the card stays wedged until its server is restarted.
+            _close_tasks(tasks.values())
+            raise
+
+        return tasks, meta
+
+    def _populate_tasks(self, compiled, tasks, meta, regeneration):
+        """Create and configure one task per non-empty stack, into `tasks`."""
         for key in self.STACK_KEYS:
             info = compiled[key]
             if not info["ops"]:
@@ -353,7 +489,20 @@ class Driver:
                 "clock_source": info.get("clock_source", None),
             }
 
-        return tasks, meta
+    def reset_device(self) -> None:
+        """Abort everything on this card and return it to a known-good state.
+
+        The recovery path when a task has been leaked -- by a crash between
+        arm() and finalize(), or by an older build that did not clean up a
+        half-built arm. DAQmx will not hand out lines that another task still
+        holds, and nothing short of closing that task or resetting the device
+        releases them, so without this the only cure is restarting the server.
+
+        Invalidates EVERY task on the card, including any this driver still
+        thinks is armed, so treat outstanding handles as dead afterwards.
+        """
+        nidaqmx.system.device.Device(name=self.dev).reset_device()
+        self.log.info(f"[NI] {self.dev} reset; all tasks on it are now invalid")
 
     def arm(self, regeneration: bool = False) -> _ArmedHandle:
         """
@@ -370,8 +519,14 @@ class Driver:
 
         tasks, meta = self._build_tasks_from_compiled(compiled, regeneration=regeneration)
         start_order = [k for k in ("ai", "di", "ao", "do") if k in tasks]
-        for k in start_order:
-            tasks[k].start()
+        try:
+            for k in start_order:
+                tasks[k].start()
+        except Exception:
+            # Same reasoning as _build_tasks_from_compiled: a task that failed
+            # to start still owns its lines, and so do the ones already started.
+            _close_tasks(tasks.values())
+            raise
 
         return _ArmedHandle(tasks=tasks, compiled=compiled, meta=meta)
 
@@ -412,16 +567,7 @@ class Driver:
 
         finally:
             if close:
-                for t in tasks.values():
-                    try:
-                        t.stop()
-                    except Exception:
-                        pass
-                    try:
-                        t.close()
-                    except Exception:
-                        pass
-
+                _close_tasks(tasks.values())
                 self.clear_stack()
 
         outputs["_meta"] = handle.meta
@@ -509,11 +655,12 @@ class Driver:
             task.ai_channels.add_ai_voltage_chan(channel)
             task.ai_channels[0].ai_rng_high = float(max_range)
             task.ai_channels[0].ai_rng_low = -float(max_range)
-            task.timing.cfg_samp_clk_timing(
-                rate=float(sample_rate),
-                sample_mode=AcquisitionType.FINITE,
-                samps_per_chan=int(num_samples),
-            )
+            if num_samples > 1:
+                task.timing.cfg_samp_clk_timing(
+                    rate=float(sample_rate),
+                    sample_mode=AcquisitionType.FINITE,
+                    samps_per_chan=int(num_samples),
+                )
             return task.read(number_of_samples_per_channel=int(num_samples))
 
     def _di_read_now(
@@ -816,15 +963,18 @@ class Driver:
 
         if not self.not_OPX_clock:
 
-            if self.dev == "PXI1Slot2_1":
+            if self.dev == self.clock_master_dev:
                 clk = info.get("clock_source", None)   # e.g. "/PXI1Slot2_1/PFI0"
-                kwargs["source"] = clk
+                # No source means the master runs off its own on-board clock;
+                # it still exports it, so the slaves stay locked to it.
+                if clk:
+                    kwargs["source"] = clk
                 task.timing.cfg_samp_clk_timing(**kwargs)
                 # Export sample clock onto chassis backplane
-                task.export_signals.samp_clk_output_term = "/PXI1Slot2_1/PXI_Trig7"
+                task.export_signals.samp_clk_output_term = f"/{self.dev}/{self.clock_export_line}"
             else:
                 # Consume backplane clock
-                kwargs["source"] = f"/{self.dev}/PXI_Trig7"
+                kwargs["source"] = f"/{self.dev}/{self.clock_export_line}"
                 task.timing.cfg_samp_clk_timing(**kwargs)
 
         else:
@@ -870,6 +1020,23 @@ class Driver:
 # -----------------------------
 # Compilation helpers
 # -----------------------------
+
+def _close_tasks(tasks) -> None:
+    """Stop and close every task, never raising.
+
+    Releasing the channel reservations is the whole point, so one task that
+    refuses to stop must not prevent the rest from being closed.
+    """
+    for t in tasks:
+        try:
+            t.stop()
+        except Exception:
+            pass
+        try:
+            t.close()
+        except Exception:
+            pass
+
 
 def _to_1d_array(x: Union[float, int, Sequence[float]]) -> np.ndarray:
     if isinstance(x, (float, int, np.floating, np.integer)):

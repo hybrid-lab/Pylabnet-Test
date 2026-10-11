@@ -277,6 +277,207 @@ class ScanGridWindow:
         self._latest_avgs[scan_idx] = (np.asarray(avg_image).copy(), self._rendered_versions[scan_idx] + 1)
 
 
+class DualScanGridWindow:
+    """Two ScanGridWindow-style displays in a SINGLE window, stacked vertically.
+    Upper half: TOP-chamber camera. Lower half: BOTTOM-chamber camera.
+    Each section has: header label row, current diff, avg diff + y-projection, x-projection.
+    Methods come in _top / _bot pairs so the caller updates either section."""
+
+    MARGIN_PX = 100
+    POLL_MS = 500
+
+    def __init__(self, scan_labels, diff_levels, avg_levels,
+                 title="Dual scan grid", tile_px=280):
+        self.scan_labels = list(scan_labels)
+        self.n_scan = len(self.scan_labels)
+        self.diff_levels = diff_levels
+        self.avg_levels = avg_levels
+        self.win = pg.GraphicsLayoutWidget(show=True, title=title)
+        # Window is taller (2x camera sections); narrower per-tile so it fits.
+        self.win.resize(tile_px * self.n_scan + self.MARGIN_PX * self.n_scan,
+                        (tile_px * 2 + self.MARGIN_PX + 60) * 2 + 60)
+        # Storage
+        self.current_imgs_top = []
+        self.avg_imgs_top = []
+        self.current_imgs_bot = []
+        self.avg_imgs_bot = []
+        self.x_data_top = []
+        self.x_fit_top = []
+        self.y_data_top = []
+        self.y_fit_top = []
+        self.x_data_bot = []
+        self.x_fit_bot = []
+        self.y_data_bot = []
+        self.y_fit_bot = []
+        self.header_labels_top = []
+        self.header_labels_bot = []
+        self._latest_avgs_top = [None] * self.n_scan
+        self._latest_avgs_bot = [None] * self.n_scan
+        self._rendered_versions_top = [0] * self.n_scan
+        self._rendered_versions_bot = [0] * self.n_scan
+
+        # Build TOP section starting at row 0
+        self._build_section(
+            row_offset=0, section_label="TOP CAMERA",
+            current_imgs=self.current_imgs_top, avg_imgs=self.avg_imgs_top,
+            x_data=self.x_data_top, x_fit=self.x_fit_top,
+            y_data=self.y_data_top, y_fit=self.y_fit_top,
+            header_labels=self.header_labels_top)
+        # Spacer row between sections (row 4) -- pyqtgraph auto-spaces ok with addLabel
+        self.win.addLabel("", row=4, col=0, colspan=2 * self.n_scan + 1)
+        # Build BOTTOM section starting at row 5
+        self._build_section(
+            row_offset=5, section_label="BOTTOM CAMERA",
+            current_imgs=self.current_imgs_bot, avg_imgs=self.avg_imgs_bot,
+            x_data=self.x_data_bot, x_fit=self.x_fit_bot,
+            y_data=self.y_data_bot, y_fit=self.y_fit_bot,
+            header_labels=self.header_labels_bot)
+
+        self._timer = QtCore.QTimer()
+        self._timer.timeout.connect(self._poll_and_update)
+        self._timer.start(self.POLL_MS)
+
+    def _build_section(self, row_offset, section_label, current_imgs, avg_imgs,
+                       x_data, x_fit, y_data, y_fit, header_labels):
+        # Section title (row_offset+0, full width)
+        title_label = self.win.addLabel(
+            f"<b><span style='color:#00FFFF; font-size:11pt'>{section_label}</span></b>",
+            row=row_offset, col=0, colspan=2 * self.n_scan + 1)
+        # Per-column scan labels (row_offset+1)
+        for col in range(self.n_scan):
+            base_col = 2 * col + 1
+            lbl = self.win.addLabel(
+                f"<b>{self.scan_labels[col]}</b><br>"
+                f"<span style='color:#FFFF00'>sx=-- sy=--</span>",
+                row=row_offset + 1, col=base_col, size="9pt")
+            header_labels.append(lbl)
+        # Current diff images (row_offset+2)
+        for col in range(self.n_scan):
+            base_col = 2 * col + 1
+            vb = self.win.addViewBox(row=row_offset + 2, col=base_col, lockAspect=True)
+            vb.invertY(True)
+            img = pg.ImageItem(axisOrder='row-major')
+            img.setLevels(self.diff_levels)
+            cmap = pg.colormap.get('inferno')
+            img.setLookupTable(cmap.getLookupTable())
+            vb.addItem(img)
+            current_imgs.append(img)
+        # Avg diff images with y-projections + x-projections (rows row_offset+3, +4)
+        for col in range(self.n_scan):
+            base_col = 2 * col + 1
+            y_margin_col = 2 * col
+            y_plot = self.win.addPlot(row=row_offset + 3, col=y_margin_col)
+            y_plot.setMaximumWidth(self.MARGIN_PX)
+            y_plot.hideAxis('bottom')
+            y_plot.hideAxis('left')
+            y_plot.setMouseEnabled(x=False, y=False)
+            y_plot.setMenuEnabled(False)
+            y_plot.invertX(True)
+            y_plot.invertY(True)
+            y_data.append(y_plot.plot([], [], pen=pg.mkPen('w', width=1)))
+            y_fit.append(y_plot.plot([], [], pen=pg.mkPen('y', width=2)))
+            vb_avg = self.win.addViewBox(row=row_offset + 3, col=base_col, lockAspect=True)
+            vb_avg.invertY(True)
+            img = pg.ImageItem(axisOrder='row-major')
+            img.setLevels(self.avg_levels)
+            cmap = pg.colormap.get('inferno')
+            img.setLookupTable(cmap.getLookupTable())
+            vb_avg.addItem(img)
+            avg_imgs.append(img)
+            y_plot.setYLink(vb_avg)
+            x_plot = self.win.addPlot(row=row_offset + 4, col=base_col)
+            x_plot.setMaximumHeight(self.MARGIN_PX)
+            x_plot.hideAxis('bottom')
+            x_plot.hideAxis('left')
+            x_plot.setMouseEnabled(x=False, y=False)
+            x_plot.setMenuEnabled(False)
+            x_data.append(x_plot.plot([], [], pen=pg.mkPen('w', width=1)))
+            x_fit.append(x_plot.plot([], [], pen=pg.mkPen('y', width=2)))
+            x_plot.setXLink(vb_avg)
+
+    def _poll_and_update(self):
+        # Update TOP section fits/labels
+        self._poll_section(
+            self._latest_avgs_top, self._rendered_versions_top,
+            self.x_data_top, self.x_fit_top,
+            self.y_data_top, self.y_fit_top,
+            self.header_labels_top)
+        # Update BOTTOM section fits/labels
+        self._poll_section(
+            self._latest_avgs_bot, self._rendered_versions_bot,
+            self.x_data_bot, self.x_fit_bot,
+            self.y_data_bot, self.y_fit_bot,
+            self.header_labels_bot)
+
+    def _poll_section(self, latest_avgs, rendered_versions,
+                      x_data, x_fit, y_data, y_fit, header_labels):
+        for idx in range(self.n_scan):
+            entry = latest_avgs[idx]
+            if entry is None:
+                continue
+            avg_copy, version = entry
+            if version <= rendered_versions[idx]:
+                continue
+            rendered_versions[idx] = version
+            try:
+                img = avg_copy.astype(np.float64)
+                x_proj = img.sum(axis=0)
+                y_proj = img.sum(axis=1)
+                mu_x, sigma_x, x_bg = _sigma_from_moment(x_proj)
+                if x_bg is not None and np.isfinite(sigma_x):
+                    x_data[idx].setData(np.arange(x_proj.size, dtype=np.float64), x_bg)
+                    gx, gy = _gaussian_curve(x_proj.size, mu_x, sigma_x, x_bg.max())
+                    x_fit[idx].setData(gx, gy)
+                mu_y, sigma_y, y_bg = _sigma_from_moment(y_proj)
+                if y_bg is not None and np.isfinite(sigma_y):
+                    y_data[idx].setData(y_bg, np.arange(y_proj.size, dtype=np.float64))
+                    gx, gy = _gaussian_curve(y_proj.size, mu_y, sigma_y, y_bg.max())
+                    y_fit[idx].setData(gy, gx)
+                sx = f"{sigma_x:.1f}" if np.isfinite(sigma_x) else "--"
+                sy = f"{sigma_y:.1f}" if np.isfinite(sigma_y) else "--"
+                area = float(img.sum())
+                header_labels[idx].setText(
+                    f"<b>{self.scan_labels[idx]}</b><br>"
+                    f"<span style='color:#FFFF00'>sx={sx} sy={sy}</span><br>"
+                    f"<span style='color:#00FF88'>area={area:.0f}</span>")
+            except Exception:
+                pass
+
+    # ---- TOP camera setters ----
+    def set_current_top(self, scan_idx, diff_image):
+        try:
+            self.current_imgs_top[scan_idx].setImage(
+                diff_image, levels=self.diff_levels, autoLevels=False)
+        except Exception:
+            pass
+
+    def set_average_top(self, scan_idx, avg_image):
+        try:
+            self.avg_imgs_top[scan_idx].setImage(
+                avg_image, levels=self.avg_levels, autoLevels=False)
+        except Exception:
+            pass
+        self._latest_avgs_top[scan_idx] = (np.asarray(avg_image).copy(),
+                                           self._rendered_versions_top[scan_idx] + 1)
+
+    # ---- BOTTOM camera setters ----
+    def set_current_bottom(self, scan_idx, diff_image):
+        try:
+            self.current_imgs_bot[scan_idx].setImage(
+                diff_image, levels=self.diff_levels, autoLevels=False)
+        except Exception:
+            pass
+
+    def set_average_bottom(self, scan_idx, avg_image):
+        try:
+            self.avg_imgs_bot[scan_idx].setImage(
+                avg_image, levels=self.avg_levels, autoLevels=False)
+        except Exception:
+            pass
+        self._latest_avgs_bot[scan_idx] = (np.asarray(avg_image).copy(),
+                                           self._rendered_versions_bot[scan_idx] + 1)
+
+
 class TempFitWindow:
     POLL_MS = 1000
 
@@ -418,7 +619,7 @@ INIT_DICT = {
     'post_hold_4_ms': {'Post-move Hold 4 (ms)': '200'},
 
     # ===================== DIM-3000 AOM DRIVER =====================
-    'dim_base_freq_mhz': {'DIM3000 Base Freq (MHz)': '100.000'},
+    'dim_base_freq_mhz': {'DIM3000 Base Freq (MHz)': '100.800'},
     'dim_amplitude_dbm': {'DIM3000 Amplitude (dBm)': '32.0'},
 
     # ===================== FIXED TOF after release =====================
@@ -442,6 +643,15 @@ INIT_DICT = {
     'bias_y_v': {'Bias Y (V)': '0.44'},
     'bias_z_v': {'Bias Z (V)': '0.0'},
 
+    # ===================== CAMERA ENABLE TOGGLES =====================
+    # Independent toggles for top and bottom cameras. Useful diagnostic:
+    #   top=1, bot=0  -> known-good single-cam mode (default)
+    #   top=0, bot=1  -> test bottom camera alone (rule in/out hardware)
+    #   top=1, bot=1  -> dual mode (interleaved real-time display)
+    # If both are 0, no cameras run.
+    'enable_top_camera': {'Enable Top Camera (1=yes, 0=no)': '1'},
+    'enable_bottom_camera': {'Enable Bottom Camera (1=yes, 0=no)': '0'},
+
     # ===================== GENERAL =====================
     'wait_time': {'Wait Time Between Cycles (s)': '0.3'},
 }
@@ -455,6 +665,10 @@ def configure(**kwargs):
     dataset = kwargs['dataset']
     dataset.frame_viewer = QtMatplotlibFrameViewer("Most recent camera frame")
     dataset.camera_client = kwargs['fluorescence_imaging_camera_bfs_u3_51s5m_top_chamber']
+    # Bottom-chamber camera (separate pylabnet client). Optional; if missing,
+    # bottom-row tiles stay blank and the script runs top-camera-only.
+    dataset.bottom_camera_client = kwargs.get(
+        'fluorescence_imaging_camera_bfs_u3_51s5m_bottom_chamber', None)
     dataset.NI_card_1 = kwargs['nidaqmx_ni_daq_1']
     dataset.NI_card_2 = kwargs['nidaqmx_ni_daq_2']
     dataset.NI_card_3 = kwargs['nidaqmx_ni_daq_3']
@@ -465,10 +679,11 @@ def configure(**kwargs):
         int(dataset.get_input_parameter("post_hold_4_ms")),
     ]
     scan_labels = [f"post-hold={t}ms" for t in post_hold_values_ms]
-    dataset.scan_grid = ScanGridWindow(
+    # SINGLE window with both cameras stacked: top half = top cam, bottom half = bot cam.
+    dataset.scan_grid = DualScanGridWindow(
         scan_labels=scan_labels,
         diff_levels=DIFF_LEVELS, avg_levels=AVG_DIFF_LEVELS,
-        title="Hold-after-Move diagnostic (in-lattice survival vs total time)",
+        title="Hold-after-Move (TOP + BOTTOM cameras)",
     )
     pixel_size_um = float(dataset.get_input_parameter("pixel_size_um"))
     dataset.graph.hide()
@@ -483,6 +698,8 @@ def experiment(**kwargs):
     NI_card_2 = kwargs["nidaqmx_ni_daq_2"]
     NI_card_3 = kwargs["nidaqmx_ni_daq_3"]
     camera_client = kwargs["fluorescence_imaging_camera_bfs_u3_51s5m_top_chamber"]
+    bottom_camera_client = kwargs.get(
+        "fluorescence_imaging_camera_bfs_u3_51s5m_bottom_chamber", None)
     OPX_client = kwargs["OPX_OPX"]
 
     # =========================================================================
@@ -585,7 +802,11 @@ def experiment(**kwargs):
         return ser.readline().decode().strip()
 
     def _dim_program_segments(ser, move_freq):
-        """Program Wseg 1-3 for a move from base_freq_hz to `move_freq` and back.
+        """Program Wseg 1-4 for a move from base_freq_hz to `move_freq` and back.
+
+        Three real legs all carrying flag 1, plus a base->base no-op
+        segment 4 carrying the flag 8 end-of-chain marker. See
+        latticeMoveSweep.py for why the marker must not sit on the decel.
         Same ramp time across calls; only the endpoint changes per scan point.
         Re-asserts Mseg:1 at the end so the DIM stays in segment-trigger mode."""
         freq_range = abs(move_freq - base_freq_hz)
@@ -597,7 +818,13 @@ def experiment(**kwargs):
         step_time_arb = max(1, min(65535, int(round(step_time_us * 1000.0 / 3.90625))))
         _dim_send(ser, f'Wseg:1;1;{base_freq_hz};{move_freq};{step_freq};{step_time_arb};0')
         _dim_send(ser, f'Wseg:2;1;{move_freq};{move_freq};0;1;0')
-        _dim_send(ser, f'Wseg:3;8;{move_freq};{base_freq_hz};{step_freq};{step_time_arb};0')
+        _dim_send(ser, f'Wseg:3;1;{move_freq};{base_freq_hz};{step_freq};{step_time_arb};0')
+        # The sentinel. Flag 8 used to sit on Wseg:3, the deceleration --
+        # so if the driver treats the marked segment as the wrap point
+        # rather than as a segment to play, the decel never runs and the
+        # carrier is left at move_freq with the lattice still walking.
+        # base->base with a zero step does nothing either way.
+        _dim_send(ser, f'Wseg:4;8;{base_freq_hz};{base_freq_hz};0;1;0')
         _dim_send(ser, 'Mseg:1')
         return num_steps, step_freq, step_time_arb
 
@@ -647,6 +874,10 @@ def experiment(**kwargs):
     bias_x_v = float(dataset.get_input_parameter("bias_x_v"))
     bias_y_v = float(dataset.get_input_parameter("bias_y_v"))
     bias_z_v = float(dataset.get_input_parameter("bias_z_v"))
+    enable_top_camera = int(dataset.get_input_parameter("enable_top_camera")) != 0
+    enable_bottom_camera = int(dataset.get_input_parameter("enable_bottom_camera")) != 0
+    logger.info(
+        f"Camera modes: top={enable_top_camera}, bottom={enable_bottom_camera}")
 
     # =========================================================================
     # CHANNELS
@@ -898,11 +1129,11 @@ def experiment(**kwargs):
         luao = [lat_am_v] * N
         ldao = [lat_am_v] * N
 
-        # DIM-3000 segment trigger (dio6): three pulses, each ~3ms BEFORE the
-        # corresponding waveform start (DIM internal latency). The move is the
-        # same for every scan point so we always fire all three triggers.
+        # DIM-3000 segment trigger (dio6): FOUR pulses, each ~seg_lead_ms BEFORE
+        # the corresponding segment start (DIM internal latency). The move is
+        # the same for every scan point so we always fire all four triggers.
         seg_do = [0] * N
-        for trig_t in (accel_start, accel_end, plateau_end):
+        for trig_t in (accel_start, accel_end, plateau_end, decel_end):
             t0 = max(0, trig_t - seg_lead_s)
             for s in range(seg_pulse_s):
                 if t0 + s < N:
@@ -956,19 +1187,36 @@ def experiment(**kwargs):
 
     diff_sums = [None] * n_scan
     diff_counts = [0] * n_scan
+    # Bottom camera: separate accumulators (parallel to top)
+    diff_sums_bot = [None] * n_scan
+    diff_counts_bot = [0] * n_scan
 
     # =========================================================================
     # MAIN ACQUISITION LOOP
     # =========================================================================
     while thread.running:
-        camera_client.set_hardware_trigger(
-            line="Line0", activation="RisingEdge",
-            selector="FrameStart", overlap="ReadOut",
-            acquisition_mode="Continuous")
-        camera_client.set_exposure(camera_exposure_us)
-        camera_client.try_set_float("Gain", 50.0)
-        logger.info("Starting acquisition")
-        dataset.camera_client.start_acquisition()
+        # TOP camera setup (gated on toggle)
+        if enable_top_camera:
+            camera_client.set_hardware_trigger(
+                line="Line0", activation="RisingEdge",
+                selector="FrameStart", overlap="ReadOut",
+                acquisition_mode="Continuous")
+            camera_client.set_exposure(camera_exposure_us)
+            camera_client.try_set_float("Gain", 50.0)
+            logger.info("Starting acquisition (TOP camera)")
+            dataset.camera_client.start_acquisition()
+        # BOTTOM camera: started BEFORE OPX execute so both cameras are ready
+        # to receive triggers simultaneously. Triggered via NI dio7 with the
+        # SAME cam_p TTL pattern as the top cam (dio0).
+        if enable_bottom_camera and bottom_camera_client is not None:
+            bottom_camera_client.set_hardware_trigger(
+                line="Line0", activation="RisingEdge",
+                selector="FrameStart", overlap="ReadOut",
+                acquisition_mode="Continuous")
+            bottom_camera_client.set_exposure(camera_exposure_us)
+            bottom_camera_client.try_set_float("Gain", 50.0)
+            logger.info("Starting acquisition (BOTTOM camera)")
+            bottom_camera_client.start_acquisition()
 
         # Clear stale clock task from previous cycle
         try:
@@ -978,13 +1226,20 @@ def experiment(**kwargs):
 
         # Load waveforms into data cards first
         NI_card_2.build_stack()
-        NI_card_2.set_do_voltage(do_channel=camera_trigger_do, value=cam_p, sample_rate=ni_rate)
+        # dio0 = top-cam trigger. Only added if top cam is enabled.
+        if enable_top_camera:
+            NI_card_2.set_do_voltage(do_channel=camera_trigger_do, value=cam_p, sample_rate=ni_rate)
         NI_card_2.set_do_voltage(do_channel=MOT_AOM_do, value=ado_p, sample_rate=ni_rate)
         NI_card_2.set_do_voltage(do_channel=mot_coils_do, value=cdo_p, sample_rate=ni_rate)
         NI_card_2.set_do_voltage(do_channel=Repump_AOM_do, value=rdo_p, sample_rate=ni_rate)
         NI_card_2.set_do_voltage(do_channel="dio4", value=ludo_p, sample_rate=ni_rate)
         NI_card_2.set_do_voltage(do_channel="dio5", value=lddo_p, sample_rate=ni_rate)
         NI_card_2.set_do_voltage(do_channel="dio6", value=seg_p, sample_rate=ni_rate)
+        # dio7 = bottom-cam trigger. Only added to NI task if bottom cam is
+        # enabled, so the disabled mode is byte-identical to the proven
+        # single-camera pipeline.
+        if enable_bottom_camera and bottom_camera_client is not None:
+            NI_card_2.set_do_voltage(do_channel="dio7", value=cam_p, sample_rate=ni_rate)
         NI_card_3.build_stack()
         NI_card_3.set_ao_voltage(ao_channel=MOT_AOM_ao, voltages=aao_p, sample_rate=ni_rate)
         NI_card_3.set_ao_voltage(ao_channel=mot_coils_ao, voltages=cao_p, sample_rate=ni_rate)
@@ -1018,42 +1273,103 @@ def experiment(**kwargs):
         OPX_client.execute(wait=False)
         logger.info("Image gathering starts")
 
-        def get_frame(timeout_ms=1000):
+        def get_frame_top(timeout_ms=1000):
             b, shape, dtype = dataset.camera_client.get_frame_bytes(timeout_ms)
             return np.frombuffer(b, dtype=np.dtype(dtype)).reshape(shape)
 
-        scan_grid = dataset.scan_grid
+        def get_frame_bot(timeout_ms=1000):
+            b, shape, dtype = bottom_camera_client.get_frame_bytes(timeout_ms)
+            return np.frombuffer(b, dtype=np.dtype(dtype)).reshape(shape)
+
+        scan_grid = dataset.scan_grid  # DualScanGridWindow instance
+        have_bottom = enable_bottom_camera and (bottom_camera_client is not None)
+        # bottom_alive: gets disabled within a cycle if get_frame_bot fails.
+        # Top-camera processing continues normally; bottom panels stop updating.
+        bottom_alive = have_bottom
+        # SHORT timeout for bottom cam: 3s. If a frame doesn't arrive in 3s,
+        # the bot is not getting triggered or has stalled. Disable for the
+        # rest of this cycle and continue top-only.
+        BOT_TIMEOUT_MS = 3000
         sigma_x_vals = [float('nan')] * n_scan
         sigma_y_vals = [float('nan')] * n_scan
+
+        def _safe_get_frame_bot(label):
+            """Returns frame or None on timeout/error. Disables bottom for rest of cycle."""
+            nonlocal bottom_alive
+            if not bottom_alive:
+                return None
+            try:
+                return get_frame_bot(timeout_ms=BOT_TIMEOUT_MS)
+            except Exception as e:
+                logger.info(
+                    f"  BOTTOM camera fetch ({label}) failed: {e!r}. "
+                    f"Disabling bottom camera for rest of cycle.")
+                bottom_alive = False
+                return None
 
         try:
             # DIM-3000 already programmed at startup with the single move_freq_hz;
             # no per-scan reprogramming needed (same move for all scan points,
             # only post-hold varies).
+            #
+            # Interleaved fetch pattern: each enabled camera fetches its f1
+            # then f2 per scan point. Skipped if disabled by GUI toggle.
             for run_idx in range(M):
                 logger.info(f"Run {run_idx+1} of {M}")
                 for scan_idx, ph_v in enumerate(post_hold_values_ms):
                     is_first = (run_idx == 0 and scan_idx == 0)
-                    frame1 = get_frame(timeout_ms=10000 if is_first else 100000)
-                    frame2 = get_frame(timeout_ms=100000)
-                    diff = frame1.astype(np.int32) - frame2.astype(np.int32)
-                    scan_grid.set_current(scan_idx, diff)
-                    if diff_sums[scan_idx] is None:
-                        diff_sums[scan_idx] = diff.astype(np.float64)
-                    else:
-                        diff_sums[scan_idx] += diff
-                    diff_counts[scan_idx] += 1
-                    avg = diff_sums[scan_idx] / diff_counts[scan_idx]
-                    scan_grid.set_average(scan_idx, avg)
-                    img = avg.astype(np.float64)
-                    _, sx, _ = _sigma_from_moment(img.sum(axis=0))
-                    _, sy, _ = _sigma_from_moment(img.sum(axis=1))
-                    sigma_x_vals[scan_idx] = sx
-                    sigma_y_vals[scan_idx] = sy
+                    frame1 = None
+                    frame2 = None
+                    frame1_bot = None
+                    frame2_bot = None
+                    # Frame 1 fetches (top first if enabled, then bot)
+                    if enable_top_camera:
+                        frame1 = get_frame_top(timeout_ms=10000 if is_first else 100000)
+                    if enable_bottom_camera:
+                        frame1_bot = _safe_get_frame_bot("frame1")
+                    # Frame 2 fetches
+                    if enable_top_camera:
+                        frame2 = get_frame_top(timeout_ms=100000)
+                    if enable_bottom_camera:
+                        frame2_bot = _safe_get_frame_bot("frame2")
+
+                    # ---- TOP camera processing (if enabled) ----
+                    sx = float('nan')
+                    sy = float('nan')
+                    avg_area = float('nan')
+                    if frame1 is not None and frame2 is not None:
+                        diff = frame1.astype(np.int32) - frame2.astype(np.int32)
+                        scan_grid.set_current_top(scan_idx, diff)
+                        if diff_sums[scan_idx] is None:
+                            diff_sums[scan_idx] = diff.astype(np.float64)
+                        else:
+                            diff_sums[scan_idx] += diff
+                        diff_counts[scan_idx] += 1
+                        avg = diff_sums[scan_idx] / diff_counts[scan_idx]
+                        scan_grid.set_average_top(scan_idx, avg)
+                        img = avg.astype(np.float64)
+                        _, sx, _ = _sigma_from_moment(img.sum(axis=0))
+                        _, sy, _ = _sigma_from_moment(img.sum(axis=1))
+                        sigma_x_vals[scan_idx] = sx
+                        sigma_y_vals[scan_idx] = sy
+                        avg_area = float(avg.sum())
+                    # ---- BOTTOM camera processing (if enabled) ----
+                    bot_area = float('nan')
+                    if frame1_bot is not None and frame2_bot is not None:
+                        diff_bot = frame1_bot.astype(np.int32) - frame2_bot.astype(np.int32)
+                        scan_grid.set_current_bottom(scan_idx, diff_bot)
+                        if diff_sums_bot[scan_idx] is None:
+                            diff_sums_bot[scan_idx] = diff_bot.astype(np.float64)
+                        else:
+                            diff_sums_bot[scan_idx] += diff_bot
+                        diff_counts_bot[scan_idx] += 1
+                        avg_bot = diff_sums_bot[scan_idx] / diff_counts_bot[scan_idx]
+                        scan_grid.set_average_bottom(scan_idx, avg_bot)
+                        bot_area = float(avg_bot.sum())
                     logger.info(
                         f"  post-hold={ph_v}ms: "
-                        f"n={diff_counts[scan_idx]}, sx={sx:.1f}px, sy={sy:.1f}px, "
-                        f"area={float(avg.sum()):.0f}")
+                        f"top_n={diff_counts[scan_idx]} area={avg_area:.0f} sx={sx:.1f} sy={sy:.1f} | "
+                        f"bot_n={diff_counts_bot[scan_idx]} area={bot_area:.0f}")
 
                 # Lifetime fit: log-linear fit of log(area) vs post-hold time
                 areas = np.array([
@@ -1072,7 +1388,16 @@ def experiment(**kwargs):
                 logger.info(f"Updated plots for run {run_idx+1} of {M}")
         finally:
             logger.info("Stopping acquisition")
-            dataset.camera_client.stop_acquisition()
+            if enable_top_camera:
+                try:
+                    dataset.camera_client.stop_acquisition()
+                except Exception as e:
+                    logger.info(f"Top cam stop: {e!r}")
+            if enable_bottom_camera and bottom_camera_client is not None:
+                try:
+                    bottom_camera_client.stop_acquisition()
+                except Exception as e:
+                    logger.info(f"Bottom cam stop: {e!r}")
 
         logger.info(f"Cycle over {time.perf_counter_ns()}")
         time.sleep(wait_time)

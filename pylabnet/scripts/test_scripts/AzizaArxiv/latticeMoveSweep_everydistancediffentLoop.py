@@ -411,7 +411,7 @@ INIT_DICT = {
     'dist_3_mm': {'Move Distance 3 (mm)': '1.5'},
 
     # ===================== DIM-3000 AOM DRIVER =====================
-    'dim_base_freq_mhz': {'DIM3000 Base Freq (MHz)': '100.000'},
+    'dim_base_freq_mhz': {'DIM3000 Base Freq (MHz)': '100.800'},
     'dim_amplitude_dbm': {'DIM3000 Amplitude (dBm)': '32.0'},
 
     # ===================== FIXED TOF after release =====================

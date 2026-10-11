@@ -13,13 +13,57 @@ class Driver:
         self.connect()
         self.image_list = []
 
+    def _is_streaming(self):
+        """Streaming state, or 'unknown' if even asking fails."""
+        try:
+            return bool(self.cam.IsStreaming())
+        except Exception:
+            return "unknown"
+
+    def _node_state(self, node):
+        """(exists, available, writable) for a node, never raising."""
+        state = []
+        for probe in (lambda: node.IsValid(),
+                      lambda: PySpin.IsAvailable(node),
+                      lambda: PySpin.IsWritable(node)):
+            try:
+                state.append(bool(probe()))
+            except Exception:
+                state.append(False)
+            if not state[-1]:
+                return tuple(state) + (False,) * (3 - len(state))
+        return tuple(state)
+
     def _set_enum(self, nodemap, node_name: str, entry_name: str):
         node = PySpin.CEnumerationPtr(nodemap.GetNode(node_name))
-        if not (PySpin.IsAvailable(node) and PySpin.IsWritable(node)):
-            raise RuntimeError(f"Node {node_name} not available/writable")
+
+        # These three conditions have completely different causes and fixes, so
+        # say which one it is. Collapsing them into one "not available/writable"
+        # message turns every camera problem into a guessing game.
+        exists, available, writable = self._node_state(node)
+        if not exists:
+            raise RuntimeError(
+                f"Node {node_name} does not exist on this camera model")
+        if not available:
+            raise RuntimeError(
+                f"Node {node_name} is not available (streaming="
+                f"{self._is_streaming()}). The camera has usually dropped off "
+                f"the bus -- a USB3 re-enumeration invalidates the node map "
+                f"while the handle still looks alive. Reconnect the camera "
+                f"server.")
+        if not writable:
+            raise RuntimeError(
+                f"Node {node_name} is read-only right now (streaming="
+                f"{self._is_streaming()}). Most Blackfly S features lock while "
+                f"acquisition is running, so stop acquisition first. If it is "
+                f"not streaming, then something else owns the camera -- "
+                f"SpinView, or a second pylabnet camera server -- and this "
+                f"connection only has read access.")
+
         entry = node.GetEntryByName(entry_name)
         if not (PySpin.IsAvailable(entry) and PySpin.IsReadable(entry)):
-            raise RuntimeError(f"Enum entry {entry_name} for {node_name} not readable")
+            raise RuntimeError(
+                f"Enum entry {entry_name} for {node_name} not readable")
         node.SetIntValue(entry.GetValue())
 
     def _try_set_enum(self, node_name: str, entry_name: str):
@@ -32,6 +76,26 @@ class Driver:
             return True
         except Exception:
             return False
+
+    def _try_get_float(self, node_name: str):
+        """Read back a float node, or None if it cannot be read.
+
+        Needed because _try_set_float is best-effort: a value outside the
+        node's range raises inside SetValue, the exception is swallowed, and
+        the camera silently keeps its old setting. For Gain that is invisible
+        in the image but scales every photometric result by 10^(dG/20), so the
+        only safe thing is to ask the camera what it actually did.
+        """
+        try:
+            if self.cam is None or not self.initialized:
+                raise RuntimeError("Camera not initialized")
+            nm = self.cam.GetNodeMap()
+            node = PySpin.CFloatPtr(nm.GetNode(node_name))
+            if PySpin.IsAvailable(node) and PySpin.IsReadable(node):
+                return float(node.GetValue())
+        except Exception:
+            pass
+        return None
 
     def _try_set_float(self, node_name: str, value: float):
         """Best-effort float set on the camera nodemap."""
@@ -47,13 +111,26 @@ class Driver:
             pass
         return False
 
+    def _force_stop_acquisition(self):
+        """Stop acquisition whether or not IsStreaming() admits it is running.
+
+        A run that dies between BeginAcquisition() and its cleanup leaves the
+        camera streaming; the next run then finds every feature node read-only.
+        Asking EndAcquisition() unconditionally recovers that, and costs only a
+        swallowed exception when the camera really was idle.
+        """
+        try:
+            self.cam.EndAcquisition()
+            return True
+        except Exception:
+            return False
+
     def disable_trigger(self):
         """Return camera to non-triggered (free-run / normal) mode."""
         if self.cam is None or not self.initialized:
             raise RuntimeError("Camera not initialized")
 
-        if self.cam.IsStreaming():
-            self.cam.EndAcquisition()
+        self._force_stop_acquisition()
 
         nm = self.cam.GetNodeMap()
         self._set_enum(nm, "TriggerMode", "Off")
@@ -83,9 +160,13 @@ class Driver:
         if self.cam is None or not self.initialized:
             raise RuntimeError("Camera not initialized")
 
-        # safest to configure when not streaming
-        if self.cam.IsStreaming():
-            self.cam.EndAcquisition()
+        # TriggerMode and friends are locked while the camera streams, so
+        # acquisition has to stop first. Don't gate this on IsStreaming(): if a
+        # previous run died mid-acquisition the flag and the camera can
+        # disagree, and the symptom is an unwritable TriggerMode here rather
+        # than anything pointing at the leaked acquisition. EndAcquisition() on
+        # an idle camera just raises, which is why it is swallowed.
+        self._force_stop_acquisition()
 
         nm = self.cam.GetNodeMap()
 

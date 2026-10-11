@@ -417,7 +417,7 @@ INIT_DICT = {
     'post_hold_4_ms': {'Post-move Hold 4 (ms)': '20'},
 
     # ===================== DIM-3000 AOM DRIVER =====================
-    'dim_base_freq_mhz': {'DIM3000 Base Freq (MHz)': '100.000'},
+    'dim_base_freq_mhz': {'DIM3000 Base Freq (MHz)': '100.800'},
     'dim_amplitude_dbm': {'DIM3000 Amplitude (dBm)': '32.0'},
 
     # ===================== TOF after move (default 0 = image in lattice) =====================
@@ -592,7 +592,11 @@ def experiment(**kwargs):
         return ser.readline().decode().strip()
 
     def _dim_program_segments(ser, move_freq):
-        """Program Wseg 1-3 for a move from base_freq_hz to `move_freq` and back.
+        """Program Wseg 1-4 for a move from base_freq_hz to `move_freq` and back.
+
+        Three real legs all carrying flag 1, plus a base->base no-op
+        segment 4 carrying the flag 8 end-of-chain marker. See
+        latticeMoveSweep.py for why the marker must not sit on the decel.
         Same ramp time, same endpoint for all scan points in this experiment
         (post-hold sweep doesn't change the move itself). Re-asserts Mseg:1."""
         freq_range = abs(move_freq - base_freq_hz)
@@ -605,7 +609,13 @@ def experiment(**kwargs):
         step_time_arb = max(1, min(65535, int(round(step_time_us * 1000.0 / 3.90625))))
         _dim_send(ser, f'Wseg:1;1;{base_freq_hz};{move_freq};{step_freq};{step_time_arb};0')
         _dim_send(ser, f'Wseg:2;1;{move_freq};{move_freq};0;1;0')
-        _dim_send(ser, f'Wseg:3;8;{move_freq};{base_freq_hz};{step_freq};{step_time_arb};0')
+        _dim_send(ser, f'Wseg:3;1;{move_freq};{base_freq_hz};{step_freq};{step_time_arb};0')
+        # The sentinel. Flag 8 used to sit on Wseg:3, the deceleration --
+        # so if the driver treats the marked segment as the wrap point
+        # rather than as a segment to play, the decel never runs and the
+        # carrier is left at move_freq with the lattice still walking.
+        # base->base with a zero step does nothing either way.
+        _dim_send(ser, f'Wseg:4;8;{base_freq_hz};{base_freq_hz};0;1;0')
         _dim_send(ser, 'Mseg:1')
         return num_steps, step_freq, step_time_arb
 
@@ -905,13 +915,20 @@ def experiment(**kwargs):
         luao = [lat_am_v] * N
         ldao = [lat_am_v] * N
 
-        # DIM-3000 segment trigger (dio6): three pulses, each ~3ms BEFORE the
-        # corresponding waveform start (DIM internal latency).
+        # DIM-3000 segment trigger (dio6): FOUR pulses, each ~seg_lead_ms
+        # BEFORE the corresponding segment start (DIM internal latency).
         # Trigger 1: start of accel ramp (seg1)
         # Trigger 2: start of plateau (seg2)
-        # Trigger 3: start of decel ramp (seg3)
+        # Trigger 3: start of decel ramp(seg3)
+        # Trigger 4: end of decel      (seg4, the flag-8 sentinel)
+        #
+        # Four segments need four triggers: a segment with no trigger
+        # stalls the chain until the NEXT cycle's first trigger, which
+        # then plays every later cycle one segment out of phase. Trigger 4
+        # fires seg_lead before decel_end, inside the decel ramp -- it
+        # moves no anchor and adds no samples.
         seg_do = [0] * N
-        for trig_t in (accel_start, accel_end, plateau_end):
+        for trig_t in (accel_start, accel_end, plateau_end, decel_end):
             t0 = max(0, trig_t - seg_lead_s)
             for s in range(seg_pulse_s):
                 if t0 + s < N:

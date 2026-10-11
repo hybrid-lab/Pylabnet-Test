@@ -1,7 +1,21 @@
-# PGC Bias Y sweep with full cooling sequence.
-# Full sequence: MOT -> CMOT -> Dark MOT -> PGC -> release -> TOF(15ms) -> image
-# Sweep ao9 (Bias Y) from 0 to 1V in 10 points.
-# Bias ramps 0 -> PGC value (ramped at coils_off) -> hold through F2 -> back to 0.
+# Lattice TRANSPORT (move) sweep.
+# Full sequence per scan point:
+#   MOT -> CMOT -> Dark MOT -> PGC_cool -> PGC_rampdown(+lattice loading)
+#   -> lattice hold (20ms)
+#   -> ACCELERATE (DIM seg 1: ramps 10ms, base_freq -> plateau_freq)
+#   -> CONSTANT VELOCITY plateau (variable duration -> sets displacement)
+#   -> DECELERATE (DIM seg 3: ramps 10ms, plateau_freq -> base_freq)
+#   -> post-move hold (20ms)
+#   -> release -> short TOF -> image
+#
+# Lattice TTL & AM held constant for entire cycle (AOM thermal stability).
+# The MOVE is done by detuning ONE lattice beam (up, via DIM-3000 COM4
+# segment mode) while the other (down, COM5) stays at base frequency.
+# A detuning Df between the two beams makes the standing wave move at
+# v = (lambda/2) * Df. With lambda=795nm: v_plateau = 3.975 mm/s @ 10 kHz.
+#
+# Sweep is over displacement (1, 2, 3, 4 mm). At fixed plateau velocity
+# and fixed ramp time, displacement = v_plateau * (t_plateau + t_ramp).
 #
 # Sequence per scan point:
 #   1. MOT loading (full power, coils on)
@@ -23,6 +37,7 @@
 #   - Cools atoms well below Doppler limit via Sisyphus effect
 
 import numpy as np
+import serial
 from pylabnet.scripts.data_center.datasets import Plot2DWithAvg, Plot2D
 import time
 from qt_plotting import QtMatplotlibFrameViewer
@@ -240,13 +255,15 @@ class ScanGridWindow:
 
     def set_current(self, scan_idx, diff_image):
         try:
-            self.current_imgs[scan_idx].setImage(diff_image, levels=self.diff_levels, autoLevels=False)
+            self.current_imgs[scan_idx].setImage(
+                diff_image, levels=self.diff_levels, autoLevels=False)
         except Exception:
             pass
 
     def set_average(self, scan_idx, avg_image):
         try:
-            self.avg_imgs[scan_idx].setImage(avg_image, levels=self.avg_levels, autoLevels=False)
+            self.avg_imgs[scan_idx].setImage(
+                avg_image, levels=self.avg_levels, autoLevels=False)
         except Exception:
             pass
         self._latest_avgs[scan_idx] = (np.asarray(avg_image).copy(), self._rendered_versions[scan_idx] + 1)
@@ -349,30 +366,56 @@ INIT_DICT = {
     'dark_mot_repump_power': {'Dark MOT Repump Power (V)': '0.1'},
     'dark_mot_repump_vco': {'Dark MOT Repump VCO (V)': '0.26'},
 
-    # ===================== PHASE 4: PGC (optical molasses) =====================
-    # Sub-Doppler cooling: no B-field, very far red-detuned, low power.
-    # Sisyphus effect cools atoms well below Doppler limit.
-    'pgc_enabled': {'PGC Enabled (1=yes, 0=no)': '1'},
-    'pgc_duration': {'PGC Duration (ms)': '10'},
+    # ===================== PHASE 4a: PGC COOL =====================
+    'pgc_cool_ms': {'PGC Cool Duration (ms)': '5'},
     'pgc_mot_power': {'PGC Cooling Power (V)': '0.15'},
-    'pgc_detuning': {'PGC Cooling VCO (V) [-100MHz]': '-1.32'},
+    'pgc_detuning': {'PGC Cooling VCO (V) [-122MHz]': '-1.75'},
     'pgc_repump_power': {'PGC Repump Power (V)': '0.05'},
     'pgc_repump_vco': {'PGC Repump VCO (V)': '0.26'},
 
-    # ===================== FIXED TOF =====================
-    'tof_us': {'TOF (us)': '15000'},
+    # ===================== PHASE 4b: PGC RAMP-DOWN (lattice loading) =====================
+    # PGC cooling/repump ramp from full to 0. Lattice already at full power.
+    # By end of rampdown, atoms only see the lattice.
+    'pgc_rampdown_ms': {'PGC Rampdown Duration (ms)': '10'},
 
-    # ===================== BIAS Y SWEEP (10 points, 0-1V) =====================
-    'bias_1_v': {'Bias Y 1 (V)': '0.000'},
-    'bias_2_v': {'Bias Y 2 (V)': '0.111'},
-    'bias_3_v': {'Bias Y 3 (V)': '0.222'},
-    'bias_4_v': {'Bias Y 4 (V)': '0.333'},
-    'bias_5_v': {'Bias Y 5 (V)': '0.444'},
-    'bias_6_v': {'Bias Y 6 (V)': '0.556'},
-    'bias_7_v': {'Bias Y 7 (V)': '0.667'},
-    'bias_8_v': {'Bias Y 8 (V)': '0.778'},
-    'bias_9_v': {'Bias Y 9 (V)': '0.889'},
-    'bias_10_v': {'Bias Y 10 (V)': '1.000'},
+    # ===================== LATTICE AM =====================
+    # DIM-3000 set to AMP=320 (+32dBm) via dim_rf_on.py; AM=1.0V => full max.
+    # AOM thermal stability: lattice TTL stays ON & AM stays at lat_am_v
+    # for the ENTIRE cycle.
+    'lat_am_v': {'Lattice AM (V)': '1.0'},
+
+    # ===================== FIXED LATTICE HOLDS (before + after move) =====================
+    'pre_hold_ms': {'Pre-move Hold (ms)': '20'},
+    'post_hold_ms': {'Post-move Hold (ms)': '20'},
+
+    # ===================== MOVE PARAMETERS (fixed across scan) =====================
+    # Trapezoidal velocity profile: accel (move_ramp_ms) -> plateau (move_plateau_ms)
+    # -> decel (move_ramp_ms). Distance = v_peak * (move_ramp_ms + move_plateau_ms).
+    # For each scan point, v_peak is computed from the requested distance.
+    # The DIM-3000 is RE-PROGRAMMED via serial between scan points.
+    'move_ramp_ms': {'Move Accel/Decel Ramp (ms)': '10'},
+    'move_plateau_ms': {'Move Plateau (ms)': '10'},
+    'seg_lead_ms': {'DIM3000 Trigger Lead (ms)': '3'},
+    # +1 or -1: which sign of detuning -> reverses lattice motion direction.
+    'move_direction': {'Move Direction (+1 or -1)': '1'},
+
+    # ===================== MOVE DISTANCE SWEEP (3 points) =====================
+    # FOV diagnostic: very small moves. If atoms appear here but not at 1+mm,
+    # the move mechanism works and the issue was atoms leaving the imaging
+    # field of view (camera FOV).
+    # Point 1: 0.05 mm (50 um) - barely moves, should look like 0mm
+    # Point 2: 0.1 mm (100 um) - small move
+    # Point 3: 0.2 mm (200 um) - moderate move
+    'dist_1_mm': {'Move Distance 1 (mm)': '0.1'},
+    'dist_2_mm': {'Move Distance 2 (mm)': '0.75'},
+    'dist_3_mm': {'Move Distance 3 (mm)': '1.5'},
+
+    # ===================== DIM-3000 AOM DRIVER =====================
+    'dim_base_freq_mhz': {'DIM3000 Base Freq (MHz)': '100.800'},
+    'dim_amplitude_dbm': {'DIM3000 Amplitude (dBm)': '32.0'},
+
+    # ===================== FIXED TOF after release =====================
+    'tof_us': {'TOF (us)': '2000'},
 
     # ===================== IMAGING =====================
     'coils_ttl_lead_ms': {'Coils TTL Lead (ms before release)': '2'},
@@ -385,10 +428,13 @@ INIT_DICT = {
     # ===================== CALIBRATION =====================
     'pixel_size_um': {'Pixel Size (um/px)': '3.45'},
 
-    # ===================== FIXED BIASES (X, Z) =====================
-    # Same ramped profile as swept axis (0 -> value at coils_off -> hold -> back to 0)
-    'bias_x_fixed_v': {'Bias X Fixed (V)': '0.0'},
-    'bias_z_fixed_v': {'Bias Z Fixed (V)': '0.0'},
+    # ===================== BIAS COILS =====================
+    # 0V during MOT+CMOT; linearly ramped to these values starting at
+    # coils_off (just before dark MOT), held through both imaging frames,
+    # then ramped back to 0V after frame 2.
+    'pgc_bias_x_v': {'PGC Bias X (V)': '0.0'},
+    'pgc_bias_y_v': {'PGC Bias Y (V)': '0.0'},
+    'pgc_bias_z_v': {'PGC Bias Z (V)': '0.78'},
     'bias_ramp_ms': {'Bias Ramp Duration (ms)': '5'},
 
     # ===================== GENERAL =====================
@@ -407,25 +453,18 @@ def configure(**kwargs):
     dataset.NI_card_1 = kwargs['nidaqmx_ni_daq_1']
     dataset.NI_card_2 = kwargs['nidaqmx_ni_daq_2']
     dataset.NI_card_3 = kwargs['nidaqmx_ni_daq_3']
-    bias_values = [
-        float(dataset.get_input_parameter("bias_1_v")),
-        float(dataset.get_input_parameter("bias_2_v")),
-        float(dataset.get_input_parameter("bias_3_v")),
-        float(dataset.get_input_parameter("bias_4_v")),
-        float(dataset.get_input_parameter("bias_5_v")),
-        float(dataset.get_input_parameter("bias_6_v")),
-        float(dataset.get_input_parameter("bias_7_v")),
-        float(dataset.get_input_parameter("bias_8_v")),
-        float(dataset.get_input_parameter("bias_9_v")),
-        float(dataset.get_input_parameter("bias_10_v")),
+    dist_values_mm = [
+        float(dataset.get_input_parameter("dist_1_mm")),
+        float(dataset.get_input_parameter("dist_2_mm")),
+        float(dataset.get_input_parameter("dist_3_mm")),
     ]
-    scan_labels = [f"BY={v:.2f}V" for v in bias_values]
+    scan_labels = [f"d={d:.2f}mm" for d in dist_values_mm]
     dataset.scan_grid = ScanGridWindow(
         scan_labels=scan_labels,
         diff_levels=DIFF_LEVELS, avg_levels=AVG_DIFF_LEVELS,
-        title="PGC Bias Y sweep (ao9, TOF=15ms)",
-        tile_px=180,
+        title="Lattice MOVE sweep (1/2/3/4 mm transport)",
     )
+    pixel_size_um = float(dataset.get_input_parameter("pixel_size_um"))
     dataset.graph.hide()
 
 
@@ -468,28 +507,138 @@ def experiment(**kwargs):
     dark_rep_power = float(dataset.get_input_parameter("dark_mot_repump_power"))
     dark_rep_vco = float(dataset.get_input_parameter("dark_mot_repump_vco"))
 
-    # Phase 4: PGC (toggleable)
-    pgc_enabled = int(dataset.get_input_parameter("pgc_enabled")) != 0
-    pgc_ms = int(dataset.get_input_parameter("pgc_duration"))
+    # Phase 4: PGC (two-stage: cool + rampdown). Always on for this experiment.
+    pgc_cool_ms = int(dataset.get_input_parameter("pgc_cool_ms"))
+    pgc_rampdown_ms = int(dataset.get_input_parameter("pgc_rampdown_ms"))
     pgc_mot_power = float(dataset.get_input_parameter("pgc_mot_power"))
     pgc_detuning = float(dataset.get_input_parameter("pgc_detuning"))
     pgc_rep_power = float(dataset.get_input_parameter("pgc_repump_power"))
     pgc_rep_vco = float(dataset.get_input_parameter("pgc_repump_vco"))
+    # Lattice
+    lat_am_v = float(dataset.get_input_parameter("lat_am_v"))
 
-    tof_us = int(dataset.get_input_parameter("tof_us"))
-    bias_values_v = [
-        float(dataset.get_input_parameter("bias_1_v")),
-        float(dataset.get_input_parameter("bias_2_v")),
-        float(dataset.get_input_parameter("bias_3_v")),
-        float(dataset.get_input_parameter("bias_4_v")),
-        float(dataset.get_input_parameter("bias_5_v")),
-        float(dataset.get_input_parameter("bias_6_v")),
-        float(dataset.get_input_parameter("bias_7_v")),
-        float(dataset.get_input_parameter("bias_8_v")),
-        float(dataset.get_input_parameter("bias_9_v")),
-        float(dataset.get_input_parameter("bias_10_v")),
+    dist_values_mm = [
+        float(dataset.get_input_parameter("dist_1_mm")),
+        float(dataset.get_input_parameter("dist_2_mm")),
+        float(dataset.get_input_parameter("dist_3_mm")),
     ]
-    n_scan = len(bias_values_v)
+    n_scan = len(dist_values_mm)
+    pre_hold_ms = int(dataset.get_input_parameter("pre_hold_ms"))
+    post_hold_ms = int(dataset.get_input_parameter("post_hold_ms"))
+    move_ramp_ms = int(dataset.get_input_parameter("move_ramp_ms"))
+    move_plateau_ms = int(dataset.get_input_parameter("move_plateau_ms"))
+    seg_lead_ms = int(dataset.get_input_parameter("seg_lead_ms"))
+    dim_base_freq_mhz = float(dataset.get_input_parameter("dim_base_freq_mhz"))
+    dim_amplitude_dbm = float(dataset.get_input_parameter("dim_amplitude_dbm"))
+    move_direction = int(dataset.get_input_parameter("move_direction"))
+    tof_us = int(dataset.get_input_parameter("tof_us"))
+    pixel_size_um = float(dataset.get_input_parameter("pixel_size_um"))
+
+    # ============ Move physics ============
+    # v = lambda/2 * df. For 795nm: v[mm/s] = 0.0003975 * df[Hz]
+    LATTICE_WAVELENGTH = 795e-9
+    v_per_Hz_mmps = LATTICE_WAVELENGTH / 2 * 1e3  # mm/s per Hz of detuning
+    base_freq_hz = int(round(dim_base_freq_mhz * 1e6))
+
+    # Trapezoid: distance = v_peak * (move_ramp_ms + move_plateau_ms)
+    # Per scan point, choose v_peak to match the requested distance.
+    move_total_ms = move_ramp_ms + move_plateau_ms  # ramp + plateau (one side)
+    v_peak_mmps_per_point = []
+    move_freq_hz_per_point = []
+    for d in dist_values_mm:
+        v_peak_mmps = d / (move_total_ms * 1e-3)            # mm/s
+        df_hz = int(round(v_peak_mmps / v_per_Hz_mmps))     # Hz of detuning
+        move_freq = base_freq_hz + move_direction * df_hz
+        v_peak_mmps_per_point.append(v_peak_mmps)
+        move_freq_hz_per_point.append(move_freq)
+
+    logger.info(
+        f"Move physics: ramp={move_ramp_ms}ms, plateau={move_plateau_ms}ms, "
+        f"v_peak per point: " +
+        ", ".join(f"{d}mm->{v:.1f}mm/s ({(f-base_freq_hz)/1e3:+.1f}kHz)"
+                  for d, v, f in zip(dist_values_mm, v_peak_mmps_per_point, move_freq_hz_per_point)))
+
+    # =========================================================================
+    # CONFIGURE DIM-3000 DRIVERS (called once per experiment start)
+    # =========================================================================
+    DIM_COM_SWEEP = 'COM4'   # lattice up -- has frequency sweep
+    DIM_COM_FIXED = 'COM5'   # lattice down -- fixed frequency
+    amplitude_x10 = int(round(dim_amplitude_dbm * 10))
+
+    def _dim_open(port):
+        try:
+            return serial.Serial(port=port, baudrate=19200,
+                                 bytesize=8, parity='N', stopbits=1, timeout=1)
+        except Exception:
+            return None
+
+    def _dim_send(ser, cmd):
+        ser.write((cmd + '\n').encode())
+        time.sleep(0.05)
+
+    def _dim_query(ser, cmd):
+        ser.flushInput()
+        _dim_send(ser, cmd)
+        time.sleep(0.1)
+        return ser.readline().decode().strip()
+
+    def _dim_program_segments(ser, move_freq):
+        """Program Wseg 1-4 for a move from base_freq_hz to `move_freq` and back.
+
+        Three real legs all carrying flag 1, plus a base->base no-op
+        segment 4 carrying the flag 8 end-of-chain marker. See
+        latticeMoveSweep.py for why the marker must not sit on the decel.
+        Same ramp time across calls; only the endpoint changes per scan point."""
+        freq_range = abs(move_freq - base_freq_hz)
+        max_step_us = 256.0
+        min_steps = max(1, int(np.ceil(move_ramp_ms * 1000.0 / max_step_us)))
+        num_steps = max(min_steps, 10)
+        step_freq = max(1, freq_range // num_steps) if freq_range > 0 else 1
+        step_time_us = (move_ramp_ms * 1000.0) / num_steps
+        step_time_arb = max(1, min(65535, int(round(step_time_us * 1000.0 / 3.90625))))
+        _dim_send(ser, f'Wseg:1;1;{base_freq_hz};{move_freq};{step_freq};{step_time_arb};0')
+        _dim_send(ser, f'Wseg:2;1;{move_freq};{move_freq};0;1;0')
+        _dim_send(ser, f'Wseg:3;1;{move_freq};{base_freq_hz};{step_freq};{step_time_arb};0')
+        # The sentinel. Flag 8 used to sit on Wseg:3, the deceleration --
+        # so if the driver treats the marked segment as the wrap point
+        # rather than as a segment to play, the decel never runs and the
+        # carrier is left at move_freq with the lattice still walking.
+        # base->base with a zero step does nothing either way.
+        _dim_send(ser, f'Wseg:4;8;{base_freq_hz};{base_freq_hz};0;1;0')
+        return num_steps, step_freq, step_time_arb
+
+    # Open both ports ONCE and keep them open across the sweep so reprogramming
+    # between scan points only costs ~10-20ms of serial writes (not open/close).
+    ser_sweep = _dim_open(DIM_COM_SWEEP)
+    ser_fixed = _dim_open(DIM_COM_FIXED)
+    if ser_sweep is not None and ser_fixed is not None:
+        id1 = _dim_query(ser_sweep, '*IDN?')
+        id2 = _dim_query(ser_fixed, '*IDN?')
+        logger.info(f"DIM-3000 sweep ({DIM_COM_SWEEP}): {id1}")
+        logger.info(f"DIM-3000 fixed ({DIM_COM_FIXED}): {id2}")
+        # Fixed driver: base freq, full amplitude, always on, no segments
+        _dim_send(ser_fixed, f'FRQ:{base_freq_hz}')
+        _dim_send(ser_fixed, f'AMP:{amplitude_x10}')
+        _dim_send(ser_fixed, 'OUT_on')
+        logger.info(f"DIM-3000 fixed: {base_freq_hz/1e6:.3f} MHz, +{amplitude_x10/10:.1f} dBm, ON")
+        # Sweep driver: start at base, full amp, always on, segment mode enabled
+        _dim_send(ser_sweep, f'FRQ:{base_freq_hz}')
+        _dim_send(ser_sweep, f'AMP:{amplitude_x10}')
+        _dim_send(ser_sweep, 'OUT_on')
+        # Program initial segments using first scan point's frequency
+        ns, sf, st = _dim_program_segments(ser_sweep, move_freq_hz_per_point[0])
+        _dim_send(ser_sweep, 'Mseg:1')
+        logger.info(
+            f"DIM-3000 sweep: initialized with point 0 freq, "
+            f"{ns} steps, step_freq={sf}, step_time_arb={st} (~{move_ramp_ms}ms ramp)")
+    else:
+        logger.info("DIM-3000: ports unavailable, will run without serial control")
+        if ser_sweep is not None:
+            ser_sweep.close()
+            ser_sweep = None
+        if ser_fixed is not None:
+            ser_fixed.close()
+            ser_fixed = None
 
     # Imaging
     coils_lead_ms = int(dataset.get_input_parameter("coils_ttl_lead_ms"))
@@ -500,8 +649,9 @@ def experiment(**kwargs):
     atoms_clear_ms = int(dataset.get_input_parameter("atoms_clear_time"))
     wait_time = float(dataset.get_input_parameter("wait_time"))
 
-    bias_x_fixed = float(dataset.get_input_parameter("bias_x_fixed_v"))
-    bias_z_fixed = float(dataset.get_input_parameter("bias_z_fixed_v"))
+    pgc_bias_x_v = float(dataset.get_input_parameter("pgc_bias_x_v"))
+    pgc_bias_y_v = float(dataset.get_input_parameter("pgc_bias_y_v"))
+    pgc_bias_z_v = float(dataset.get_input_parameter("pgc_bias_z_v"))
     bias_ramp_ms = int(dataset.get_input_parameter("bias_ramp_ms"))
 
     # =========================================================================
@@ -533,7 +683,16 @@ def experiment(**kwargs):
     cmot_ramp_s = ms2s(CMOT_RAMP_MS)
     cmot_hold_s = ms2s(cmot_hold_ms)
     dark_s = ms2s(dark_ms) if dark_enabled else 0
-    pgc_s = ms2s(pgc_ms) if pgc_enabled else 0
+    pgc_cool_s = ms2s(pgc_cool_ms)
+    pgc_rampdown_s = ms2s(pgc_rampdown_ms)
+    pgc_s = pgc_cool_s + pgc_rampdown_s  # total PGC duration
+    pre_hold_s = ms2s(pre_hold_ms)
+    post_hold_s = ms2s(post_hold_ms)
+    move_ramp_s = ms2s(move_ramp_ms)
+    move_plateau_s = ms2s(move_plateau_ms)
+    seg_lead_s = ms2s(seg_lead_ms)
+    seg_pulse_s = max(1, SPM // 20)   # ~50us trigger pulse
+    tof_s_fixed = us2s(tof_us)
     clear_s = ms2s(atoms_clear_ms)
     vco_lead_s = us2s(vco_lead_us)
     coils_lead_s = ms2s(coils_lead_ms)
@@ -553,41 +712,50 @@ def experiment(**kwargs):
     dark_end = dark_start + dark_s
 
     pgc_start = dark_end
-    pgc_end = pgc_start + pgc_s
+    pgc_cool_end = pgc_start + pgc_cool_s
+    pgc_end = pgc_cool_end + pgc_rampdown_s
+    # release time depends on hold (per scan point) - computed in build_sub_sequence
 
-    release = pgc_end
-
-    # Coils OFF: before Dark MOT if it's enabled, else before PGC, else before release
-    # Dark MOT and PGC are both field-free phases
+    # Coils OFF before Dark MOT (or PGC if no Dark MOT) -- field-free phases
     if dark_enabled:
         coils_off = cmot_end - coils_lead_s
-    elif pgc_enabled:
-        coils_off = pgc_start - coils_lead_s
     else:
-        coils_off = release - coils_lead_s
+        coils_off = pgc_start - coils_lead_s
 
     dark_str = "ON" if dark_enabled else "OFF"
-    pgc_str = "ON" if pgc_enabled else "OFF"
     logger.info(f"Time at start {time.perf_counter_ns()}")
     logger.info(
         f"Timeline: MOT 0-{mot_loading_ms}ms, "
         f"CMOT {mot_loading_ms}-{cmot_end/SPM:.0f}ms, "
         f"Dark MOT {dark_str} ({dark_start/SPM:.0f}-{dark_end/SPM:.0f}ms), "
-        f"PGC {pgc_str} ({pgc_start/SPM:.0f}-{pgc_end/SPM:.0f}ms), "
-        f"coils OFF at {coils_off/SPM:.0f}ms, "
-        f"release at {release/SPM:.0f}ms, "
-        f"TOF={tof_us}us, bias_y_sweep={bias_values_v}V"
+        f"PGC_cool ({pgc_start/SPM:.0f}-{pgc_cool_end/SPM:.0f}ms), "
+        f"PGC_rampdown+lattice load ({pgc_cool_end/SPM:.0f}-{pgc_end/SPM:.0f}ms), "
+        f"pre_hold={pre_hold_ms}ms, accel={move_ramp_ms}ms, "
+        f"plateau={move_plateau_ms}ms (fixed), decel={move_ramp_ms}ms, "
+        f"post_hold={post_hold_ms}ms, TOF={tof_us}us"
     )
 
     # =========================================================================
     # WAVEFORM CONSTRUCTION
     # =========================================================================
-    tof_s = us2s(tof_us)
-
-    def build_sub_sequence(bias_swept_v):
-        f1 = release + tof_s
+    def build_sub_sequence(dist_mm):
+        do_move = (dist_mm > 0)
+        # Sequence after PGC end:
+        #   pre_hold -> [accel -> plateau -> decel if moving] -> post_hold -> release
+        # For 0mm reference (dist_mm==0), accel/plateau/decel collapse to zero
+        # AND no DIM triggers fire => atoms just sit in stationary lattice.
+        ramp_s = move_ramp_s if do_move else 0
+        plat_s = move_plateau_s if do_move else 0
+        pre_hold_end = pgc_end + pre_hold_s
+        accel_start = pre_hold_end
+        accel_end = accel_start + ramp_s        # = seg2 start
+        plateau_end = accel_end + plat_s          # = seg3 start
+        decel_end = plateau_end + ramp_s
+        post_hold_end = decel_end + post_hold_s
+        release = post_hold_end
+        f1 = release + tof_s_fixed
         f2 = f1 + clear_s
-        crt = f2 + aom_pulse_s + coils_restore_s  # coils stay OFF through frame 2
+        crt = f2 + aom_pulse_s + coils_restore_s
         N = max(crt + ttl_up + 1, f2 + ttl_up + 1)
 
         cam = [0] * N
@@ -633,16 +801,27 @@ def experiment(**kwargs):
                 rdo[t] = 1
                 rao[t] = dark_rep_power
 
-        # Phase 4: PGC (if enabled) -- very far detuned, low power, no B-field
-        if pgc_enabled:
-            for s in range(pgc_s):
-                t = pgc_start + s
-                ado[t] = 1
-                aao[t] = pgc_mot_power
-                rdo[t] = 1
-                rao[t] = pgc_rep_power
-
-        # TOF: digital off, analog stays at full power (thermal stability)
+        # Phase 4a: PGC cool (full PGC light, lattice already on)
+        for s in range(pgc_cool_s):
+            t = pgc_start + s
+            ado[t] = 1
+            aao[t] = pgc_mot_power
+            rdo[t] = 1
+            rao[t] = pgc_rep_power
+        # Phase 4b: PGC rampdown (cooling & repump amplitude -> 0; lattice unchanged)
+        for s in range(pgc_rampdown_s):
+            t = pgc_cool_end + s
+            frac = s / max(pgc_rampdown_s - 1, 1)
+            ado[t] = 1
+            aao[t] = pgc_mot_power * (1.0 - frac)
+            rdo[t] = 1
+            rao[t] = pgc_rep_power * (1.0 - frac)
+        # Lattice HOLD: PGC TTL off (no cooling light), analog stays at full
+        # for thermal stability. Lattice provides the trapping during this time.
+        for s in range(pgc_end, release):
+            ado[s] = 0
+            rdo[s] = 0
+        # TOF: same (digital off, analog stays at full)
         for s in range(release, min(f1, N)):
             ado[s] = 0
             rdo[s] = 0
@@ -688,22 +867,11 @@ def experiment(**kwargs):
         if dark_enabled:
             for s in range(dark_s):
                 mvco[dark_start + s] = dark_detuning
-        # PGC
-        if pgc_enabled:
-            for s in range(pgc_s):
-                mvco[pgc_start + s] = pgc_detuning
-        # After last phase: fill with last detuning
-        if pgc_enabled:
-            last_det = pgc_detuning
-            last_end = pgc_end
-        elif dark_enabled:
-            last_det = dark_detuning
-            last_end = dark_end
-        else:
-            last_det = cmot_detuning
-            last_end = cmot_end
-        for s in range(last_end, N):
-            mvco[s] = last_det
+        # PGC (both stages held at pgc_detuning)
+        for s in range(pgc_s):
+            mvco[pgc_start + s] = pgc_detuning
+        for s in range(pgc_end, N):
+            mvco[s] = pgc_detuning
         # Imaging VCO override
         vlo = max(0, f1 - vco_lead_s)
         vhi = min(N, f2 + aom_pulse_s)
@@ -712,31 +880,19 @@ def experiment(**kwargs):
 
         # Repump VCO
         rvco = [repump_vco] * N
-        # CMOT ramp
         for s in range(cmot_ramp_s):
             t = cmot_start + s
             frac = s / max(cmot_ramp_s - 1, 1)
             rvco[t] = repump_vco + frac * (cmot_repump_vco - repump_vco)
-        # CMOT hold
         for s in range(cmot_hold_start, cmot_end):
             rvco[s] = cmot_repump_vco
-        # Dark MOT
         if dark_enabled:
             for s in range(dark_s):
                 rvco[dark_start + s] = dark_rep_vco
-        # PGC
-        if pgc_enabled:
-            for s in range(pgc_s):
-                rvco[pgc_start + s] = pgc_rep_vco
-        # After last phase
-        if pgc_enabled:
-            last_rvco = pgc_rep_vco
-        elif dark_enabled:
-            last_rvco = dark_rep_vco
-        else:
-            last_rvco = cmot_repump_vco
-        for s in range(last_end, N):
-            rvco[s] = last_rvco
+        for s in range(pgc_s):
+            rvco[pgc_start + s] = pgc_rep_vco
+        for s in range(pgc_end, N):
+            rvco[s] = pgc_rep_vco
 
         # Bias coils: 0V during MOT+CMOT, ramp UP to PGC values at coils_off,
         # hold through both imaging frames, then ramp DOWN to 0V after F2.
@@ -750,25 +906,53 @@ def experiment(**kwargs):
             if t >= N:
                 break
             frac = s / max(bias_ramp_s - 1, 1)
-            biasx[t] = frac * bias_x_fixed
-            biasy[t] = frac * bias_swept_v
-            biasz[t] = frac * bias_z_fixed
+            biasx[t] = frac * pgc_bias_x_v
+            biasy[t] = frac * pgc_bias_y_v
+            biasz[t] = frac * pgc_bias_z_v
         # Hold at PGC values from end of up-ramp through F2
         for s in range(coils_off + bias_ramp_s, min(bias_down_start, N)):
-            biasx[s] = bias_x_fixed
-            biasy[s] = bias_swept_v
-            biasz[s] = bias_z_fixed
+            biasx[s] = pgc_bias_x_v
+            biasy[s] = pgc_bias_y_v
+            biasz[s] = pgc_bias_z_v
         # Ramp DOWN to 0V after F2
         for s in range(bias_ramp_s):
             t = bias_down_start + s
             if t >= N:
                 break
             frac = 1.0 - s / max(bias_ramp_s - 1, 1)
-            biasx[t] = frac * bias_x_fixed
-            biasy[t] = frac * bias_swept_v
-            biasz[t] = frac * bias_z_fixed
+            biasx[t] = frac * pgc_bias_x_v
+            biasy[t] = frac * pgc_bias_y_v
+            biasz[t] = frac * pgc_bias_z_v
 
-        return cam, ado, aao, rdo, rao, cdo, cao, mvco, rvco, biasx, biasy, biasz, N
+        # Lattice: TTL ON and AM constant at lat_am_v for the entire sub-seq
+        # (matches the fast lattice code for AOM thermal stability).
+        ludo = [0] * N
+        lddo = [0] * N
+        luao = [lat_am_v] * N
+        ldao = [lat_am_v] * N
+
+        # DIM-3000 segment trigger (dio6): FOUR pulses, each ~seg_lead_ms
+        # BEFORE the corresponding segment start (DIM internal latency).
+        # Trigger 1: start of accel ramp (seg1)
+        # Trigger 2: start of plateau (seg2)
+        # Trigger 3: start of decel ramp(seg3)
+        # Trigger 4: end of decel      (seg4, the flag-8 sentinel)
+        #
+        # Four segments need four triggers: a segment with no trigger
+        # stalls the chain until the NEXT cycle's first trigger, which
+        # then plays every later cycle one segment out of phase. Trigger 4
+        # fires seg_lead before decel_end, inside the decel ramp -- it
+        # moves no anchor and adds no samples.
+        # For 0mm reference, no triggers fire and DIM stays at base_freq.
+        seg_do = [0] * N
+        if do_move:
+            for trig_t in (accel_start, accel_end, plateau_end, decel_end):
+                t0 = max(0, trig_t - seg_lead_s)
+                for s in range(seg_pulse_s):
+                    if t0 + s < N:
+                        seg_do[t0 + s] = 1
+
+        return cam, ado, aao, rdo, rao, cdo, cao, mvco, rvco, biasx, biasy, biasz, ludo, lddo, luao, ldao, seg_do, N
 
     # Concatenate all TOF sub-sequences
     cam_p = []
@@ -783,8 +967,14 @@ def experiment(**kwargs):
     biasx_p = []
     biasy_p = []
     biasz_p = []
-    for b_v in bias_values_v:
-        cam, ado, aao, rdo, rao, cdo, cao, mvco, rvco, bx_w, by_w, bz_w, N = build_sub_sequence(b_v)
+    ludo_p = []
+    lddo_p = []
+    luao_p = []
+    ldao_p = []
+    seg_p = []
+    for dist_mm in dist_values_mm:
+        (cam, ado, aao, rdo, rao, cdo, cao, mvco, rvco,
+         bx_w, by_w, bz_w, ludo, lddo, luao, ldao, seg_w, N) = build_sub_sequence(dist_mm)
         cam_p += cam
         ado_p += ado
         aao_p += aao
@@ -797,9 +987,14 @@ def experiment(**kwargs):
         biasx_p += bx_w
         biasy_p += by_w
         biasz_p += bz_w
+        ludo_p += ludo
+        lddo_p += lddo
+        luao_p += luao
+        ldao_p += ldao
+        seg_p += seg_w
 
     total = len(cam_p)
-    logger.info(f"PGC Bias Y sweep: values={bias_values_v}V, tof={tof_us}us, total={total} samples")
+    logger.info(f"Lattice MOVE sweep: distances={dist_values_mm}mm, plateau={move_plateau_ms}ms (fixed), tof={tof_us}us, total={total} samples")
 
     diff_sums = [None] * n_scan
     diff_counts = [0] * n_scan
@@ -829,17 +1024,17 @@ def experiment(**kwargs):
         NI_card_2.set_do_voltage(do_channel=MOT_AOM_do, value=ado_p, sample_rate=ni_rate)
         NI_card_2.set_do_voltage(do_channel=mot_coils_do, value=cdo_p, sample_rate=ni_rate)
         NI_card_2.set_do_voltage(do_channel=Repump_AOM_do, value=rdo_p, sample_rate=ni_rate)
-        NI_card_2.set_do_voltage(do_channel="dio4", value=[1] * total, sample_rate=ni_rate)
-        NI_card_2.set_do_voltage(do_channel="dio5", value=[1] * total, sample_rate=ni_rate)
-        NI_card_2.set_do_voltage(do_channel="dio6", value=[0] * total, sample_rate=ni_rate)
+        NI_card_2.set_do_voltage(do_channel="dio4", value=ludo_p, sample_rate=ni_rate)
+        NI_card_2.set_do_voltage(do_channel="dio5", value=lddo_p, sample_rate=ni_rate)
+        NI_card_2.set_do_voltage(do_channel="dio6", value=seg_p, sample_rate=ni_rate)
         NI_card_3.build_stack()
         NI_card_3.set_ao_voltage(ao_channel=MOT_AOM_ao, voltages=aao_p, sample_rate=ni_rate)
         NI_card_3.set_ao_voltage(ao_channel=mot_coils_ao, voltages=cao_p, sample_rate=ni_rate)
         NI_card_3.set_ao_voltage(ao_channel=MOT_freq_VCO_ao, voltages=mvco_p, sample_rate=ni_rate)
         NI_card_3.set_ao_voltage(ao_channel=Repump_freq_VCO_ao, voltages=rvco_p, sample_rate=ni_rate)
         NI_card_3.set_ao_voltage(ao_channel=Repump_AOM_ao, voltages=rao_p, sample_rate=ni_rate)
-        NI_card_3.set_ao_voltage(ao_channel="ao6", voltages=[0.0] * total, sample_rate=ni_rate)
-        NI_card_3.set_ao_voltage(ao_channel="ao7", voltages=[0.0] * total, sample_rate=ni_rate)
+        NI_card_3.set_ao_voltage(ao_channel="ao6", voltages=luao_p, sample_rate=ni_rate)
+        NI_card_3.set_ao_voltage(ao_channel="ao7", voltages=ldao_p, sample_rate=ni_rate)
         NI_card_3.set_ao_voltage(ao_channel="ao8", voltages=biasx_p, sample_rate=ni_rate)
         NI_card_3.set_ao_voltage(ao_channel="ao9", voltages=biasy_p, sample_rate=ni_rate)
         NI_card_3.set_ao_voltage(ao_channel="ao10", voltages=biasz_p, sample_rate=ni_rate)
@@ -870,14 +1065,27 @@ def experiment(**kwargs):
             return np.frombuffer(b, dtype=np.dtype(dtype)).reshape(shape)
 
         scan_grid = dataset.scan_grid
+        sigma_x_vals = [float('nan')] * n_scan
+        sigma_y_vals = [float('nan')] * n_scan
 
         try:
+            # Initial reprogram for scan point 0 (in case it differs from startup)
+            if ser_sweep is not None:
+                _dim_program_segments(ser_sweep, move_freq_hz_per_point[0])
             for run_idx in range(M):
                 logger.info(f"Run {run_idx+1} of {M}")
-                for scan_idx, b_v in enumerate(bias_values_v):
+                for scan_idx, d_v in enumerate(dist_values_mm):
                     is_first = (run_idx == 0 and scan_idx == 0)
                     frame1 = get_frame(timeout_ms=10000 if is_first else 100000)
                     frame2 = get_frame(timeout_ms=100000)
+                    # Reprogram DIM for the NEXT scan point so segments are
+                    # ready before that sub-sequence reaches the move phase.
+                    next_idx = (scan_idx + 1) % n_scan
+                    if ser_sweep is not None:
+                        try:
+                            _dim_program_segments(ser_sweep, move_freq_hz_per_point[next_idx])
+                        except Exception as e:
+                            logger.info(f"  DIM reprogram failed for next point: {e!r}")
                     diff = frame1.astype(np.int32) - frame2.astype(np.int32)
                     scan_grid.set_current(scan_idx, diff)
                     if diff_sums[scan_idx] is None:
@@ -890,12 +1098,15 @@ def experiment(**kwargs):
                     img = avg.astype(np.float64)
                     _, sx, _ = _sigma_from_moment(img.sum(axis=0))
                     _, sy, _ = _sigma_from_moment(img.sum(axis=1))
+                    sigma_x_vals[scan_idx] = sx
+                    sigma_y_vals[scan_idx] = sy
                     logger.info(
-                        f"  BiasY={b_v:.2f}V: n={diff_counts[scan_idx]}, "
-                        f"sx={sx:.1f}px, sy={sy:.1f}px, "
+                        f"  d={d_v:.2f}mm (v_peak={v_peak_mmps_per_point[scan_idx]:.1f}mm/s): "
+                        f"n={diff_counts[scan_idx]}, sx={sx:.1f}px, sy={sy:.1f}px, "
                         f"area={float(avg.sum()):.0f}")
 
                 time.sleep(wait_time)
+                logger.info(f"Updated plots for run {run_idx+1} of {M}")
         finally:
             logger.info("Stopping acquisition")
             dataset.camera_client.stop_acquisition()
@@ -914,3 +1125,14 @@ def experiment(**kwargs):
             NI_card_1.finalize_clock()
         except Exception as e:
             logger.info(f"Clock finalize: {e!r}")
+        # Close DIM serial ports (release REMOTE CONTROL display)
+        if ser_sweep is not None:
+            try:
+                ser_sweep.close()
+            except Exception:
+                pass
+        if ser_fixed is not None:
+            try:
+                ser_fixed.close()
+            except Exception:
+                pass

@@ -25,6 +25,9 @@ class Service(ServiceBase):
     def exposed_try_set_float(self, node_name, value):
         return self._module._try_set_float(node_name, value)
 
+    def exposed_get_float(self, node_name):
+        return self._module._try_get_float(node_name)
+
     def exposed_try_set_enum(self, node_name, entry_name):
         return self._module._try_set_enum(node_name, entry_name)
 
@@ -75,6 +78,14 @@ class Client(ClientBase):
 
     def try_set_float(self, node_name, value):
         return self._service.exposed_try_set_float(node_name, value)
+
+    def get_float(self, node_name):
+        """Read back a float node (e.g. "Gain", "ExposureTime"), or None.
+
+        try_set_float is best-effort; use this to confirm what the camera
+        actually applied before relying on the value in a calculation.
+        """
+        return self._service.exposed_get_float(node_name)
 
     def try_set_enum(self, node_name, entry_name):
         return self._service.exposed_try_set_enum(node_name, entry_name)

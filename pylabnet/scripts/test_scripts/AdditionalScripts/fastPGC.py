@@ -1,5 +1,5 @@
-# Fast single image: MOT -> CMOT -> release -> image
-# No Dark MOT, no PGC, no lattice. Basic diagnostic code.
+# Fast single image: MOT -> CMOT -> Dark MOT -> PGC -> release -> TOF -> image
+# No lattice. Fast diagnostic for full cooling sequence.
 
 import numpy as np
 from pylabnet.scripts.data_center.datasets import Plot2DWithAvg, Plot2D
@@ -17,39 +17,68 @@ DIFF_LEVELS = (-5, 50)
 
 INIT_DICT = {
     # ===================== PHASE 1: MOT =====================
-    'mot_loading_time': {'MOT Loading Time (ms)': '500'},
-    'mot_aom_power': {'MOT AOM Power (V)': '1.0'},
-    'repump_aom_power': {'Repump AOM Power (V)': '1.0'},
-    'mot_coils_voltage': {'MOT Coils Voltage (V)': '4.5'},
-    'MOT_VCO_loading': {'MOT VCO Loading (V)': '0.31'},
-    'Repump_VCO': {'Repump VCO (V)': '0.2'},
+    'mot_loading_time': {'MOT Loading Time (ms)': '800'},
+    'mot_aom_power': {'MOT AOM Power (V)': '0.8'},
+    'repump_aom_power': {'Repump AOM Power (V)': '0.8'},
+    'mot_coils_voltage': {'MOT Coils Voltage (V)': '6'},
+    'MOT_VCO_loading': {'MOT VCO Loading (V)': '0'},
+    'Repump_VCO': {'Repump VCO (V)': '0'},
 
     # ===================== PHASE 2: CMOT =====================
-    'cmot_hold_time': {'CMOT Hold Time (ms)': '10'},
-    'cmot_mot_power': {'CMOT MOT AOM Power (V)': '0.5'},
-    'cmot_repump_power': {'CMOT Repump AOM Power (V)': '0.15'},
-    'cmot_detuning_voltage': {'CMOT MOT VCO (V) [-40MHz]': '-0.17'},
-    'cmot_coils_voltage': {'CMOT Coils Voltage (V)': '6.5'},
-    'cmot_repump_vco': {'CMOT Repump VCO (V) [-3MHz]': '0.26'},
+    # MOT -> CMOT ramp duration. Was hardcoded at 10 ms (CMOT_RAMP_MS), which
+    # made it impossible to match temp_PGC_aziza / jingfastPGC without editing
+    # the file. Every quantity that differs between the two phases (AOM powers,
+    # coil current, both VCOs) is swept linearly over this window.
+    'mot_switch_time': {'MOT Switch Time (ms) [MOT->CMOT ramp]': '15'},
+    'cmot_hold_time': {'CMOT Hold Time (ms)': '5'},
+    'cmot_mot_power': {'CMOT MOT AOM Power (V)': '0.6'},
+    'cmot_repump_power': {'CMOT Repump AOM Power (V)': '0.2'},
+    'cmot_detuning_voltage': {'CMOT MOT VCO (V) [-40MHz]': '-0.6'},
+    'cmot_coils_voltage': {'CMOT Coils Voltage (V)': '8'},
+    'cmot_repump_vco': {'CMOT Repump VCO (V) [-3MHz]': '-0.2'},
+
+    # ===================== PHASE 3: DARK MOT =====================
+    'dark_mot_duration': {'Dark MOT Duration (ms)': '4'},
+    'dark_mot_power': {'Dark MOT Cooling Power (V)': '0.2'},
+    'dark_mot_detuning': {'Dark MOT Cooling VCO (V) [-55MHz]': '-0.6'},
+    'dark_mot_repump_power': {'Dark MOT Repump Power (V)': '0.2'},
+    'dark_mot_repump_vco': {'Dark MOT Repump VCO (V)': '0.0'},
+
+    # ===================== PHASE 4: PGC =====================
+    'pgc_duration': {'PGC Duration (ms)': '5'},
+    'pgc_mot_power': {'PGC Cooling Power (V)': '0.2'},
+    'pgc_detuning': {'PGC Cooling VCO (V) [-122MHz]': '-2.3'},
+    'pgc_repump_power': {'PGC Repump Power (V)': '0.03'},
+    'pgc_repump_vco': {'PGC Repump VCO (V)': '-0.05'},
 
     # ===================== RELEASE + IMAGING =====================
-    'tof_us': {'TOF (us)': '2000'},
+    # temp_PGC_aziza sweeps TOF over six points (9000-24000 us) instead of
+    # carrying a single value, so there is no one setting to copy here; 0 is
+    # kept, which is what jingfastPGC uses for its in-situ image.
+    'tof_us': {'TOF (us)': '0'},
     'coils_ttl_lead_ms': {'Coils TTL Lead (ms before release)': '2'},
     'coils_restore_delay_ms': {'Coils Restore (ms after frame 2)': '10'},
     'coils_rampback_ms': {'Coils Rampback Duration (ms)': '10'},
-    'MOT_VCO_imaging': {'MOT VCO Imaging (V)': '0.6'},
-    'vco_lead_us': {'VCO Lead Time Before AOM (us)': '10'},
+    'MOT_VCO_imaging': {'MOT VCO Imaging (V)': '0.3'},
+    'vco_lead_us': {'VCO Lead Time Before AOM (us)': '100'},
     'camera_exposure_us': {'Camera Exposure Time (us)': '200'},
     'atoms_clear_time': {'Atoms Clear Time (ms)': '100'},
 
     # ===================== BIAS COILS =====================
-    'bias_x_v': {'Bias X (V)': '0.0'},
-    'bias_y_v': {'Bias Y (V)': '0.0'},
-    'bias_z_v': {'Bias Z (V)': '0.0'},
+    # 0V during MOT+CMOT; linearly ramped to these values starting at
+    # coils_off (2ms before dark MOT), active through PGC and imaging.
+    'pgc_bias_x_v': {'PGC Bias X (V)': '0.0'},
+    'pgc_bias_y_v': {'PGC Bias Y (V)': '0.0'},
+    'pgc_bias_z_v': {'PGC Bias Z (V)': '0.0'},
+    'bias_ramp_ms': {'Bias Ramp Duration (ms)': '5'},
 
     # ===================== DISPLAY =====================
-    'display_min': {'Display Min / Background (counts)': '-5'},
-    'display_max': {'Display Max (counts)': '50'},
+    # Matches temp_PGC_aziza. NOTE this script always autoscales the top of
+    # the colour range to the frame peak, so Display Max is only the starting
+    # value here -- temp_PGC_aziza has a 'display_autoscale' toggle that lets
+    # it honour the number instead. See the note in the sync summary.
+    'display_min': {'Display Min / Background (counts)': '0'},
+    'display_max': {'Display Max (counts)': '2000'},
 }
 
 
@@ -69,7 +98,7 @@ def configure(**kwargs):
     disp_max = float(dataset.get_input_parameter("display_max"))
     dataset.diff_levels = (disp_min, disp_max)
 
-    dataset.img_win = pg.GraphicsLayoutWidget(show=True, title="MOT+CMOT image (diff)")
+    dataset.img_win = pg.GraphicsLayoutWidget(show=True, title="PGC image (diff)")
     dataset.img_win.resize(600, 500)
     vb = dataset.img_win.addViewBox(lockAspect=True)
     vb.invertY(True)
@@ -102,13 +131,25 @@ def experiment(**kwargs):
     vco_loading = float(dataset.get_input_parameter("MOT_VCO_loading"))
     repump_vco = float(dataset.get_input_parameter("Repump_VCO"))
 
-    CMOT_RAMP_MS = 10
+    mot_switch_ms = int(dataset.get_input_parameter("mot_switch_time"))
     cmot_hold_ms = int(dataset.get_input_parameter("cmot_hold_time"))
     cmot_mot_power = float(dataset.get_input_parameter("cmot_mot_power"))
     cmot_repump_power = float(dataset.get_input_parameter("cmot_repump_power"))
     cmot_detuning = float(dataset.get_input_parameter("cmot_detuning_voltage"))
     cmot_coils_v = float(dataset.get_input_parameter("cmot_coils_voltage"))
     cmot_repump_vco = float(dataset.get_input_parameter("cmot_repump_vco"))
+
+    dark_ms = int(dataset.get_input_parameter("dark_mot_duration"))
+    dark_power = float(dataset.get_input_parameter("dark_mot_power"))
+    dark_detuning = float(dataset.get_input_parameter("dark_mot_detuning"))
+    dark_rep_power = float(dataset.get_input_parameter("dark_mot_repump_power"))
+    dark_rep_vco = float(dataset.get_input_parameter("dark_mot_repump_vco"))
+
+    pgc_ms = int(dataset.get_input_parameter("pgc_duration"))
+    pgc_mot_power = float(dataset.get_input_parameter("pgc_mot_power"))
+    pgc_detuning = float(dataset.get_input_parameter("pgc_detuning"))
+    pgc_rep_power = float(dataset.get_input_parameter("pgc_repump_power"))
+    pgc_rep_vco = float(dataset.get_input_parameter("pgc_repump_vco"))
 
     tof_us = int(dataset.get_input_parameter("tof_us"))
     coils_lead_ms = int(dataset.get_input_parameter("coils_ttl_lead_ms"))
@@ -119,9 +160,10 @@ def experiment(**kwargs):
     camera_exposure_us = int(dataset.get_input_parameter("camera_exposure_us"))
     atoms_clear_ms = int(dataset.get_input_parameter("atoms_clear_time"))
 
-    bias_x_v = float(dataset.get_input_parameter("bias_x_v"))
-    bias_y_v = float(dataset.get_input_parameter("bias_y_v"))
-    bias_z_v = float(dataset.get_input_parameter("bias_z_v"))
+    pgc_bias_x_v = float(dataset.get_input_parameter("pgc_bias_x_v"))
+    pgc_bias_y_v = float(dataset.get_input_parameter("pgc_bias_y_v"))
+    pgc_bias_z_v = float(dataset.get_input_parameter("pgc_bias_z_v"))
+    bias_ramp_ms = int(dataset.get_input_parameter("bias_ramp_ms"))
 
     # =========================================================================
     # TIMING
@@ -135,8 +177,10 @@ def experiment(**kwargs):
     def us2s(t): return int(round(t * SPU))
 
     mot_s = ms2s(mot_loading_ms)
-    cmot_ramp_s = ms2s(CMOT_RAMP_MS)
+    cmot_ramp_s = ms2s(mot_switch_ms)
     cmot_hold_s = ms2s(cmot_hold_ms)
+    dark_s = ms2s(dark_ms)
+    pgc_s = ms2s(pgc_ms)
     tof_samp = us2s(tof_us)
     clear_s = ms2s(atoms_clear_ms)
     vco_lead_s = us2s(vco_lead_us)
@@ -146,20 +190,25 @@ def experiment(**kwargs):
     aom_pulse_s = max(ttl_up, int(np.ceil(camera_exposure_us * SPU)))
 
     # =========================================================================
-    # TIMELINE: MOT -> CMOT -> release -> TOF -> image
+    # TIMELINE: MOT -> CMOT -> Dark MOT -> PGC -> release -> TOF -> image
     # =========================================================================
     cmot_start = mot_s
     cmot_hold_start = cmot_start + cmot_ramp_s
     cmot_end = cmot_start + cmot_ramp_s + cmot_hold_s
-    release = cmot_end
-    coils_off = release - coils_lead_s
+    dark_start = cmot_end
+    dark_end = dark_start + dark_s
+    pgc_start = dark_end
+    pgc_end = pgc_start + pgc_s
+    release = pgc_end
+    coils_off = cmot_end - coils_lead_s
     f1 = release + tof_samp
     f2 = f1 + clear_s
     coils_restore_t = f2 + aom_pulse_s + coils_restore_s  # coils stay OFF through frame 2
     N = coils_restore_t + coils_rampback_s + 2
 
     logger.info(
-        f"Fast MOT+CMOT: mot={mot_loading_ms}ms, cmot={CMOT_RAMP_MS}+{cmot_hold_ms}ms, "
+        f"Fast PGC: mot={mot_loading_ms}ms, cmot={mot_switch_ms}+{cmot_hold_ms}ms, "
+        f"dark={dark_ms}ms, pgc={pgc_ms}ms, "
         f"tof={tof_us}us, release={release/SPM:.0f}ms, N={N}"
     )
 
@@ -197,6 +246,20 @@ def experiment(**kwargs):
         aao[t] = cmot_mot_power
         rdo[t] = 1
         rao[t] = cmot_repump_power
+    # Dark MOT
+    for s in range(dark_s):
+        t = dark_start + s
+        ado[t] = 1
+        aao[t] = dark_power
+        rdo[t] = 1
+        rao[t] = dark_rep_power
+    # PGC
+    for s in range(pgc_s):
+        t = pgc_start + s
+        ado[t] = 1
+        aao[t] = pgc_mot_power
+        rdo[t] = 1
+        rao[t] = pgc_rep_power
     # TOF: digital off, analog stays at full power (thermal stability)
     for s in range(release, min(f1, N)):
         ado[s] = 0
@@ -242,8 +305,14 @@ def experiment(**kwargs):
         t = cmot_start + s
         frac = s / max(cmot_ramp_s - 1, 1)
         mvco[t] = vco_loading + frac * (cmot_detuning - vco_loading)
-    for s in range(cmot_hold_start, N):
+    for s in range(cmot_hold_start, cmot_end):
         mvco[s] = cmot_detuning
+    for s in range(dark_s):
+        mvco[dark_start + s] = dark_detuning
+    for s in range(pgc_s):
+        mvco[pgc_start + s] = pgc_detuning
+    for s in range(pgc_end, N):
+        mvco[s] = pgc_detuning
     vlo = max(0, f1 - vco_lead_s)
     vhi = min(N, f2 + aom_pulse_s)
     for s in range(vlo, vhi):
@@ -255,12 +324,52 @@ def experiment(**kwargs):
         t = cmot_start + s
         frac = s / max(cmot_ramp_s - 1, 1)
         rvco[t] = repump_vco + frac * (cmot_repump_vco - repump_vco)
-    for s in range(cmot_hold_start, N):
+    for s in range(cmot_hold_start, cmot_end):
         rvco[s] = cmot_repump_vco
+    for s in range(dark_s):
+        rvco[dark_start + s] = dark_rep_vco
+    for s in range(pgc_s):
+        rvco[pgc_start + s] = pgc_rep_vco
+    for s in range(pgc_end, N):
+        rvco[s] = pgc_rep_vco
 
     # Lattice channels: all off
     lat_off_do = [1] * N
     lat_off_ao = [0.0] * N
+
+    # Bias coils: 0V during MOT+CMOT, ramp UP to PGC values at coils_off
+    # (2ms before dark MOT), hold through both imaging frames, then ramp
+    # DOWN back to 0V after frame 2. Symmetric on/off avoids inductive
+    # transients and ends the cycle at the same state as the next begins.
+    bias_ramp_s = ms2s(bias_ramp_ms)
+    bias_down_start = f2 + aom_pulse_s  # ramp down begins right after F2
+    biasx = [0.0] * N
+    biasy = [0.0] * N
+    biasz = [0.0] * N
+    # Ramp UP at coils_off
+    for s in range(bias_ramp_s):
+        t = coils_off + s
+        if t >= N:
+            break
+        frac = s / max(bias_ramp_s - 1, 1)
+        biasx[t] = frac * pgc_bias_x_v
+        biasy[t] = frac * pgc_bias_y_v
+        biasz[t] = frac * pgc_bias_z_v
+    # Hold at PGC values from end of up-ramp through F2
+    for s in range(coils_off + bias_ramp_s, min(bias_down_start, N)):
+        biasx[s] = pgc_bias_x_v
+        biasy[s] = pgc_bias_y_v
+        biasz[s] = pgc_bias_z_v
+    # Ramp DOWN to 0V after F2
+    for s in range(bias_ramp_s):
+        t = bias_down_start + s
+        if t >= N:
+            break
+        frac = 1.0 - s / max(bias_ramp_s - 1, 1)
+        biasx[t] = frac * pgc_bias_x_v
+        biasy[t] = frac * pgc_bias_y_v
+        biasz[t] = frac * pgc_bias_z_v
+    # After ramp-down: stay at 0 (implicit from initialization)
 
     # =========================================================================
     # LOAD, ARM, EXECUTE
@@ -297,9 +406,9 @@ def experiment(**kwargs):
     NI_card_3.set_ao_voltage(ao_channel="ao5", voltages=rao, sample_rate=ni_rate)
     NI_card_3.set_ao_voltage(ao_channel="ao6", voltages=lat_off_ao, sample_rate=ni_rate)
     NI_card_3.set_ao_voltage(ao_channel="ao7", voltages=lat_off_ao, sample_rate=ni_rate)
-    NI_card_3.set_ao_voltage(ao_channel="ao8", voltages=[bias_x_v] * N, sample_rate=ni_rate)
-    NI_card_3.set_ao_voltage(ao_channel="ao9", voltages=[bias_y_v] * N, sample_rate=ni_rate)
-    NI_card_3.set_ao_voltage(ao_channel="ao10", voltages=[bias_z_v] * N, sample_rate=ni_rate)
+    NI_card_3.set_ao_voltage(ao_channel="ao8", voltages=biasx, sample_rate=ni_rate)
+    NI_card_3.set_ao_voltage(ao_channel="ao9", voltages=biasy, sample_rate=ni_rate)
+    NI_card_3.set_ao_voltage(ao_channel="ao10", voltages=biasz, sample_rate=ni_rate)
 
     h1 = NI_card_2.arm(regeneration=True)
     h2 = NI_card_3.arm(regeneration=True)
@@ -352,7 +461,6 @@ def experiment(**kwargs):
             dataset.img_item.setImage(
                 diff, levels=(dataset.diff_levels[0], frame_max),
                 autoLevels=False)
-            logger.info(f"area={float(diff.sum()):.0f}")
     finally:
         dataset.camera_client.stop_acquisition()
         if h1 is not None:

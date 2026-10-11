@@ -9,7 +9,7 @@ K = 1         # backoff factor: actual crossover = F0/K
 V_OP = -0.85      # DAC volts at the operating point   <-- SET FROM FIT
 SETPOINT = -0.015
 VMIN = -1.0       # anti-windup / AM-port safe range
-VMAX = -0.65
+VMAX = -0.55   #The actual voltage is 1V higher than what is set on the computer because the DC offset was removed from red pitaya. So -0.55 V corresponds to 0.45 V
 # ----------------------------------------------------------------------
 
 
