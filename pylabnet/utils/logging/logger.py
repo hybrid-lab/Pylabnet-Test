@@ -1,4 +1,5 @@
 import rpyc
+import ssl
 import traceback
 import time
 import logging
@@ -208,7 +209,9 @@ class LogClient:
                         port=self._port,
                         config={'allow_public_attrs': True},
                         keyfile=key,
-                        certfile=cert
+                        certfile=cert,
+                        # negotiate TLS 1.2+; rpyc 5.0.1 defaults to TLS 1.0, which Python >= 3.10 refuses
+                        ssl_version=ssl.PROTOCOL_TLS
                     )
                 self._service = self._connection.root
 

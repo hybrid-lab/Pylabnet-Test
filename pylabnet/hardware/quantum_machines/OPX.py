@@ -58,6 +58,9 @@ class Driver:
         simulate_config = SimulationConfig(duration=duration // 4) # duration is in clock cycles (1 clock cycles is 4ns)
         # Simulate blocks python until the simulation is done
         job = self.qmm.simulate(config, program, simulate_config)
+        # qm-qua >= 1.2.3 refuses to hand out samples before the simulation is done
+        if hasattr(job, "wait_until"):
+            job.wait_until("Done", timeout=60)
         # Get the simulated samples
         samples = job.get_simulated_samples()
         # Plot the simulated samples

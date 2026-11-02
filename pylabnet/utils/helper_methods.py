@@ -828,7 +828,9 @@ def launch_device_server(server, dev_config, log_ip, log_port, server_port, debu
         start += time.strftime("%Y-%m-%d, %H:%M:%S", time.gmtime())
         start += '" '
         host_ip = get_ip()
-        python_path = sys.executable
+        # A device config may name its own interpreter, e.g. the OPX server,
+        # whose qm-qua needs a newer Python than the rest of pylabnet.
+        python_path = config_dict.get('python_path', sys.executable)
         launch_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
             'launchers',

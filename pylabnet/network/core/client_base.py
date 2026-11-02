@@ -1,4 +1,5 @@
 import rpyc
+import ssl
 import os
 from socket import timeout
 from ssl import SSLError
@@ -74,7 +75,9 @@ class ClientBase:
                     port=self._port,
                     config={'allow_public_attrs': True},
                     keyfile=key,
-                    certfile=key
+                    certfile=key,
+                    # negotiate TLS 1.2+; rpyc 5.0.1 defaults to TLS 1.0, which Python >= 3.10 refuses
+                    ssl_version=ssl.PROTOCOL_TLS
                 )
 
             self._service = self._connection.root
