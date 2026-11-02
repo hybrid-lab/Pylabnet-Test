@@ -1,15 +1,15 @@
 {
-    "servers" : [
+    "servers": [
         {
-            "type" : "sensorpush",
-            "config" : "atoms_rack"
+            "type": "sensorpush",
+            "config": "atoms_rack"
         },
         {
-            "type" : "sensorpush",
-            "config" : "atoms_MOT"
+            "type": "sensorpush",
+            "config": "atoms_MOT"
         }
     ],
-    "script" : "C:\\Users\\hybri\\pylabnet\\pylabnet\\scripts\\lasers\\rack_monitor_only_sensorpush.py",
-    "device_id" : "Bob",
-    "script_service" : "True"
+    "script": "C:\\Users\\User\\repos\\Pylabnet-Test\\pylabnet\\scripts\\lasers\\rack_monitor_only_sensorpush.py",
+    "device_id": "Bob",
+    "script_service": "True"
 }

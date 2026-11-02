@@ -1,0 +1,11 @@
+{
+    "script": "C:\\Users\\User\\repos\\Pylabnet-Test\\pylabnet\\scripts\\data_center\\take_data.py",
+    "exp_path": "C:\\Users\\User\\repos\\claude\\sandbox_experiments",
+    "save_path": "C:\\Users\\User\\pylabnet_data",
+    "servers": [
+        {
+            "type": "dummy",
+            "config": "test_dummy"
+        }
+    ]
+}

@@ -18,8 +18,21 @@ u = unit(coerce_to_integer=True)
 ######################
 # Network parameters #
 ######################
-qop_ip = "192.168.88.253"
-cluster_name = "Cluster_1"
+# B167 OPX1000. No cluster name: the gateway rejects "Cluster_1" and connects
+# fine without one. The OPX server overrides these from configs/devices/OPX/OPX.json.
+qop_ip = "192.168.0.188"
+cluster_name = None
+
+# OPX1000: every port is (controller, FEM slot, port). B167 chassis: slots 1-2
+# are MW-FEMs, slots 3-4 are LF-FEMs. All AO/DO/AI of this driver go through
+# the LF-FEM in LF_FEM_SLOT.
+CONTROLLER = "con1"
+LF_FEM_SLOT = 3
+
+
+def opx_port(ch, fem=None):
+    """Config port tuple for channel `ch` on the driver's LF-FEM."""
+    return (CONTROLLER, LF_FEM_SLOT if fem is None else int(fem), int(ch))
 
 #############
 # Save Path #
@@ -72,7 +85,7 @@ zero_pulse_single = [0.3] * set_length_single
 on_len = 320  # ns
 IF = 0
 
-CHS = range(1, 11)
+CHS = range(1, 9)   # an LF-FEM has 8 analog and 8 digital outputs
 
 ################
 # CONFIG BUILD #
@@ -80,15 +93,18 @@ CHS = range(1, 11)
 hard_coded_config = {
     "version": 1,
     "controllers": {
-        "con1": {
-            "analog_outputs": {
-                1: {"offset": +0.0}, 2: {"offset": +0.0}, 3: {"offset": +0.0}, 4: {"offset": +0.0}, 5: {"offset": +0.0},
-                6: {"offset": +0.0}, 7: {"offset": +0.0}, 8: {"offset": +0.0}, 9: {"offset": +0.0}, 10: {"offset": +0.0},
-            },
-            "digital_outputs": {k: {} for k in CHS},
-            "analog_inputs": {
-                1: {"offset": 0.0129, "gain_db": 0},
-                2: {"offset": 0.0, "gain_db": 0},
+        CONTROLLER: {
+            "type": "opx1000",
+            "fems": {
+                LF_FEM_SLOT: {
+                    "type": "LF",
+                    "analog_outputs": {k: {"offset": 0.0} for k in CHS},
+                    "digital_outputs": {k: {} for k in CHS},
+                    "analog_inputs": {
+                        1: {"offset": 0.0, "gain_db": 0},
+                        2: {"offset": 0.0, "gain_db": 0},
+                    },
+                },
             },
         },
     },

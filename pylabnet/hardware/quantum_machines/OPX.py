@@ -25,17 +25,26 @@ from pylabnet.utils.logging.logger import LogHandler
 
 
 class Driver:
-    def __init__(self, device_name, logger=None, dummy=False):
+    def __init__(self, device_name, logger=None, dummy=False, host=None, cluster_name=None, lf_fem_slot=None):
 
         self.dev = device_name
         self.log = LogHandler(logger=logger)
         self.dummy = dummy
         self.elem_counters = defaultdict(int) #can this list be in the config?
         self.elems = [] #can this list be in the config?
-        self.qop_ip = "192.168.88.253"
-        self.cluster_name = "Cluster_1"
+        # Defaults live in the config module; the device config can override them.
+        self.qop_ip = host or opx_cfg.qop_ip
+        self.cluster_name = cluster_name or opx_cfg.cluster_name
+        if lf_fem_slot is not None and int(lf_fem_slot) != opx_cfg.LF_FEM_SLOT:
+            self.log.warn(f"lf_fem_slot={lf_fem_slot} in the device config, but the OPX config "
+                          f"is built for LF-FEM slot {opx_cfg.LF_FEM_SLOT}; edit LF_FEM_SLOT in "
+                          f"OPXdriverConfigmultelemsperchannel.py to change it.")
 
-        self.qmm = QuantumMachinesManager(host=self.qop_ip, cluster_name=self.cluster_name)
+        if self.cluster_name:
+            self.qmm = QuantumMachinesManager(host=self.qop_ip, cluster_name=self.cluster_name)
+        else:
+            self.qmm = QuantumMachinesManager(host=self.qop_ip)
+        self.log.info(f"Connected to OPX at {self.qop_ip}: {self.qmm.version()}")
 
         self.adding_to_stack = False
         self.stack = []
@@ -175,7 +184,7 @@ class Driver:
 
     def get_ai_voltage(self, pulse=default_measure_pulse, ai_channel=None, element=None, ao_channel=None, amplitude=default_amplitude, length=default_length, wave_function=None, frequency=default_frequency, time_of_flight=defaut_time_of_flight, smearing=default_smearing, gauss_sd=default_length / 5, variable_name=None):
         if element:
-            ai_channel = config["elements"][element]["singleInput"]["port"][1]
+            ai_channel = config["elements"][element]["singleInput"]["port"][-1]
 
         if not element:
             element = self.create_new_ai_elem(
@@ -573,7 +582,7 @@ class Driver:
         self.log.error(f"frequecy {frequency}")
 
         config["elements"][elem_name] = {
-            "singleInput": {"port": ("con1", ao_channel)},
+            "singleInput": {"port": opx_port(ao_channel)},
             "intermediate_frequency": frequency * u.MHz,
             "operations": {}
         }
@@ -668,7 +677,7 @@ class Driver:
         config["elements"][elem_name] = {
             "digitalInputs": {
                 "activate": {
-                    "port": ("con1", do_channel),
+                    "port": opx_port(do_channel),
                     "delay": int(delay),
                     "buffer": int(buffer),
                 }
@@ -708,12 +717,12 @@ class Driver:
 
         # Element block (measurement element that drives AO and reads from AI)
         config["elements"][elem_name] = {
-            "singleInput": {"port": ("con1", ao_channel)},           # drive out on AO
+            "singleInput": {"port": opx_port(ao_channel)},           # drive out on AO
             "intermediate_frequency": frequency * u.MHz,
             "operations": {"readout": meas_pulse_name},
             "time_of_flight": int(time_of_flight),
             "smearing": int(smearing),
-            "outputs": {"out1": ("con1", ai_channel)},               # read back on AI
+            "outputs": {"out1": opx_port(ai_channel)},               # read back on AI
         }
 
         # Choose / create waveform per requested pulse type

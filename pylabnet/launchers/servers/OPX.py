@@ -17,7 +17,10 @@ def launch(**kwargs):
         config_dict = load_device_config('OPX', kwargs['config'], logger)
         OPX_driver = OPX.Driver(
             device_name=config_dict['device_id'],
-            logger=logger
+            logger=logger,
+            host=config_dict.get('host'),
+            cluster_name=config_dict.get('cluster_name'),
+            lf_fem_slot=config_dict.get('lf_fem_slot'),
         )
     except AttributeError:
         try:

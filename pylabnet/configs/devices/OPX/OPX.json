@@ -1,4 +1,6 @@
 {
     "device_id": "OPX",
-    "port": 15201
+    "port": 15201,
+    "host": "192.168.0.188",
+    "lf_fem_slot": 3
 }

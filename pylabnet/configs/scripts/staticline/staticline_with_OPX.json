@@ -1,5 +1,5 @@
 {
-    "servers" : [
+    "servers": [
         {
             "type": "OPX",
             "config": "OPX"
@@ -9,37 +9,62 @@
             "config": "ni_daq_1"
         }
     ],
-    "script" : "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\staticlines\\staticline.py",
+    "script": "C:\\Users\\User\\repos\\Pylabnet-Test\\pylabnet\\scripts\\staticlines\\staticline.py",
     "lines": {
-        "OPX":
-        {
-
+        "OPX": {
             "hardware_type": "OPX",
             "config_name": "OPX",
-            "staticline_names": ["analog", "digital", "adjustable_digital"],
+            "staticline_names": [
+                "analog",
+                "digital",
+                "adjustable_digital"
+            ],
             "staticline_configs": [
-                {"type":"analog", "ao_output": 1, "do_output": 1, "down_voltage": 0},
-                {"type":"digital", "ao_output":1,"do_output": 1},
-                {"type": "adjustable_digital", "ao_output": 1, "do_output": 1}
+                {
+                    "type": "analog",
+                    "ao_output": 1,
+                    "do_output": 1,
+                    "down_voltage": 0
+                },
+                {
+                    "type": "digital",
+                    "ao_output": 1,
+                    "do_output": 1
+                },
+                {
+                    "type": "adjustable_digital",
+                    "ao_output": 1,
+                    "do_output": 1
+                }
             ]
         },
-        "Nidaq":
-        {
+        "Nidaq": {
             "hardware_type": "nidaqmx",
             "config_name": "ni_daq_1",
-            "staticline_names": ["analog", "digital", "adjustable_digital"],
+            "staticline_names": [
+                "analog",
+                "digital",
+                "adjustable_digital"
+            ],
             "staticline_configs": [
-                {"type":"analog", "ao_output": 1},
-                {"type":"digital", "ao_output": 1},
-                {"type": "adjustable_digital", "ao_output": 1}
-
+                {
+                    "type": "analog",
+                    "ao_output": 1
+                },
+                {
+                    "type": "digital",
+                    "ao_output": 1
+                },
+                {
+                    "type": "adjustable_digital",
+                    "ao_output": 1
+                }
             ]
         }
-        
     },
     "logger": "",
-    "clients": {"OPX": "Hello Aziza!"},
-    "server_port": "70" 
-
-
+    "clients": {
+        "OPX": "Hello Aziza!"
+    },
+    "server_port": "70"
 }

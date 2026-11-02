@@ -92,13 +92,13 @@ class Driver:
     # onto the chassis backplane; every other card consumes that backplane line,
     # which is what keeps cards sample-locked to each other.
     #
-    # Out of the box the master is NI card 1 (PXI1Slot2_1), which does not
+    # Out of the box the master is NI card 1 (PXI1Slot2), which does not
     # generate the clock itself but receives it from the OPX on its own PFI0 and
     # re-exports it as PXI_Trig7. Changing these three values (see set_clock)
     # moves that role to another card and/or drops the external source, without
     # affecting any script that leaves them alone.
-    DEFAULT_CLOCK_MASTER_DEV = "PXI1Slot2_1"
-    DEFAULT_CLOCK_SOURCE = "/PXI1Slot2_1/PFI0"
+    DEFAULT_CLOCK_MASTER_DEV = "PXI1Slot2"
+    DEFAULT_CLOCK_SOURCE = "/PXI1Slot2/PFI0"
     DEFAULT_CLOCK_EXPORT_LINE = "PXI_Trig7"
 
     def __init__(self, device_name: str, logger=None, dummy: bool = False):
@@ -112,7 +112,7 @@ class Driver:
         self.clock_export_line = self.DEFAULT_CLOCK_EXPORT_LINE
         # NOTE: APFI0 is not a digital trigger terminal. Kept for compatibility with your existing file,
         # but NOT used by _cfg_trigger_if_needed (which uses set_trigger()).
-        self.default_start_trigger = "/PXI1Slot2_1/APFI0"
+        self.default_start_trigger = "/PXI1Slot2/APFI0"
         self.not_OPX_clock = False
 
         # Try to get info of DAQ device to verify connection
@@ -190,13 +190,13 @@ class Driver:
         Example -- make NI card 2 the master, running off its own on-board
         clock, with card 3 slaved to it:
 
-            card2.set_clock(master_dev="PXI1Slot4_1", source="internal")
-            card3.set_clock(master_dev="PXI1Slot4_1")
+            card2.set_clock(master_dev="PXI1Slot4", source="internal")
+            card3.set_clock(master_dev="PXI1Slot4")
 
         :param master_dev: (str) device name of the clock master, e.g.
-            "PXI1Slot4_1". Compared against this driver's own device name.
+            "PXI1Slot4". Compared against this driver's own device name.
         :param source: (str) terminal the MASTER derives its clock from, e.g.
-            "/PXI1Slot2_1/PFI0" for the OPX clock. Pass "internal" (or an empty
+            "/PXI1Slot2/PFI0" for the OPX clock. Pass "internal" (or an empty
             string) to have the master use its own on-board timebase instead.
             Ignored by cards that are not the master.
         :param export_line: (str) backplane line the master exports onto and the
@@ -964,7 +964,7 @@ class Driver:
         if not self.not_OPX_clock:
 
             if self.dev == self.clock_master_dev:
-                clk = info.get("clock_source", None)   # e.g. "/PXI1Slot2_1/PFI0"
+                clk = info.get("clock_source", None)   # e.g. "/PXI1Slot2/PFI0"
                 # No source means the master runs off its own on-board clock;
                 # it still exports it, so the slaves stay locked to it.
                 if clk:
