@@ -18,11 +18,7 @@
         },
         {
             "type": "fluorescence_imaging_camera",
-            "config": "bfs_u3_51s5m_top_chamber"
-        },
-        {
-            "type": "fluorescence_imaging_camera",
-            "config": "bfs_u3_51s5m_bottom_chamber"
+            "config": "bfs_u3_51s5m"
         }
     ],
     "script": "C:\\Users\\User\\repos\\Pylabnet-Test\\pylabnet\\scripts\\data_center\\take_data.py",
