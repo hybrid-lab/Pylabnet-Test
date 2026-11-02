@@ -1502,6 +1502,52 @@ class HeatMap(Dataset):
         self.graph.clear()
 
 
+class CameraFrame(HeatMap):
+    """ Shows the latest camera frame. Saves it as .npy (full resolution) plus a PNG of the view.
+
+    Redraws only when set_data() delivers a new frame, so the GUI refresh does
+    not keep re-uploading a multi-megapixel image.
+    """
+
+    def visualize(self, graph, **kwargs):
+
+        self.handle_new_window(graph, **kwargs)
+
+        self.graph.view.setAspectLocked(True)
+        self.graph.view.invertY(True)    # row 0 at the top, as in SpinView
+        self.graph.setPredefinedGradient('grey')
+        self._new_frame = False
+        self._first_frame = True
+
+    def set_data(self, data=None, x=None):
+
+        super().set_data(data, x)
+        self._new_frame = True
+
+    def update(self, **kwargs):
+
+        if self._new_frame and self.data is not None:
+            self._new_frame = False
+            self.graph.setImage(
+                img=np.transpose(self.data),
+                autoRange=self._first_frame,    # keep the user's zoom after the first frame
+                autoLevels=True
+            )
+            self._first_frame = False
+
+    def clear_data(self):
+
+        super().clear_data()
+        self._first_frame = True
+
+    def save(self, filename=None, directory=None, date_dir=True, unique_id=None):
+
+        name = f'{filename}_{self.name}_{unique_id}'
+        if self.data is not None:
+            npy_generic_save(data=self.data, filename=name, directory=directory, date_dir=date_dir)
+        pyqtgraph_save(self.graph.getView(), name, directory, date_dir)
+
+
 class Plot2D(Dataset):
     """ Plots a 2D dataset on a 2D color plot. Plots only the latest value and overwrites if more data is added"""
 
