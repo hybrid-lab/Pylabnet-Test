@@ -1542,6 +1542,7 @@ class CameraFrame(HeatMap):
 
     def save(self, filename=None, directory=None, date_dir=True, unique_id=None):
 
+        self.update()    # draw a pending frame so the PNG matches the .npy
         name = f'{filename}_{self.name}_{unique_id}'
         if self.data is not None:
             npy_generic_save(data=self.data, filename=name, directory=directory, date_dir=date_dir)

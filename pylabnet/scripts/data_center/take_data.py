@@ -248,8 +248,15 @@ class DataTaker:
         except:
             pass
 
+        if not hasattr(self, 'exp_name'):
+            self.log.error('No experiment selected. Click a script in the Experiments list first.')
+            return
+
         if not self.valid_init_dict:
             self.log.warn("No valid INIT_DICT found.")
+
+        # Until configure succeeds, Run is refused (it checks for a dataset)
+        self.dataset = None
 
         # Load the config
         self.reload_config()
@@ -293,10 +300,14 @@ class DataTaker:
         self.load_input_dict()
 
         # Run any pre-experiment configuration
-        try:
-            self.module.configure(dataset=self.dataset, **self.clients)
-        except AttributeError:
-            pass
+        if hasattr(self.module, 'configure'):
+            try:
+                self.module.configure(dataset=self.dataset, **self.clients)
+            except Exception as e:
+                self.dataset = None
+                self.log.error(f'Experiment {self.exp_name} configure failed, fix and press Configure again: '
+                               f'{type(e).__name__}: {e}')
+                return
         self.experiment = self.module.experiment
 
         self.log.info(f'Experiment {self.exp_name} configured')
@@ -306,6 +317,8 @@ class DataTaker:
 
     def clear_data(self):
         """ Clears all data from curves"""
+        if self.dataset is None:
+            return
         self.log.info("Clearing data")
         self.dataset.clear_all_data()
 
@@ -314,6 +327,9 @@ class DataTaker:
 
         # Run experiment
         if self.gui.run.text() == 'Run':
+            if self.dataset is None:
+                self.log.error('Nothing configured. Select a script and press Configure (check the log for configure errors).')
+                return
             self.gui.run.setStyleSheet('background-color: red')
             self.gui.run.setText('Stop')
             self.log.info('Experiment started')
@@ -398,6 +414,8 @@ class DataTaker:
         self.gui.run.setText('Run')
         self.log.info('Experiment stopped')
         self.update_thread.running = False
+        # Final redraw: a run shorter than REFRESH_RATE can end before the update thread fires
+        self.dataset.update()
 
         self.log.update_metadata(
             exp_stop_time=datetime.now().strftime('%d/%m/%Y %H:%M:%S:%f')
@@ -410,6 +428,9 @@ class DataTaker:
     def save(self):
         """ Saves data """
 
+        if self.dataset is None:
+            self.log.error('Nothing to save: no experiment is configured.')
+            return
         unique_id = str(uuid.uuid4())
 
         self.log.update_metadata(notes=self.gui.notes.toPlainText())
