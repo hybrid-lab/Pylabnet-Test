@@ -69,8 +69,9 @@ class Driver:
         waveform_report = job.get_simulated_waveform_report()
         # Cast the waveform report to a python dictionary
         waveform_dict = waveform_report.to_dict()
-        # Visualize and save the waveform report
-        waveform_report.create_plot(samples, plot=True, save_path=str(Path(__file__).resolve()))
+        # Visualize and save the waveform report. create_plot saves into dirname(save_path),
+        # so name a file inside save_dir (git-ignored)
+        waveform_report.create_plot(samples, plot=True, save_path=str(opx_cfg.save_dir / "waveform_report"))
 
     def build_stack(self):
         self.adding_to_stack = True

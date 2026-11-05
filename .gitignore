@@ -158,6 +158,8 @@ secretkeys.env
 
 # Data folders
 pylabnet/utils/iq_upconversion/results/*
+pylabnet/hardware/quantum_machines/Data/
+waveform_report_*.html
 
 
 
