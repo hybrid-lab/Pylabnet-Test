@@ -54,13 +54,34 @@ save_dir.mkdir(exist_ok=True)
 ######################################
 # Defaults for the driver and client #
 ######################################
-default_length = 100            # ns
-default_frequency = 10          # MHz, intermediate frequency of analog elements
-default_amplitude = 0.3         # V
+# Used when a call leaves the argument out, both by OPX.py and by the client
+# (network/client_server/OPX.py), which is what experiment scripts call.
+
+# Pulse duration in ns. For a digital output: how long it stays high.
+default_length = 100
+
+# Intermediate frequency of analog elements, in MHz. Not 0, so a "const" pulse is a
+# 10 MHz sine of amplitude default_amplitude, not a DC level. For a DC level (e.g. an
+# AOM amplitude or a coil voltage), pass frequency=0.
+default_frequency = 10
+
+# V: the level of a "const" pulse, or the peak of a "gauss" pulse.
+default_amplitude = 0.3
+
+# Shape that get_ai_voltage plays on the analog output while recording:
+# "const", "gauss" or "arbitrary".
 default_measure_pulse = "const"
+
+# Digital pulse played by the client's set_digital_voltage. "ON" is the only one the driver creates.
 default_digital_pulse = "ON"
-default_time_of_flight = 28      # ns; the OPX1000 needs a multiple of 4, >= 28
-default_smearing = 0            # ns
+
+# ns from the start of the output pulse until recording of the input starts (cable and
+# electronics delay). The OPX1000 needs a multiple of 4, >= 28.
+default_time_of_flight = 28
+
+# ns of extra recording before and after the window, so a slightly early or late
+# signal isn't cut off.
+default_smearing = 0
 
 ##############
 # QUA config #
