@@ -1188,8 +1188,9 @@ class TimedCounter:
             self.task.start()
             while time.time() - current_time < self.duration:
                 pass
-            self.task.stop()
+            # Read before stopping: reading a stopped task restarts it from 0
             self.count = self.task.read()
+            self.task.stop()
         except nidaqmx.DaqError:
             if self.log:
                 self.log.warn(f"Failed to count on {self.task.name}")
