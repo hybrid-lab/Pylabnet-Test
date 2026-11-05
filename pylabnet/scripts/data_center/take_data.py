@@ -399,7 +399,7 @@ class DataTaker:
             # self.experiment_thread.status_flag.connect(self.dataset.interpret_status)
             # self.experiment_thread.finished.connect(self.stop)
             self.log.update_metadata(
-                exp_start_time=datetime.now().strftime('%d/%m/%Y %H:%M:%S:%f')
+                exp_start_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')    # local time, sortable
             )
 
         # Stop experiment
@@ -418,7 +418,7 @@ class DataTaker:
         self.dataset.update()
 
         self.log.update_metadata(
-            exp_stop_time=datetime.now().strftime('%d/%m/%Y %H:%M:%S:%f')
+            exp_stop_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
         )
 
         # Autosave if relevant

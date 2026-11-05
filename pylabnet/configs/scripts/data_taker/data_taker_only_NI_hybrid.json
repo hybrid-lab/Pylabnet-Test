@@ -6,7 +6,7 @@
         }
     ],
     "script": "C:\\Users\\User\\repos\\Pylabnet-Test\\pylabnet\\scripts\\data_center\\take_data.py",
-    "exp_path": "C:\\Users\\User\\repos\\atoms-circuits-scripts",
+    "exp_path": "C:\\Users\\User\\repos\\atoms-circuits-scripts\\experiments",
     "save_path": "C:\\Users\\User\\pylabnet_data",
     "auto_save": false
 }
