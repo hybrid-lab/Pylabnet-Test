@@ -7,21 +7,17 @@ from qm import SimulationConfig
 from qm.qua import *
 from qm import LoopbackInterface
 from qm import QuantumMachinesManager
-#from pylabnet.hardware.quantum_machines.OPXdriverConfig import *
 from pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel import *
 import pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel as opx_cfg
 import time
-
-
-#from pylabnet.qua_practice.configuration import *
+import warnings
 
 from pylabnet.utils.logging.logger import LogHandler
 
 ######################################################CHANGE ALL CONFIG TO OPX_CFG.CONFIG AND SEE IF IT WORKS
 
-# Right now the driver is only set up for outputting out of digital and analog channels 1
-# Would be nice to be able to specify channel for output in set voltage functions but may be a little tricky
-# Copy config dictionary into constructor
+# Driver for the OPX1000 only (the OPX+ is not supported). All channels are on one
+# LF-FEM: analog outputs 1-8, digital outputs 1-8, analog inputs 1-2.
 
 
 class Driver:
@@ -35,16 +31,15 @@ class Driver:
         # Defaults live in the config module; the device config can override them.
         self.qop_ip = host or opx_cfg.qop_ip
         self.cluster_name = cluster_name or opx_cfg.cluster_name
-        if lf_fem_slot is not None and int(lf_fem_slot) != opx_cfg.LF_FEM_SLOT:
-            self.log.warn(f"lf_fem_slot={lf_fem_slot} in the device config, but the OPX config "
-                          f"is built for LF-FEM slot {opx_cfg.LF_FEM_SLOT}; edit LF_FEM_SLOT in "
-                          f"OPXdriverConfigmultelemsperchannel.py to change it.")
+        if lf_fem_slot is not None:
+            opx_cfg.set_lf_fem_slot(lf_fem_slot)
 
         if self.cluster_name:
             self.qmm = QuantumMachinesManager(host=self.qop_ip, cluster_name=self.cluster_name)
         else:
             self.qmm = QuantumMachinesManager(host=self.qop_ip)
         self.log.info(f"Connected to OPX at {self.qop_ip}: {self.qmm.version()}")
+        self._check_opx1000()
 
         self.adding_to_stack = False
         self.stack = []
@@ -52,6 +47,22 @@ class Driver:
         self._current_stack = [self.stack]  # where _append() writes
         self._if_stack = []                # open IF nodes for else_()
         self.simulating = False
+
+    def _check_opx1000(self):
+        """Refuse anything but an OPX1000 with an LF-FEM in the configured slot."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")    # get_controllers is deprecated, but the only call that reports FEMs
+            controllers = {c.name: c for c in self.qmm.get_controllers()}
+        con = controllers.get(opx_cfg.CONTROLLER)
+        if con is None:
+            raise RuntimeError(f"No controller {opx_cfg.CONTROLLER} at {self.qop_ip}; found {sorted(controllers)}")
+        if con.controller_type != "OPX1000":
+            raise RuntimeError(f"{opx_cfg.CONTROLLER} is an {con.controller_type}; this driver supports only the OPX1000")
+        fem = con.fems.get(opx_cfg.LF_FEM_SLOT)
+        if fem != "LF":
+            raise RuntimeError(f"Slot {opx_cfg.LF_FEM_SLOT} of {opx_cfg.CONTROLLER} holds {fem or 'no FEM'}, not an LF-FEM; "
+                               f"FEMs present: {con.fems}. Set lf_fem_slot in configs/devices/OPX/OPX.json")
+        self.log.info(f"{opx_cfg.CONTROLLER}: OPX1000, using LF-FEM in slot {opx_cfg.LF_FEM_SLOT}")
 
     def _simulate(self, program, duration=4000):
         # Simulates the QUA program for the specified duration
@@ -578,6 +589,7 @@ class Driver:
 
     def create_new_ao_elem(self, pulse, ao_channel=None, amplitude=default_amplitude, length=default_length, wave_function=None, frequency=default_frequency, gauss_sd=default_length / 5,):
         ao_channel = int(float(ao_channel))
+        ao_port = opx_port(ao_channel, "ao")    # raises before anything is registered
         self.elem_counters[f"ao_{ao_channel}"] += 1
         idx = self.elem_counters[f"ao_{ao_channel}"]
         elem_name = f"generic_ai_elem_ch{ao_channel}_{idx}"
@@ -586,7 +598,7 @@ class Driver:
         self.log.error(f"frequecy {frequency}")
 
         config["elements"][elem_name] = {
-            "singleInput": {"port": opx_port(ao_channel)},
+            "singleInput": {"port": ao_port},
             "intermediate_frequency": frequency * u.MHz,
             "operations": {}
         }
@@ -656,6 +668,7 @@ class Driver:
 
         # Normalize type
         do_channel = int(float(do_channel))
+        do_port = opx_port(do_channel, "do")    # raises before anything is registered
 
         # Counter/indexing scheme per DO channel
         self.elem_counters[f"do_{do_channel}"] += 1
@@ -681,7 +694,7 @@ class Driver:
         config["elements"][elem_name] = {
             "digitalInputs": {
                 "activate": {
-                    "port": opx_port(do_channel),
+                    "port": do_port,
                     "delay": int(delay),
                     "buffer": int(buffer),
                 }
@@ -707,6 +720,7 @@ class Driver:
         # Normalize types
         ai_channel = int(float(ai_channel))
         ao_channel = int(float(ao_channel))
+        ao_port, ai_port = opx_port(ao_channel, "ao"), opx_port(ai_channel, "ai")
 
         # Counter/indexing scheme (mirror AO creator: per AO channel)
         self.elem_counters[f"ai_{ao_channel}_{ai_channel}"] += 1
@@ -721,12 +735,12 @@ class Driver:
 
         # Element block (measurement element that drives AO and reads from AI)
         config["elements"][elem_name] = {
-            "singleInput": {"port": opx_port(ao_channel)},           # drive out on AO
+            "singleInput": {"port": ao_port},           # drive out on AO
             "intermediate_frequency": frequency * u.MHz,
             "operations": {"readout": meas_pulse_name},
             "time_of_flight": int(time_of_flight),
             "smearing": int(smearing),
-            "outputs": {"out1": opx_port(ai_channel)},               # read back on AI
+            "outputs": {"out1": ai_port},               # read back on AI
         }
 
         # Choose / create waveform per requested pulse type

@@ -23,16 +23,26 @@ u = unit(coerce_to_integer=True)
 qop_ip = "192.168.0.188"
 cluster_name = None
 
-# OPX1000: every port is (controller, FEM slot, port). B167 chassis: slots 1-2
-# are MW-FEMs, slots 3-4 are LF-FEMs. All AO/DO/AI of this driver go through
-# the LF-FEM in LF_FEM_SLOT.
+# OPX1000 only (the OPX+ is not supported). Every port is (controller, FEM slot,
+# port). B167 chassis: slots 1-2 are MW-FEMs, slots 3-4 are LF-FEMs. All AO/DO/AI
+# of this driver go through one LF-FEM, LF_FEM_SLOT; the OPX server sets it from
+# lf_fem_slot in configs/devices/OPX/OPX.json via set_lf_fem_slot().
 CONTROLLER = "con1"
 LF_FEM_SLOT = 3
 
+# Ports on an LF-FEM, numbered from 1
+LF_FEM_PORTS = {"ao": 8, "do": 8, "ai": 2}
+_PORT_NAMES = {"ao": "analog output", "do": "digital output", "ai": "analog input"}
 
-def opx_port(ch, fem=None):
-    """Config port tuple for channel `ch` on the driver's LF-FEM."""
-    return (CONTROLLER, LF_FEM_SLOT if fem is None else int(fem), int(ch))
+
+def opx_port(ch, kind):
+    """Config port tuple for channel `ch` of `kind` ('ao', 'do' or 'ai') on the driver's LF-FEM."""
+    ch = int(float(ch))
+    n = LF_FEM_PORTS[kind]
+    if not 1 <= ch <= n:
+        raise ValueError(f"{_PORT_NAMES[kind]} {ch} does not exist: the OPX1000 LF-FEM has "
+                         f"{_PORT_NAMES[kind]}s 1-{n}")
+    return (CONTROLLER, LF_FEM_SLOT, ch)
 
 #############
 # Save Path #
@@ -85,7 +95,15 @@ zero_pulse_single = [0.3] * set_length_single
 on_len = 320  # ns
 IF = 0
 
-CHS = range(1, 9)   # an LF-FEM has 8 analog and 8 digital outputs
+
+def _lf_fem_config():
+    return {
+        "type": "LF",
+        "analog_outputs": {k: {"offset": 0.0} for k in range(1, LF_FEM_PORTS["ao"] + 1)},
+        "digital_outputs": {k: {} for k in range(1, LF_FEM_PORTS["do"] + 1)},
+        "analog_inputs": {k: {"offset": 0.0, "gain_db": 0} for k in range(1, LF_FEM_PORTS["ai"] + 1)},
+    }
+
 
 ################
 # CONFIG BUILD #
@@ -95,17 +113,7 @@ hard_coded_config = {
     "controllers": {
         CONTROLLER: {
             "type": "opx1000",
-            "fems": {
-                LF_FEM_SLOT: {
-                    "type": "LF",
-                    "analog_outputs": {k: {"offset": 0.0} for k in CHS},
-                    "digital_outputs": {k: {} for k in CHS},
-                    "analog_inputs": {
-                        1: {"offset": 0.0, "gain_db": 0},
-                        2: {"offset": 0.0, "gain_db": 0},
-                    },
-                },
-            },
+            "fems": {LF_FEM_SLOT: _lf_fem_config()},
         },
     },
 
@@ -136,13 +144,13 @@ hard_coded_config = {
 
 config = hard_coded_config.copy()
 
-# Channel → element name helpers
-AI_CHANNEL_TO_GEN_EL = {ch: f"generic_ai_elem_ch{ch}" for ch in CHS}
 
-# You only defined these two output->input elements explicitly:
-AO_CHANNEL_TO_GEN_EL = {
-    1: "generic_output_elem_ch1_to_ch1",
-    2: "generic_output_elem_ch2_to_ch2",
-}
-
-DO_CHANNEL_TO_GEN_EL = {ch: f"generic_di_elem_ch{ch}" for ch in CHS}
+def set_lf_fem_slot(slot):
+    """Point the driver at the LF-FEM in `slot`. Call before any element is created."""
+    global LF_FEM_SLOT
+    slot = int(slot)
+    # config is a shallow copy, so it shares this dict: edit it in place
+    fems = hard_coded_config["controllers"][CONTROLLER]["fems"]
+    fems.clear()
+    fems[slot] = _lf_fem_config()
+    LF_FEM_SLOT = slot
