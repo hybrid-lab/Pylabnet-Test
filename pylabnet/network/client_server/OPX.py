@@ -1,6 +1,6 @@
 from pylabnet.network.core.service_base import ServiceBase
 from pylabnet.network.core.client_base import ClientBase
-from pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel import default_amplitude, default_digital_pulse, default_frequency, default_length, default_measure_pulse, default_smearing, defaut_time_of_flight
+from pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel import default_amplitude, default_digital_pulse, default_frequency, default_length, default_measure_pulse, default_smearing, default_time_of_flight
 
 
 class Service(ServiceBase):
@@ -110,7 +110,7 @@ class Service(ServiceBase):
         length=default_length,
         wave_function=None,
         frequency=default_frequency,
-        time_of_flight=defaut_time_of_flight,
+        time_of_flight=default_time_of_flight,
         smearing=default_smearing,
         gauss_sd=default_length / 5,
     ):
@@ -250,7 +250,7 @@ class Client(ClientBase):
         length=default_length,
         wave_function=None,
         frequency=default_frequency,
-        time_of_flight=defaut_time_of_flight,
+        time_of_flight=default_time_of_flight,
         smearing=default_smearing,
         gauss_sd=default_length / 5,
         variable_name=None,
@@ -299,7 +299,7 @@ class Client(ClientBase):
         length=default_length,
         wave_function=None,
         frequency=default_frequency,
-        time_of_flight=defaut_time_of_flight,
+        time_of_flight=default_time_of_flight,
         smearing=default_smearing,
         gauss_sd=default_length / 5,
     ):

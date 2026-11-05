@@ -1,23 +1,21 @@
-##############################################################################################################################################################################################################
-import qm
-import numpy as np
+"""pylabnet driver for the Quantum Machines OPX1000 (the OPX+ is not supported).
 
-from collections import defaultdict
-from qm import SimulationConfig
-from qm.qua import *
-from qm import LoopbackInterface
-from qm import QuantumMachinesManager
-from pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel import *
-import pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel as opx_cfg
+All channels are on one LF-FEM: analog outputs 1-8, digital outputs 1-8, analog
+inputs 1-2. Each set_/play_/get_ call creates a QUA element for its channel and
+either runs a one-off program at once, or, between build_stack() and execute(),
+is recorded on a stack that execute() turns into a single QUA program.
+"""
 import time
 import warnings
+from collections import defaultdict
 
+from qm import QuantumMachinesManager, SimulationConfig
+from qm.qua import *
+
+# config (the QUA config dict), opx_port, u, drag_gaussian_pulse_waveforms and the default_* values
+from pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel import *
+import pylabnet.hardware.quantum_machines.OPXdriverConfigmultelemsperchannel as opx_cfg
 from pylabnet.utils.logging.logger import LogHandler
-
-######################################################CHANGE ALL CONFIG TO OPX_CFG.CONFIG AND SEE IF IT WORKS
-
-# Driver for the OPX1000 only (the OPX+ is not supported). All channels are on one
-# LF-FEM: analog outputs 1-8, digital outputs 1-8, analog inputs 1-2.
 
 
 class Driver:
@@ -25,9 +23,9 @@ class Driver:
 
         self.dev = device_name
         self.log = LogHandler(logger=logger)
-        self.dummy = dummy
-        self.elem_counters = defaultdict(int) #can this list be in the config?
-        self.elems = [] #can this list be in the config?
+        self.dummy = dummy    # part of pylabnet's driver signature; there is no dummy mode
+        self.elem_counters = defaultdict(int)    # per channel, numbers the elements created on it
+        self.elems = []
         # Defaults live in the config module; the device config can override them.
         self.qop_ip = host or opx_cfg.qop_ip
         self.cluster_name = cluster_name or opx_cfg.cluster_name
@@ -65,43 +63,38 @@ class Driver:
         self.log.info(f"{opx_cfg.CONTROLLER}: OPX1000, using LF-FEM in slot {opx_cfg.LF_FEM_SLOT}")
 
     def _simulate(self, program, duration=4000):
-        # Simulates the QUA program for the specified duration
-        simulate_config = SimulationConfig(duration=duration // 4) # duration is in clock cycles (1 clock cycles is 4ns)
-        # Simulate blocks python until the simulation is done
-        job = self.qmm.simulate(config, program, simulate_config)
-        # qm-qua >= 1.2.3 refuses to hand out samples before the simulation is done
-        if hasattr(job, "wait_until"):
-            job.wait_until("Done", timeout=60)
-        # Get the simulated samples
+        """Simulate `program` for `duration` ns on the OPX's simulator, plot it and save the waveform report."""
+        job = self.qmm.simulate(config, program, SimulationConfig(duration=duration // 4))    # in 4 ns clock cycles
+        job.wait_until("Done", timeout=60)    # samples are only available once the simulation is done
         samples = job.get_simulated_samples()
-        # Plot the simulated samples
         samples.con1.plot()
-        # Get the waveform report object
-        waveform_report = job.get_simulated_waveform_report()
-        # Cast the waveform report to a python dictionary
-        waveform_dict = waveform_report.to_dict()
-        # Visualize and save the waveform report. create_plot saves into dirname(save_path),
-        # so name a file inside save_dir (git-ignored)
-        waveform_report.create_plot(samples, plot=True, save_path=str(opx_cfg.save_dir / "waveform_report"))
+        # create_plot saves into dirname(save_path), so name a file inside save_dir (git-ignored)
+        job.get_simulated_waveform_report().create_plot(
+            samples, plot=True, save_path=str(opx_cfg.save_dir / "waveform_report"))
 
     def build_stack(self):
+        """Start recording: later set_/play_/get_/delay/loop calls go on the stack until execute()."""
         self.adding_to_stack = True
         self.simulating = False
+        # Elements from earlier programs stay in config; restarting the counters
+        # reuses their names, and each new element overwrites the old entry.
         self.elem_counters = defaultdict(int)
-        opx_cfg.config = opx_cfg.hard_coded_config.copy() #In general, this is wrong
 
         self.stack = []
         self._current_stack = [self.stack]
         self._if_stack = []
 
-    def set_ao_voltage(self, pulse=None, ao_channel=None, element=None, amplitude=default_amplitude, length=default_length, wave_function=None, simulate=False, frequency=default_frequency, gauss_sd=default_length / 5,): #removed pulse in driver #if we only specify ao_channel, I want pulse to play to first element for that channel
+    def set_ao_voltage(self, pulse=None, ao_channel=None, element=None, amplitude=default_amplitude, length=default_length, wave_function=None, simulate=False, frequency=default_frequency, gauss_sd=default_length / 5,):
+        """Play `pulse` ('const', 'gauss' or 'arbitrary') on an analog output in an infinite loop.
+
+        Inside build_stack()/execute() it is played once at that point of the program instead.
+        Pass `element` to reuse one (its first operation is played if `pulse` is not given);
+        otherwise a new element is created on `ao_channel`. Returns the element name.
+        """
         if not pulse and element:
             pulse = next(iter(config["elements"][element]["operations"]))
-            # self.log.error(f"THIS IS THE ELEMENT: {element}")
 
-        if element == None:
-            ao_channel = int(float(ao_channel))
-
+        if element is None:
             element = self.create_new_ao_elem(
                 ao_channel=ao_channel,
                 pulse=pulse,
@@ -115,30 +108,24 @@ class Driver:
         if not self.adding_to_stack:
             with program() as set_voltage:
                 with infinite_loop_():
-                    play(pulse, element) #right now only defined pulse is const (Modulated with IF frequency)
+                    play(pulse, element)
 
-            # execute QUA program
             if simulate:
                 self._simulate(set_voltage)
-
             else:
-
-                qm = self.qmm.open_qm(config)
-                job = qm.execute(set_voltage)  # execute QUA program
+                self.qmm.open_qm(config).execute(set_voltage)
         else:
-            #True of False is infinite or not infinite
+            # Stack node: ["play", element, pulse, infinite (not used by _emit_stack), simulate]
             self._append(["play", element, pulse, True, simulate])
 
         return element
 
-    def play_ao_voltage(self, pulse, ao_channel, element, amplitude, length, gauss_sd, wave_function, simulate, frequency): #removed pulse in driver #if we only specify ao_channel, I want pulse to play to first element for that channel
+    def play_ao_voltage(self, pulse, ao_channel, element, amplitude, length, gauss_sd, wave_function, simulate, frequency):
+        """Like set_ao_voltage, but plays the pulse once instead of in a loop."""
         if not pulse and element:
             pulse = next(iter(config["elements"][element]["operations"]))
-            self.log.error(f"THIS IS THE ELEMENT: {element}")
 
-        if element == None:
-            ao_channel = int(float(ao_channel))
-
+        if element is None:
             element = self.create_new_ao_elem(
                 ao_channel=ao_channel,
                 pulse=pulse,
@@ -150,25 +137,24 @@ class Driver:
             )
 
         if not self.adding_to_stack:
-            with program() as set_voltage:
-                play(pulse, element) #right now only defined pulse is const (Modulated with IF frequency)
+            with program() as play_voltage:
+                play(pulse, element)
 
-            # execute QUA program
             if simulate:
-                self._simulate(set_voltage)
-
+                self._simulate(play_voltage)
             else:
-
-                qm = self.qmm.open_qm(config)
-                job = qm.execute(set_voltage)  # execute QUA program
+                self.qmm.open_qm(config).execute(play_voltage)
         else:
-            #True of False is infinite or not infinite
             self._append(["play", element, pulse, True, simulate])
 
         return element
 
     def set_digital_voltage(self, element, pulse, do_channel, length, delay, buffer, simulate):
+        """Play a digital output's ON pulse (`length` ns high) in an infinite loop.
 
+        Inside build_stack()/execute() it is played once at that point of the program instead.
+        Pass `element` to reuse one; otherwise a new element is created on `do_channel`.
+        """
         if element is None:
             element = self.create_new_do_elem(
                 do_channel=do_channel,
@@ -182,24 +168,26 @@ class Driver:
         if not self.adding_to_stack:
             with program() as set_voltage:
                 with infinite_loop_():
-                    play(pulse, element) #right now only defined pulse is ON pulse
+                    play(pulse, element)
 
-            # execute QUA program
             if simulate:
                 self._simulate(set_voltage)
-
             else:
-                qm = self.qmm.open_qm(config)
-                job = qm.execute(set_voltage)  # execute QUA program
+                self.qmm.open_qm(config).execute(set_voltage)
         else:
-            #True of False is infinite or not infinite
             self._append(["play", element, pulse, False, simulate])
 
         return element
 
-    def get_ai_voltage(self, pulse=default_measure_pulse, ai_channel=None, element=None, ao_channel=None, amplitude=default_amplitude, length=default_length, wave_function=None, frequency=default_frequency, time_of_flight=defaut_time_of_flight, smearing=default_smearing, gauss_sd=default_length / 5, variable_name=None):
+    def get_ai_voltage(self, pulse=default_measure_pulse, ai_channel=None, element=None, ao_channel=None, amplitude=default_amplitude, length=default_length, wave_function=None, frequency=default_frequency, time_of_flight=default_time_of_flight, smearing=default_smearing, gauss_sd=default_length / 5, variable_name=None):
+        """Drive `ao_channel` with a measurement pulse and record the raw trace on `ai_channel`.
+
+        Run at once, returns [(timestamp, value), ...]. Inside build_stack()/execute() it is
+        recorded instead; with `variable_name` the trace is also demodulated into that QUA
+        variable, for use in if_gt/while_. Pass `element` to reuse a measurement element.
+        """
         if element:
-            ai_channel = config["elements"][element]["singleInput"]["port"][-1]
+            ai_channel = config["elements"][element]["outputs"]["out1"][-1]    # the element's AI port
 
         if not element:
             element = self.create_new_ai_elem(
@@ -218,20 +206,12 @@ class Driver:
         if not self.adding_to_stack:
             with program() as get_voltage:
                 adc_stream = declare_stream(adc_trace=True)
-
                 measure("readout", element, adc_stream=adc_stream)
+                with stream_processing():
+                    trace = adc_stream.input1() if ai_channel == 1 else adc_stream.input2()
+                    trace.with_timestamps().save('raw_adc')
 
-                if ai_channel == 1:
-                    with stream_processing():
-                        adc_stream.input1().with_timestamps().save('raw_adc')
-
-                elif ai_channel == 2:
-                    with stream_processing():
-                        adc_stream.input2().with_timestamps().save('raw_adc')
-
-            qm = self.qmm.open_qm(config)
-            job = qm.execute(get_voltage)
-            res = job.result_handles
+            res = self.qmm.open_qm(config).execute(get_voltage).result_handles
             res.wait_for_all_values()
             raw = res.get("raw_adc").fetch_all()
 
@@ -249,6 +229,11 @@ class Driver:
         return element
 
     def execute(self, wait=False, timeout=None):
+        """Turn the recorded stack into one QUA program and run (or simulate) it.
+
+        With measurements: waits for them and returns {stream label: data}. Otherwise
+        returns the job, after it is done if `wait` (`timeout` in s).
+        """
         self.log.info(f"Time OPX execute starts {time.perf_counter_ns()}")
 
         self.adding_to_stack = False
@@ -327,9 +312,7 @@ class Driver:
         if self.simulating:
             self._simulate(curr_prog)
         elif measuring_flag["value"]:
-            qm = self.qmm.open_qm(config)
-            job = qm.execute(curr_prog)
-            res = job.result_handles
+            res = self.qmm.open_qm(config).execute(curr_prog).result_handles
             res.wait_for_all_values()
 
             out = {}
@@ -362,7 +345,6 @@ class Driver:
                         out[label] = []
                     else:
                         raw = raw[0][0]
-                        # Handle structured numpy arraysdfds
                         if hasattr(raw[0], 'dtype') and raw[0].dtype.names and 'timestamp' in raw[0].dtype.names:
                             out[label] = [(int(x["timestamp"]), float(x["value"])) for x in raw]
                         else:
@@ -372,21 +354,11 @@ class Driver:
         else:
             self.log.info(f"Time OPX compilation local done {time.perf_counter_ns()}")
 
-            qm = self.qmm.open_qm(config)
-            job = qm.execute(curr_prog)
-
+            job = self.qmm.open_qm(config).execute(curr_prog)
             self.log.info(f"Time OPX job submitted to hardware {time.perf_counter_ns()}")
 
             if wait:
-                if hasattr(job, "wait_until"):
-                    job.wait_until("Done", timeout=timeout)
-                elif hasattr(job, "_is_job_running"):
-                    start_time = time.perf_counter()
-                    while job._is_job_running():
-                        self.log.info("Checking to see if OPX job is finsihed")
-                        if timeout is not None and (time.perf_counter() - start_time) > timeout:
-                            raise TimeoutError(f"OPX job did not finish within {timeout} seconds")
-                        time.sleep(0.01)
+                job.wait_until("Done", timeout=timeout)
 
             return job
 
@@ -444,9 +416,6 @@ class Driver:
                     with else_():
                         self._emit_stack(else_stack, streams, measuring_flag, measure_counter)
 
-            # -------------------------------------------------------------
-            # LOOP LOGIC (Matches your new execute function)
-            # -------------------------------------------------------------
             elif kind == "for":
                 # ["for", var_name, start, stop, step, body]
                 _, var_name, start, stop, step, body = op
@@ -588,14 +557,16 @@ class Driver:
         return _WhileContext(self, var_name, operator, threshold)
 
     def create_new_ao_elem(self, pulse, ao_channel=None, amplitude=default_amplitude, length=default_length, wave_function=None, frequency=default_frequency, gauss_sd=default_length / 5,):
+        """Add an analog-output element with one pulse: 'const' (`amplitude` V), 'gauss'
+        (sigma `gauss_sd` ns) or 'arbitrary' (`wave_function` samples), `length` ns long,
+        modulated at `frequency` MHz. Returns the element name.
+        """
         ao_channel = int(float(ao_channel))
         ao_port = opx_port(ao_channel, "ao")    # raises before anything is registered
         self.elem_counters[f"ao_{ao_channel}"] += 1
         idx = self.elem_counters[f"ao_{ao_channel}"]
-        elem_name = f"generic_ai_elem_ch{ao_channel}_{idx}"
+        elem_name = f"generic_ai_elem_ch{ao_channel}_{idx}"    # "ai" is historical; this is an output
         self.elems.append(elem_name)
-
-        self.log.error(f"frequecy {frequency}")
 
         config["elements"][elem_name] = {
             "singleInput": {"port": ao_port},
@@ -603,55 +574,44 @@ class Driver:
             "operations": {}
         }
         if pulse == "const":
-
-            # Element operation name
             config["elements"][elem_name]["operations"]["const"] = f"square_pulse_ch{ao_channel}_{idx}"
-
-            # Pulse block
             config["pulses"][f"square_pulse_ch{ao_channel}_{idx}"] = {
                 "operation": "control",
                 "length": length,
                 "waveforms": {"single": f"square_wf_ch{ao_channel}_{idx}"},
             }
-
-            # Waveform block
             config["waveforms"][f"square_wf_ch{ao_channel}_{idx}"] = {
                 "type": "constant",
                 "sample": amplitude,
             }
 
         elif pulse == "gauss":
-            gauss_wf, default = drag_gaussian_pulse_waveforms(
+            # A DRAG pulse with alpha=0 is a plain Gaussian; the derivative waveform is not used
+            gauss_wf, _ = drag_gaussian_pulse_waveforms(
                 amplitude, length, gauss_sd,
                 alpha=0, delta=1, anharmonicity=0, detuning=0, subtracted=True
             )
-
             config["elements"][elem_name]["operations"]["gauss"] = f"gaussian_pulse_ch{ao_channel}_{idx}"
-
             config["pulses"][f"gaussian_pulse_ch{ao_channel}_{idx}"] = {
                 "operation": "control",
                 "length": length,
                 "waveforms": {"single": f"gaussian_wf_ch{ao_channel}_{idx}"},
             }
-
             config["waveforms"][f"gaussian_wf_ch{ao_channel}_{idx}"] = {
-                "type": "gaussian",
-                "samples": gauss_wf,   # you should define this earlier
+                "type": "arbitrary",    # QUA waveforms are "constant" or "arbitrary"
+                "samples": gauss_wf,
             }
 
         elif pulse == "arbitrary":
-
             config["elements"][elem_name]["operations"]["arbitrary"] = f"arbitrary_pulse_ch{ao_channel}_{idx}"
-
             config["pulses"][f"arbitrary_pulse_ch{ao_channel}_{idx}"] = {
                 "operation": "control",
                 "length": length,
                 "waveforms": {"single": f"arbitrary_wf_ch{ao_channel}_{idx}"},
             }
-
             config["waveforms"][f"arbitrary_wf_ch{ao_channel}_{idx}"] = {
                 "type": "arbitrary",
-                "samples": wave_function,  # also define this earlier
+                "samples": wave_function,
             }
         self.log.info(f"Element created: {elem_name}")
 
@@ -664,33 +624,19 @@ class Driver:
         delay,
         buffer,
     ):
-        """Create a new digital-output element and its ON pulse."""
+        """Add a digital-output element whose "ON" pulse is high for `length` ns.
 
-        # Normalize type
+        `delay` and `buffer` (ns) shift and widen the marker, as in QUA's digitalInputs.
+        Returns the element name.
+        """
         do_channel = int(float(do_channel))
         do_port = opx_port(do_channel, "do")    # raises before anything is registered
-
-        # Counter/indexing scheme per DO channel
         self.elem_counters[f"do_{do_channel}"] += 1
         idx = self.elem_counters[f"do_{do_channel}"]
-
-        # Names
-        elem_name = f"generic_di_elem_ch{do_channel}_{idx}"
+        elem_name = f"generic_di_elem_ch{do_channel}_{idx}"    # "di" is historical; this is an output
         pulse_name = f"ON_pulse_ch{do_channel}_{idx}"
-
         self.elems.append(elem_name)
-        self.log.info(
-            f"[create_new_do_elem] do_channel={do_channel}, idx={idx}, "
-            f"elem={elem_name}, pulse={pulse_name}"
-        )
 
-        # Ensure digital_waveforms / ON exist
-        if "digital_waveforms" not in config:
-            config["digital_waveforms"] = {}
-        if "ON" not in config["digital_waveforms"]:
-            config["digital_waveforms"]["ON"] = {"samples": [(1, 0)]}
-
-        # Element block
         config["elements"][elem_name] = {
             "digitalInputs": {
                 "activate": {
@@ -699,13 +645,8 @@ class Driver:
                     "buffer": int(buffer),
                 }
             },
-            "operations": {
-                # Operation name -> pulse name
-                "ON": pulse_name
-            },
+            "operations": {"ON": pulse_name},
         }
-
-        # Pulse block
         config["pulses"][pulse_name] = {
             "operation": "control",
             "length": int(length),   # ns
@@ -715,37 +656,31 @@ class Driver:
         self.log.info(f"Digital element created: {elem_name}")
         return elem_name
 
-    def create_new_ai_elem(self, pulse=default_measure_pulse, ai_channel=None, ao_channel=None, amplitude=default_amplitude, length=default_length, wave_function=None, frequency=default_frequency, time_of_flight=defaut_time_of_flight, smearing=default_smearing, gauss_sd=default_length / 5,):
+    def create_new_ai_elem(self, pulse=default_measure_pulse, ai_channel=None, ao_channel=None, amplitude=default_amplitude, length=default_length, wave_function=None, frequency=default_frequency, time_of_flight=default_time_of_flight, smearing=default_smearing, gauss_sd=default_length / 5,):
+        """Add a measurement element: plays a "readout" pulse on `ao_channel` and records `ai_channel`.
 
-        # Normalize types
+        Pulse shapes as in create_new_ao_elem. `time_of_flight` and `smearing` (ns) are QUA's
+        readout timing settings. Returns the element name.
+        """
         ai_channel = int(float(ai_channel))
         ao_channel = int(float(ao_channel))
         ao_port, ai_port = opx_port(ao_channel, "ao"), opx_port(ai_channel, "ai")
-
-        # Counter/indexing scheme (mirror AO creator: per AO channel)
         self.elem_counters[f"ai_{ao_channel}_{ai_channel}"] += 1
         idx = self.elem_counters[f"ai_{ao_channel}_{ai_channel}"]
-
-        # Element & pulse names
         elem_name = f"generic_output_elem_ch{ao_channel}_ch{ai_channel}_{idx}"
         meas_pulse_name = f"meas_pulse_out_ch{ao_channel}_in_ch{ai_channel}_{idx}"
-
         self.elems.append(elem_name)
-        self.log.info(f"[create_new_ai_elem] freq {frequency}, ao={ao_channel}, ai={ai_channel}, idx={idx}")
 
-        # Element block (measurement element that drives AO and reads from AI)
         config["elements"][elem_name] = {
-            "singleInput": {"port": ao_port},           # drive out on AO
+            "singleInput": {"port": ao_port},
             "intermediate_frequency": frequency * u.MHz,
             "operations": {"readout": meas_pulse_name},
             "time_of_flight": int(time_of_flight),
             "smearing": int(smearing),
-            "outputs": {"out1": ai_port},               # read back on AI
+            "outputs": {"out1": ai_port},
         }
 
-        # Choose / create waveform per requested pulse type
         if pulse == "const":
-            self.log.info("[create_new_ai_elem] using CONST measurement pulse")
             wf_name = f"square_measure_wf_ch{ao_channel}_{idx}"
             config["waveforms"][wf_name] = {
                 "type": "constant",
@@ -753,36 +688,31 @@ class Driver:
             }
 
         elif pulse == "gauss":
-            gauss_wf, default = drag_gaussian_pulse_waveforms(
+            gauss_wf, _ = drag_gaussian_pulse_waveforms(
                 amplitude, length, gauss_sd,
                 alpha=0, delta=1, anharmonicity=0, detuning=0, subtracted=True
             )
-
-            self.log.info("[create_new_ai_elem] using GAUSS measurement pulse")
             wf_name = f"gaussian_measure_wf_ch{ao_channel}_{idx}"
-
             config["waveforms"][wf_name] = {
                 "type": "arbitrary",
                 "samples": gauss_wf,
             }
 
         elif pulse == "arbitrary":
-            self.log.info("[create_new_ai_elem] using ARBITRARY measurement pulse")
             wf_name = f"arbitrary_measure_wf_ch{ao_channel}_{idx}"
             config["waveforms"][wf_name] = {
                 "type": "arbitrary",
-                "samples": wave_function,   # caller supplies list of samples
+                "samples": wave_function,
             }
 
         else:
             raise ValueError(f"Unknown pulse type for measurement: {pulse!r}")
 
-        # Measurement pulse block
         config["pulses"][meas_pulse_name] = {
             "operation": "measurement",
             "length": int(length),
-            "waveforms": {"single": wf_name},   # <-- reference by STRING name
-            # These weights exist in your config; harmless if not demodulating
+            "waveforms": {"single": wf_name},
+            # Defined in the config module; "cos" is the one measure_demod uses
             "integration_weights": {
                 "cos": "cos",
                 "sin": "sin",
@@ -794,21 +724,23 @@ class Driver:
         return elem_name
 
     def delay(self, length, elements, simulate=False):
-        cycles = int(length / 4)
+        """Wait `length` ns (a multiple of 4) on `elements`, or on all elements if none are given.
+
+        Only useful inside build_stack()/execute(); on its own it runs a program that just
+        waits. `simulate` is not used.
+        """
         if length % 4 != 0:
-            self.log.error("ERROR. Input to length of delay function must be a multiple of 4ns.")
+            self.log.error(f"delay length must be a multiple of 4 ns, got {length}")
             raise ValueError("Length in delay function must be a multiple of 4")
+        cycles = int(length / 4)
         if not self.adding_to_stack:
             with program() as wait_prog:
                 if elements:
                     wait(cycles, *elements)
                 else:
                     wait(cycles)
-            # execute QUA program
-            qm = self.qmm.open_qm(config)
-            job = qm.execute(wait_prog)  # execute QUA program
+            self.qmm.open_qm(config).execute(wait_prog)
         else:
-            #True of False is infinite or not infinite
             self._append(["wait", cycles, elements])
 
 

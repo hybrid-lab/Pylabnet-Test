@@ -1,28 +1,30 @@
+"""Connection settings, port helpers, defaults and the QUA config for the OPX1000 driver (OPX.py).
+
+`config` starts with only the hardware and the shared pieces (digital "ON" marker,
+integration weights). OPX.py adds an element, pulse and waveform to it for every
+channel it uses, and opens the quantum machine with it.
+"""
 from pathlib import Path
-import numpy as np
-from qualang_tools.config.waveform_tools import drag_gaussian_pulse_waveforms
+
+import plotly.io as pio
+from qualang_tools.config.waveform_tools import drag_gaussian_pulse_waveforms    # used by OPX.py (import *)
 from qualang_tools.units import unit
 
-# These packages are imported here so that we don't have to import them in all the other files
-from qualang_tools.plot import interrupt_on_close
-from qualang_tools.results import progress_counter, fetching_tool
-import plotly.io as pio
+pio.renderers.default = "browser"    # simulation plots open in the browser
 
-pio.renderers.default = "browser"
-
-#######################
-# AUXILIARY FUNCTIONS #
-#######################
 u = unit(coerce_to_integer=True)
 
-######################
-# Network parameters #
-######################
+##############
+# Connection #
+##############
 # B167 OPX1000. No cluster name: the gateway rejects "Cluster_1" and connects
 # fine without one. The OPX server overrides these from configs/devices/OPX/OPX.json.
 qop_ip = "192.168.0.188"
 cluster_name = None
 
+#########
+# Ports #
+#########
 # OPX1000 only (the OPX+ is not supported). Every port is (controller, FEM slot,
 # port). B167 chassis: slots 1-2 are MW-FEMs, slots 3-4 are LF-FEMs. All AO/DO/AI
 # of this driver go through one LF-FEM, LF_FEM_SLOT; the OPX server sets it from
@@ -44,56 +46,25 @@ def opx_port(ch, kind):
                          f"{_PORT_NAMES[kind]}s 1-{n}")
     return (CONTROLLER, LF_FEM_SLOT, ch)
 
-#############
-# Save Path #
-#############
+
+# Simulation waveform reports (git-ignored)
 save_dir = Path(__file__).parent.resolve() / "Data"
 save_dir.mkdir(exist_ok=True)
 
-default_additional_files = {
-    Path(__file__).name: Path(__file__).name,
-    "optimal_weights.npz": "optimal_weights.npz",
-}
-
-#####################
-# OPX configuration #
-#####################
-
-#####################
-# PARAMS (DICT FORM)#
-#####################
-
-default_length = 100
-default_frequency = 10 #in MHz
-default_amplitude = 0.3
-default_measure_length = 100
-
+######################################
+# Defaults for the driver and client #
+######################################
+default_length = 100            # ns
+default_frequency = 10          # MHz, intermediate frequency of analog elements
+default_amplitude = 0.3         # V
 default_measure_pulse = "const"
 default_digital_pulse = "ON"
-defaut_time_of_flight = 24
-default_smearing = 0
-#####################
-# HARDCODED PARAMS  #
-#####################
-# (These are your single, non-per-channel items)
-AOM_IF = 10 * u.MHz
-measure_length_default = 200
-gauss_amp_single = 0.3
-gauss_len_single = 100
+default_time_of_flight = 28      # ns; the OPX1000 needs a multiple of 4, >= 28
+default_smearing = 0            # ns
 
-gauss_wf_single, gauss_der_wf_single = drag_gaussian_pulse_waveforms(
-    gauss_amp_single, gauss_len_single, gauss_len_single / 5,
-    alpha=0, delta=1, anharmonicity=0, detuning=0, subtracted=True
-)
-
-square_len_single = 100   # ns
-square_amp_single = 0.1   # Volts
-gauss_sd = 1
-set_length_single = 100
-zero_pulse_single = [0.3] * set_length_single
-
-on_len = 320  # ns
-IF = 0
+##############
+# QUA config #
+##############
 
 
 def _lf_fem_config():
@@ -105,36 +76,20 @@ def _lf_fem_config():
     }
 
 
-################
-# CONFIG BUILD #
-################
-hard_coded_config = {
-    "version": 1,
+config = {
     "controllers": {
         CONTROLLER: {
             "type": "opx1000",
             "fems": {LF_FEM_SLOT: _lf_fem_config()},
         },
     },
-
-    "elements": {
-
-    },
-
-    "pulses": {
-
-    },
-
-    "waveforms": {
-        # ---------- Your hardcoded waveforms
-        "square_wf": {"type": "constant", "sample": square_amp_single},
-        "gaussian_wf": {"type": "arbitrary", "samples": gauss_wf_single},
-    },
-
+    "elements": {},     # filled in by OPX.py
+    "pulses": {},       # filled in by OPX.py
+    "waveforms": {},    # filled in by OPX.py
     "digital_waveforms": {
-        "ON": {"samples": [(1, 0)]},
+        "ON": {"samples": [(1, 0)]},    # high for the whole pulse; used by every digital pulse
     },
-
+    # Referenced by every measurement pulse; measure_demod demodulates with "cos"
     "integration_weights": {
         "cos": {"cosine": [(4.0, 500)], "sine": [(0.0, 500)]},
         "sin": {"cosine": [(0.0, 500)], "sine": [(4.0, 500)]},
@@ -142,15 +97,12 @@ hard_coded_config = {
     },
 }
 
-config = hard_coded_config.copy()
-
 
 def set_lf_fem_slot(slot):
     """Point the driver at the LF-FEM in `slot`. Call before any element is created."""
     global LF_FEM_SLOT
     slot = int(slot)
-    # config is a shallow copy, so it shares this dict: edit it in place
-    fems = hard_coded_config["controllers"][CONTROLLER]["fems"]
-    fems.clear()
+    fems = config["controllers"][CONTROLLER]["fems"]
+    fems.clear()    # in place: OPX.py holds a reference to this same dict
     fems[slot] = _lf_fem_config()
     LF_FEM_SLOT = slot
