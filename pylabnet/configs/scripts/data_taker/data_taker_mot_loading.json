@@ -1,0 +1,28 @@
+{
+    "servers": [
+        {
+            "type": "OPX",
+            "config": "OPX"
+        },
+        {
+            "type": "nidaqmx",
+            "config": "ni_daq_1"
+        },
+        {
+            "type": "rigol_dp832",
+            "config": "mot_coils"
+        },
+        {
+            "type": "flir_camera",
+            "config": "bfs_u3_51s5m"
+        },
+        {
+            "type": "opencv_camera",
+            "config": "network_camera"
+        }
+    ],
+    "script": "C:\\Users\\User\\repos\\Pylabnet-Test\\pylabnet\\scripts\\data_center\\take_data.py",
+    "exp_path": "C:\\Users\\User\\repos\\atoms-circuits-scripts\\experiments",
+    "save_path": "C:\\Users\\User\\pylabnet_data",
+    "auto_save": false
+}

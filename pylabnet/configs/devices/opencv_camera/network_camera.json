@@ -1,0 +1,5 @@
+{
+    "device_id": "network_192.168.0.12",
+    "source": "rtsp://192.168.0.12:554/user=admin&password=&channel=1&stream=0.sdp?real_stream",
+    "port": 15207
+}

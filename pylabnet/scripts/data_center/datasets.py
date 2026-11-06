@@ -3,6 +3,7 @@ import pyqtgraph as pg
 import numpy as np
 import copy
 import time
+import threading
 from PyQt5 import QtWidgets, QtCore
 
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
@@ -1547,6 +1548,246 @@ class CameraFrame(HeatMap):
         if self.data is not None:
             npy_generic_save(data=self.data, filename=name, directory=directory, date_dir=date_dir)
         pyqtgraph_save(self.graph.getView(), name, directory, date_dir)
+
+
+def _turbo_ticks(n=16):
+    """Google's Turbo colormap as gradient ticks, from the polynomial fit by
+    Mikhailov (2019), the same one camera_stream uses."""
+    x = np.linspace(0, 1, n)
+    r = 0.13572138 + x * (4.61539260 + x * (-42.66032258 + x * (132.13108234 + x * (-152.94239396 + x * 59.28637943))))
+    g = 0.09140261 + x * (2.19418839 + x * (4.84296658 + x * (-14.18503333 + x * (4.27729857 + x * 2.82956604))))
+    b = 0.10667330 + x * (12.64194608 + x * (-60.58204836 + x * (110.36276771 + x * (-89.90310912 + x * 27.34824973))))
+    rgb = (np.clip(np.stack([r, g, b], axis=1), 0, 1) * 255).astype(int)
+    return [(float(xi), (int(c[0]), int(c[1]), int(c[2]), 255)) for xi, c in zip(x, rgb)]
+
+
+# Colormaps offered in ImageGrid's menus: name shown -> pyqtgraph preset name, or
+# gradient ticks for maps pyqtgraph 0.11 doesn't ship. The sequential maps come first,
+# then the diverging ones, which suit images centred on 0 (differences, with the
+# 'symmetric' scale): 0 is the middle color, negative and positive go opposite ways.
+IMAGE_COLORMAPS = {
+    'gray': 'grey',
+    'viridis': 'viridis',
+    'inferno': 'inferno',
+    'magma': 'magma',
+    'plasma': 'plasma',
+    'turbo': _turbo_ticks(),
+    'jet': [(0.0, (0, 0, 128, 255)), (0.125, (0, 0, 255, 255)), (0.375, (0, 255, 255, 255)),
+            (0.625, (255, 255, 0, 255)), (0.875, (255, 0, 0, 255)), (1.0, (128, 0, 0, 255))],
+    # Diverging. coolwarm: Moreland's blue - light gray - red, as in matplotlib
+    'coolwarm': [(0.0, (59, 76, 192, 255)), (0.125, (98, 130, 234, 255)), (0.25, (141, 176, 254, 255)), (0.375, (184, 208, 249, 255)), (0.5, (221, 221, 221, 255)), (0.625, (245, 196, 173, 255)), (0.75, (244, 154, 123, 255)), (0.875, (222, 96, 77, 255)), (1.0, (180, 4, 38, 255))],
+    'bwr': [(0.0, (0, 0, 255, 255)), (0.5, (255, 255, 255, 255)), (1.0, (255, 0, 0, 255))],
+    'seismic': [(0.0, (0, 0, 77, 255)), (0.25, (0, 0, 255, 255)), (0.5, (255, 255, 255, 255)),
+                (0.75, (255, 0, 0, 255)), (1.0, (128, 0, 0, 255))],
+    # RdBu: ColorBrewer red - white - blue (red for negative)
+    'RdBu': [(0.0, (103, 0, 31, 255)), (0.1, (178, 24, 43, 255)), (0.2, (214, 96, 77, 255)), (0.3, (244, 165, 130, 255)), (0.4, (253, 219, 199, 255)), (0.5, (247, 247, 247, 255)), (0.6, (209, 229, 240, 255)), (0.7, (146, 197, 222, 255)), (0.8, (67, 147, 195, 255)), (0.9, (33, 102, 172, 255)), (1.0, (5, 48, 97, 255))],
+    # bipolar: pyqtgraph's cyan - blue - black - red - yellow (dark at 0)
+    'bipolar': 'bipolar',
+}
+
+
+def _load_colormap(hist, name):
+    """Apply colormap `name` (a key of IMAGE_COLORMAPS, or any pyqtgraph preset) to a
+    HistogramLUTItem."""
+    cmap = IMAGE_COLORMAPS.get(name, name)
+    if isinstance(cmap, str):
+        hist.gradient.loadPreset(cmap)
+    else:
+        hist.gradient.restoreState({'mode': 'rgb', 'ticks': cmap})
+
+
+class ImageGrid(Dataset):
+    """ Images in rows, each with its own color scale.
+
+    The script sends images by panel name: set_image(name, image, row=...). An image
+    under a new name adds a panel at the right end of its row. Each panel has a
+    histogram next to it: drag its handles to change the color scale. A dragged scale
+    stays for later images until you press that panel's Autoscale button.
+
+    Panels with the same `link` (e.g. images from one camera) zoom and pan together.
+
+    Each panel has a colormap menu below it: sequential maps (gray, viridis, inferno,
+    magma, plasma, turbo, jet) and diverging ones for differences (coolwarm, bwr,
+    seismic, RdBu, bipolar). Panels start in viridis unless the script picks another; a choice made in the menu
+    stays for later images.
+
+    Color scale of each new image (the `scale` argument of set_image):
+        'minmax'      darkest to brightest pixel
+        'percentile'  between two percentiles, so a few hot or dead pixels don't set the scale
+        'symmetric'   -m to +m around 0, m = upper percentile of |image|; for differences
+
+    Save writes every image, shown or kept with keep_image(), as .npy (full
+    resolution), plus one PNG of the row.
+    """
+
+    # Percentiles are computed on every SUBSAMPLE-th pixel in each direction: plenty
+    # for a color scale, and fast on 5 MP frames
+    SUBSAMPLE = 4
+
+    def visualize(self, graph, **kwargs):
+        # A pyqtgraph layout for the images, with a row of Autoscale buttons below
+        self.widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(self.widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.glw = pg.GraphicsLayoutWidget()
+        layout.addWidget(self.glw, 1)
+        self.buttons = QtWidgets.QHBoxLayout()
+        layout.addLayout(self.buttons)
+        self.gui.graph_layout.addWidget(self.widget)
+
+        self.panels = {}        # name -> widgets and state of the panel
+        self.images = {}        # name -> latest image
+        self.options = {}       # name -> how to show it (title, scale, percentiles, gradient)
+        self._pending = []      # names with an image not drawn yet
+        self._lock = threading.Lock()
+        self._setting_levels = False
+
+    def set_image(self, name, image, title=None, scale='minmax', percentiles=(1, 99), gradient='viridis',
+                  row=0, link=None):
+        """Show an image in panel `name` (made on first use). Safe to call from the
+        experiment thread: drawing happens on the next GUI update.
+
+        :param name: (str) panel name; also used in the saved file names
+        :param image: 2D array (rows, columns)
+        :param title: (str) text above the panel; default is the name
+        :param scale: 'minmax', 'percentile' or 'symmetric' (see the class docstring)
+        :param percentiles: (lo, hi) for 'percentile'; 'symmetric' uses hi
+        :param gradient: starting colormap of the panel (default viridis): a name in IMAGE_COLORMAPS
+            ('gray', 'viridis', ..., 'coolwarm', 'bwr', ...) or any pyqtgraph preset.
+            Used only when the panel is made.
+        :param row: (int) row of the panel, from 0 at the top; fixed when the panel is made
+        :param link: (str) panels with the same link zoom and pan together
+        """
+        if scale not in ('minmax', 'percentile', 'symmetric'):
+            raise ValueError(f'Unknown scale {scale}')
+        with self._lock:
+            self.images[name] = np.asarray(image)
+            self.options[name] = dict(title=title or name, scale=scale, percentiles=tuple(percentiles),
+                                      gradient=gradient, row=int(row), link=link)
+            if name not in self._pending:
+                self._pending.append(name)
+
+    def keep_image(self, name, image):
+        """Store an image to be saved with the others, without showing it."""
+        with self._lock:
+            self.images[name] = np.asarray(image)
+
+    def set_data(self, data=None, x=None):
+        """Same as set_image for each item of a {name: image} dict."""
+        for name, image in (data or {}).items():
+            self.set_image(name, image)
+
+    def _add_panel(self, name, options):
+        # Each image row takes two layout rows (title, image) and each panel two
+        # columns (image, histogram)
+        row = options['row']
+        col = 2 * sum(1 for p in self.panels.values() if p['row'] == row)
+        label = self.glw.addLabel(name, row=2 * row, col=col, colspan=2)
+        view = self.glw.addViewBox(row=2 * row + 1, col=col, lockAspect=True, invertY=True)
+        item = pg.ImageItem()
+        view.addItem(item)
+        hist = pg.HistogramLUTItem(image=item)
+        _load_colormap(hist, options['gradient'])
+        self.glw.addItem(hist, row=2 * row + 1, col=col + 1)
+
+        # Zooming or panning with the mouse is copied to the other panels of the same
+        # link. Only mouse changes are copied: copying every range change (as
+        # pyqtgraph's setXLink/setYLink do) makes panels with locked aspect ratios push
+        # each other's range out whenever the layout resizes.
+        link = options['link']
+        if link is not None:
+            view.sigRangeChangedManually.connect(lambda *args, v=view: self._sync_range(link, v))
+
+        # Dragging the histogram handles switches this panel to a manual color scale
+        def manual_levels(*args):
+            if not self._setting_levels:
+                self.panels[name]['auto'] = False
+        hist.sigLevelChangeFinished.connect(manual_levels)
+
+        # Controls below the images, one group per panel: Autoscale and the colormap menu
+        button = QtWidgets.QPushButton(f'Autoscale {name}')
+        button.setToolTip('Set the color scale from the image again, and keep doing so for new images')
+        button.clicked.connect(lambda: self._autoscale(name))
+        cmap_box = QtWidgets.QComboBox()
+        cmap_box.setToolTip(f'Colormap of {name}')
+        cmap_box.addItems(list(IMAGE_COLORMAPS))
+        if options['gradient'] in IMAGE_COLORMAPS:
+            cmap_box.setCurrentText(options['gradient'])
+        cmap_box.currentTextChanged.connect(lambda cmap: _load_colormap(hist, cmap))
+        self.buttons.addWidget(button, 2)
+        self.buttons.addWidget(cmap_box, 1)
+
+        self.panels[name] = dict(label=label, view=view, item=item, hist=hist, button=button,
+                                 cmap_box=cmap_box, auto=True, first=True, row=row, link=link)
+
+    def _sync_range(self, link, source):
+        """Copy the range of one panel to the others of its link."""
+        rect = source.viewRect()
+        for panel in self.panels.values():
+            if panel['link'] == link and panel['view'] is not source:
+                panel['view'].setRange(rect, padding=0)
+
+    def _levels(self, image, options):
+        sub = image[::self.SUBSAMPLE, ::self.SUBSAMPLE]
+        if options['scale'] == 'minmax':
+            lo, hi = float(sub.min()), float(sub.max())
+        elif options['scale'] == 'percentile':
+            lo, hi = (float(v) for v in np.percentile(sub, options['percentiles']))
+        else:
+            m = float(np.percentile(np.abs(sub), options['percentiles'][1]))
+            lo, hi = -m, m
+        if hi <= lo:
+            hi = lo + 1
+        return lo, hi
+
+    def _autoscale(self, name):
+        panel = self.panels[name]
+        panel['auto'] = True
+        with self._lock:
+            image, options = self.images.get(name), self.options.get(name)
+        if image is not None:
+            self._set_levels(panel, self._levels(image, options))
+
+    def _set_levels(self, panel, levels):
+        self._setting_levels = True
+        try:
+            panel['hist'].setLevels(*levels)
+        finally:
+            self._setting_levels = False
+
+    def update(self, **kwargs):
+        with self._lock:
+            pending, self._pending = self._pending, []
+            todo = [(name, self.images[name], self.options[name]) for name in pending]
+        for name, image, options in todo:
+            if name not in self.panels:
+                self._add_panel(name, options)
+            panel = self.panels[name]
+            panel['label'].setText(options['title'])
+            # ImageItem takes (x, y) = (column, row) order
+            panel['item'].setImage(image.T, autoLevels=False)
+            if panel['auto']:
+                self._set_levels(panel, self._levels(image, options))
+            if panel['first']:
+                panel['view'].autoRange(padding=0)
+                panel['first'] = False
+
+    def clear_data(self):
+        with self._lock:
+            self.images, self.options, self._pending = {}, {}, []
+        for panel in self.panels.values():
+            panel['item'].clear()
+
+    def save(self, filename=None, directory=None, date_dir=True, unique_id=None):
+        self.update()    # draw pending images so the PNG matches the .npy files
+        with self._lock:
+            images = dict(self.images)
+        for name, image in images.items():
+            safe = ''.join(c if c.isalnum() or c in '-_' else '_' for c in name)
+            npy_generic_save(data=image, filename=f'{filename}_{safe}_{unique_id}',
+                             directory=directory, date_dir=date_dir)
+        pyqtgraph_save(self.glw.ci, f'{filename}_{self.name}_{unique_id}', directory, date_dir)
+        save_metadata(self.log, filename, directory, date_dir, unique_id)
 
 
 class Plot2D(Dataset):

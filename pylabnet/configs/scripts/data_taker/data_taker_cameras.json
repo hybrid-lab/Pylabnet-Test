@@ -1,0 +1,20 @@
+{
+    "servers": [
+        {
+            "type": "flir_camera",
+            "config": "bfs_u3_51s5m"
+        },
+        {
+            "type": "opencv_camera",
+            "config": "usb_camera_0"
+        },
+        {
+            "type": "opencv_camera",
+            "config": "network_camera"
+        }
+    ],
+    "script": "C:\\Users\\User\\repos\\Pylabnet-Test\\pylabnet\\scripts\\data_center\\take_data.py",
+    "exp_path": "C:\\Users\\User\\repos\\atoms-circuits-scripts\\experiments",
+    "save_path": "C:\\Users\\User\\pylabnet_data",
+    "auto_save": false
+}

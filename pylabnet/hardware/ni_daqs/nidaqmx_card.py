@@ -728,6 +728,10 @@ class Driver:
     def close_timed_counter(self, name): self.counters[name].close()
     def get_count(self, name): return int(self.counters[name].count)
 
+    # Free-running use of the same counters: count from start until closed, read at any time
+    def start_counting(self, name): self.counters[name].start_continuous()
+    def read_count(self, name): return int(self.counters[name].read())
+
     # ---------------------------------------------------------------------
     # Compiler + timing config (unchanged except kept as in your original)
     # ---------------------------------------------------------------------
@@ -1194,6 +1198,17 @@ class TimedCounter:
         except nidaqmx.DaqError:
             if self.log:
                 self.log.warn(f"Failed to count on {self.task.name}")
+
+    def start_continuous(self):
+        """Start counting and return at once. read() gives the running total; the count
+        keeps going until terminate_counting() or close()."""
+        self.task.start()
+        self._status = "Counting"
+
+    def read(self):
+        """Edges counted since start_continuous(), read without stopping the count."""
+        self.count = self.task.read()
+        return self.count
 
     def terminate_counting(self):
         try:

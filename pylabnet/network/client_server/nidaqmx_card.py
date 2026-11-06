@@ -311,6 +311,12 @@ class Service(ServiceBase):
     def exposed_get_count(self, name):
         return self._module.get_count(name)
 
+    def exposed_start_counting(self, name):
+        return self._module.start_counting(name)
+
+    def exposed_read_count(self, name):
+        return self._module.read_count(name)
+
 
 # =======================
 # Client (client-side API)
@@ -467,6 +473,15 @@ class Client(ClientBase):
 
     def get_count(self, name):
         return self._service.exposed_get_count(name)
+
+    def start_counting(self, name):
+        """Start a counter made with create_timed_counter and return at once; it counts
+        until close_timed_counter. read_count gives the running total."""
+        return self._service.exposed_start_counting(name)
+
+    def read_count(self, name):
+        """Edges counted so far by a counter started with start_counting."""
+        return self._service.exposed_read_count(name)
 
     def not_use_OPX_clock(self):
         return self._service.exposed_not_use_OPX_clock()
