@@ -9,7 +9,7 @@ from PyQt5 import QtWidgets, QtCore
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from pylabnet.gui.pyqt.external_gui import Window, ParameterPopup, GraphPopup, Confluence_support_GraphPopup, Confluence_Handler, GraphPopupTabs, Confluence_support_GraphPopupTabs
 from pylabnet.utils.logging.logger import LogClient, LogHandler
-from pylabnet.utils.helper_methods import save_metadata, generic_save, npy_generic_save, pyqtgraph_save, fill_2dlist, TimeAxisItem
+from pylabnet.utils.helper_methods import save_metadata, generic_save, npy_generic_save, pyqtgraph_save, fill_2dlist, TimeAxisItem, generate_filepath
 
 import sys
 
@@ -1597,7 +1597,7 @@ def _load_colormap(hist, name):
 
 
 class ImageGrid(Dataset):
-    """ Images in rows, each with its own color scale.
+    """ Images (and line plots) in rows, each image with its own color scale.
 
     The script sends images by panel name: set_image(name, image, row=...). An image
     under a new name adds a panel at the right end of its row. Each panel has a
@@ -1616,8 +1616,17 @@ class ImageGrid(Dataset):
         'percentile'  between two percentiles, so a few hot or dead pixels don't set the scale
         'symmetric'   -m to +m around 0, m = upper percentile of |image|; for differences
 
+    Line plots: set_curve(name, x, y, row=...) adds a plot panel the same way, e.g. a
+    signal against time. Its Autoscale button turns automatic axis ranges back on
+    after you zoom. NaN values leave gaps.
+
+    Square regions: set_roi(panel, row, col, size) draws a square on an image panel
+    that the user can drag and resize (drag the corner handle). get_roi(panel) gives
+    its current position in image pixels, with a version number that goes up every
+    time the user moves it, so a script can e.g. average the pixels inside it.
+
     Save writes every image, shown or kept with keep_image(), as .npy (full
-    resolution), plus one PNG of the row.
+    resolution), every curve as a two-column .csv, plus one PNG of the grid.
     """
 
     # Percentiles are computed on every SUBSAMPLE-th pixel in each direction: plenty
@@ -1639,6 +1648,11 @@ class ImageGrid(Dataset):
         self.images = {}        # name -> latest image
         self.options = {}       # name -> how to show it (title, scale, percentiles, gradient)
         self._pending = []      # names with an image not drawn yet
+        self.plots = {}         # name -> widgets of a line-plot panel
+        self.curves = {}        # name -> (x, y, options) of the latest curve
+        self._pending_curves = []
+        self.rois = {}          # panel name -> current square: dict(row, col, size, version)
+        self._roi_items = {}    # panel name -> the pyqtgraph ROI drawn on it
         self._lock = threading.Lock()
         self._setting_levels = False
 
@@ -1667,6 +1681,89 @@ class ImageGrid(Dataset):
             if name not in self._pending:
                 self._pending.append(name)
 
+    def set_curve(self, name, x, y, title=None, xlabel='', ylabel='', row=0):
+        """Show a line plot in panel `name` (made on first use), replacing its data.
+        Safe to call from the experiment thread.
+
+        :param x, y: 1D arrays of equal length
+        :param title: (str) text above the panel; default is the name
+        :param xlabel, ylabel: (str) axis labels
+        :param row: (int) row of the panel; fixed when the panel is made
+        """
+        with self._lock:
+            self.curves[name] = (np.asarray(x, dtype=float), np.asarray(y, dtype=float),
+                                 dict(title=title or name, xlabel=xlabel, ylabel=ylabel, row=int(row)))
+            if name not in self._pending_curves:
+                self._pending_curves.append(name)
+
+    def set_roi(self, name, row, col, size):
+        """Put a square the user can move and resize on image panel `name`.
+        Safe to call from the experiment thread; it is drawn once the panel exists.
+
+        :param row, col: (int) top-left corner, in image pixels
+        :param size: (int) side length, in pixels
+        """
+        with self._lock:
+            old = self.rois.get(name, {}).get('version', -1)
+            self.rois[name] = dict(row=int(row), col=int(col), size=int(size), version=old + 1, drawn=False)
+
+    def get_roi(self, name):
+        """Current square on panel `name` as dict(row, col, size, version), or None."""
+        with self._lock:
+            roi = self.rois.get(name)
+            return None if roi is None else {k: roi[k] for k in ('row', 'col', 'size', 'version')}
+
+    def _draw_roi(self, name):
+        """Runs in update(): draw (or move) the square of panel `name`."""
+        roi = self.rois[name]
+        if name in self._roi_items:
+            item = self._roi_items[name]
+            item.setPos((roi['col'], roi['row']), finish=False)
+            item.setSize((roi['size'], roi['size']), finish=False)
+        else:
+            # The image is drawn transposed (x = column, y = row); so is the square
+            item = pg.ROI((roi['col'], roi['row']), (roi['size'], roi['size']), pen=pg.mkPen('r', width=2))
+            item.addScaleHandle([1, 1], [0, 0], lockAspect=True)
+            item.sigRegionChangeFinished.connect(lambda r, n=name: self._roi_moved(n, r))
+            self.panels[name]['view'].addItem(item)
+            self._roi_items[name] = item
+        roi['drawn'] = True
+
+    def _roi_moved(self, name, item):
+        """The user moved or resized the square: store it in whole pixels inside the image."""
+        image = self.images.get(name)
+        x, y = item.pos()
+        size = max(1, int(round(item.size()[0])))
+        if image is not None:
+            h, w = image.shape[:2]
+            size = min(size, h, w)
+            x = min(max(0, x), w - size)
+            y = min(max(0, y), h - size)
+        with self._lock:
+            version = self.rois[name]['version'] + 1
+            # drawn=False: update() redraws it at the stored (whole-pixel, clipped)
+            # place, so what is drawn is exactly what get_roi() reports
+            self.rois[name] = dict(row=int(round(y)), col=int(round(x)), size=size, version=version, drawn=False)
+
+    def _next_col(self, row):
+        """First free layout column in an image row: every panel takes two columns."""
+        used = [p for p in list(self.panels.values()) + list(self.plots.values()) if p['row'] == row]
+        return 2 * len(used)
+
+    def _add_plot(self, name, options):
+        row, col = options['row'], self._next_col(options['row'])
+        label = self.glw.addLabel(name, row=2 * row, col=col, colspan=2)
+        plot = self.glw.addPlot(row=2 * row + 1, col=col, colspan=2)
+        plot.showGrid(x=True, y=True, alpha=0.3)
+        plot.setLabel('bottom', options['xlabel'])
+        plot.setLabel('left', options['ylabel'])
+        curve = plot.plot(pen='y', symbol='o', symbolSize=4, symbolBrush='y', symbolPen=None, connect='finite')
+        button = QtWidgets.QPushButton(f'Autoscale {name}')
+        button.setToolTip('Turn automatic axis ranges back on')
+        button.clicked.connect(plot.enableAutoRange)
+        self.buttons.addWidget(button, 2)
+        self.plots[name] = dict(label=label, plot=plot, curve=curve, button=button, row=row)
+
     def keep_image(self, name, image):
         """Store an image to be saved with the others, without showing it."""
         with self._lock:
@@ -1681,7 +1778,7 @@ class ImageGrid(Dataset):
         # Each image row takes two layout rows (title, image) and each panel two
         # columns (image, histogram)
         row = options['row']
-        col = 2 * sum(1 for p in self.panels.values() if p['row'] == row)
+        col = self._next_col(row)
         label = self.glw.addLabel(name, row=2 * row, col=col, colspan=2)
         view = self.glw.addViewBox(row=2 * row + 1, col=col, lockAspect=True, invertY=True)
         item = pg.ImageItem()
@@ -1772,22 +1869,48 @@ class ImageGrid(Dataset):
                 panel['view'].autoRange(padding=0)
                 panel['first'] = False
 
+        # Squares set by the script (new, or moved by set_roi) on panels that exist now
+        with self._lock:
+            to_draw = [n for n, r in self.rois.items() if not r['drawn'] and n in self.panels]
+        for name in to_draw:
+            self._draw_roi(name)
+
+        with self._lock:
+            pending, self._pending_curves = self._pending_curves, []
+            curves = [(name, self.curves[name]) for name in pending]
+        for name, (x, y, options) in curves:
+            if name not in self.plots:
+                self._add_plot(name, options)
+            self.plots[name]['label'].setText(options['title'])
+            self.plots[name]['curve'].setData(x, y)
+
     def clear_data(self):
         with self._lock:
             self.images, self.options, self._pending = {}, {}, []
+            self.curves, self._pending_curves = {}, []
         for panel in self.panels.values():
             panel['item'].clear()
+        for plot in self.plots.values():
+            plot['curve'].clear()
 
     def save(self, filename=None, directory=None, date_dir=True, unique_id=None):
         self.update()    # draw pending images so the PNG matches the .npy files
         with self._lock:
-            images = dict(self.images)
+            images, curves = dict(self.images), dict(self.curves)
         for name, image in images.items():
-            safe = ''.join(c if c.isalnum() or c in '-_' else '_' for c in name)
-            npy_generic_save(data=image, filename=f'{filename}_{safe}_{unique_id}',
+            npy_generic_save(data=image, filename=f'{filename}_{self._safe(name)}_{unique_id}',
                              directory=directory, date_dir=date_dir)
+        for name, (x, y, options) in curves.items():
+            path = generate_filepath(f'{filename}_{self._safe(name)}_{unique_id}', directory, date_dir) + '.csv'
+            header = f'{options["xlabel"] or "x"},{options["ylabel"] or "y"}'
+            np.savetxt(path, np.column_stack([x, y]), delimiter=',', header=header, comments='')
         pyqtgraph_save(self.glw.ci, f'{filename}_{self.name}_{unique_id}', directory, date_dir)
         save_metadata(self.log, filename, directory, date_dir, unique_id)
+
+    @staticmethod
+    def _safe(name):
+        """Panel name made safe for a file name."""
+        return ''.join(c if c.isalnum() or c in '-_' else '_' for c in name)
 
 
 class Plot2D(Dataset):
