@@ -1618,7 +1618,7 @@ class ImageGrid(Dataset):
 
     Line plots: set_curve(name, x, y, row=...) adds a plot panel the same way, e.g. a
     signal against time. Its Autoscale button turns automatic axis ranges back on
-    after you zoom. NaN values leave gaps.
+    after you zoom. NaN values leave gaps. fit=(x, y) draws a fit over the data in red.
 
     Square regions: set_roi(panel, row, col, size) draws a square on an image panel
     that the user can drag and resize (drag the corner handle). get_roi(panel) gives
@@ -1681,7 +1681,7 @@ class ImageGrid(Dataset):
             if name not in self._pending:
                 self._pending.append(name)
 
-    def set_curve(self, name, x, y, title=None, xlabel='', ylabel='', row=0):
+    def set_curve(self, name, x, y, title=None, xlabel='', ylabel='', row=0, fit=None):
         """Show a line plot in panel `name` (made on first use), replacing its data.
         Safe to call from the experiment thread.
 
@@ -1689,10 +1689,13 @@ class ImageGrid(Dataset):
         :param title: (str) text above the panel; default is the name
         :param xlabel, ylabel: (str) axis labels
         :param row: (int) row of the panel; fixed when the panel is made
+        :param fit: (x, y) of a fit to draw over the data as a red line, or None for none
         """
+        if fit is not None:
+            fit = (np.asarray(fit[0], dtype=float), np.asarray(fit[1], dtype=float))
         with self._lock:
             self.curves[name] = (np.asarray(x, dtype=float), np.asarray(y, dtype=float),
-                                 dict(title=title or name, xlabel=xlabel, ylabel=ylabel, row=int(row)))
+                                 dict(title=title or name, xlabel=xlabel, ylabel=ylabel, row=int(row), fit=fit))
             if name not in self._pending_curves:
                 self._pending_curves.append(name)
 
@@ -1758,11 +1761,12 @@ class ImageGrid(Dataset):
         plot.setLabel('bottom', options['xlabel'])
         plot.setLabel('left', options['ylabel'])
         curve = plot.plot(pen='y', symbol='o', symbolSize=4, symbolBrush='y', symbolPen=None, connect='finite')
+        fit = plot.plot(pen=pg.mkPen('r', width=2))    # optional fit over the data
         button = QtWidgets.QPushButton(f'Autoscale {name}')
         button.setToolTip('Turn automatic axis ranges back on')
         button.clicked.connect(plot.enableAutoRange)
         self.buttons.addWidget(button, 2)
-        self.plots[name] = dict(label=label, plot=plot, curve=curve, button=button, row=row)
+        self.plots[name] = dict(label=label, plot=plot, curve=curve, fit=fit, button=button, row=row)
 
     def keep_image(self, name, image):
         """Store an image to be saved with the others, without showing it."""
@@ -1883,6 +1887,11 @@ class ImageGrid(Dataset):
                 self._add_plot(name, options)
             self.plots[name]['label'].setText(options['title'])
             self.plots[name]['curve'].setData(x, y)
+            fit = options.get('fit')
+            if fit is None:
+                self.plots[name]['fit'].clear()
+            else:
+                self.plots[name]['fit'].setData(*fit)
 
     def clear_data(self):
         with self._lock:
@@ -1892,6 +1901,7 @@ class ImageGrid(Dataset):
             panel['item'].clear()
         for plot in self.plots.values():
             plot['curve'].clear()
+            plot['fit'].clear()
 
     def save(self, filename=None, directory=None, date_dir=True, unique_id=None):
         self.update()    # draw pending images so the PNG matches the .npy files
