@@ -5,7 +5,7 @@ relevant commandline arguments. For example,
 
     'start "dummy_testing_server, 2020-12-21, 02:54:27"
     "C:\\Users\\mbhas\\pylabnet\\venv\\pylabnet-test\\Scripts\\python.exe"
-    "C:\\Users\\mbhas\\pylabnet\\pylabnet\\launchers\\launcher.py"
+    "C:\\Users\\mbhas\\pylabnet\\pylabnet\\pylabnet\\launchers\\launcher.py"
     --logip 192.168.0.106 --logport 21189 --script dummy_testing
     --num_clients 1
 
@@ -33,7 +33,7 @@ Example config dict:
             "config" : "science_tool"
         }
     ],
-    "script" : "C:\\Users\\mbhas\\pylabnet\\pylabnet\\scripts\\deviceless_test.py"
+    "script" : "C:\\Users\\mbhas\\pylabnet\\pylabnet\\pylabnet\\scripts\\deviceless_test.py"
 }
 """
 
