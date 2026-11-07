@@ -1,29 +1,13 @@
 {
     "servers": [
-                {
-            "type": "nidaqmx",
-            "config": "ni_daq_1"
-        },
-        {
-            "type": "nidaqmx",
-            "config": "ni_daq_2"
-        },
-        {
-            "type": "OPX",
-            "config": "OPX"
-        },
-        {
-            "type": "nidaqmx",
-            "config": "ni_daq_3"
-        },
-        {
-            "type": "fluorescence_imaging_camera",
-            "config": "bfs_u3_51s5m"
-        }
 
+        {
+            "type": "OPX1000",
+            "config": "OPX1000"
+        }
     ],
-    "script": "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\data_center\\take_data.py",
-    "exp_path" : "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\test_scripts",
+    "script": "C:\\Users\\hybri\\Documents\\pylabnet\\pylabnet\\pylabnet\\scripts\\data_center\\take_data.py",
+    "exp_path" : "C:\\Users\\hybri\\Documents\\pylabnet\\pylabnet\\pylabnet\\scripts\\test_scripts",
     "save_path": "C:\\Data\\Datataker",
     "auto_save": "False"
 }

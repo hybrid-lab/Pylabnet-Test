@@ -9,7 +9,7 @@
             "config": "ni_daq_2"
         }
     ],
-    "script" : "C:\\Users\\user\\pylabnet\\pylabnet\\scripts\\staticlines\\staticline.py",
+    "script" : "C:\\Users\\hybri\\Documents\\pylabnet\\pylabnet\\pylabnet\\scripts\\staticlines\\staticline.py",
     "lines": {
         "PXIe_6363":
         {
