@@ -1,4 +1,5 @@
 {
     "device_id": "OPX1000",
-    "ip_address": "192.168.0.188"
+    "ip_address": "192.168.0.188",
+    "python_path": "C:\\Users\\hybri\\Documents\\pylabnet\\pylabnet\\.venv-opx\\Scripts\\python.exe"
 }

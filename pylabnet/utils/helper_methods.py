@@ -831,6 +831,23 @@ def launch_device_server(server, dev_config, log_ip, log_port, server_port, debu
         # A device config may name its own interpreter, e.g. the OPX server,
         # whose qm-qua needs a newer Python than the rest of pylabnet.
         python_path = config_dict.get('python_path', sys.executable)
+        process_env = None
+        if 'python_path' in config_dict:
+            process_env = os.environ.copy()
+            repo_root = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+            )
+            existing_pythonpath = process_env.get('PYTHONPATH')
+            pythonpath_entries = (
+                existing_pythonpath.split(os.pathsep) if existing_pythonpath else []
+            )
+            normalized_repo_root = os.path.normcase(os.path.abspath(repo_root))
+            if not any(
+                os.path.normcase(os.path.abspath(path)) == normalized_repo_root
+                for path in pythonpath_entries if path
+            ):
+                pythonpath_entries.insert(0, repo_root)
+            process_env['PYTHONPATH'] = os.pathsep.join(pythonpath_entries)
         launch_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
             'launchers',
@@ -876,7 +893,10 @@ def launch_device_server(server, dev_config, log_ip, log_port, server_port, debu
             logger.info(msg_str)
         ssh.exec_command(cmd)
     else:
-        subprocess.Popen(cmd, shell=True)
+        if process_env is None:
+            subprocess.Popen(cmd, shell=True)
+        else:
+            subprocess.Popen(cmd, shell=True, env=process_env)
 
     logger.info(f"Cmd: {cmd}")
 
