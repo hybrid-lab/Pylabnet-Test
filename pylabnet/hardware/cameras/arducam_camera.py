@@ -13,8 +13,12 @@ Frames
   exposure up to ~100 counts above the dark level (~18), then grows more slowly; 235 is
   the top of the range. For absorption imaging keep the probe image well below that, and
   calibrate the response if the optical density has to be accurate.
-- Contrast stays at its default: other contrast and gamma values (e.g. contrast 64 with
-  a 2 ms exposure, gamma 150) stop the camera sending frames until they are set back.
+- The camera sometimes stops sending frames: with some contrast and gamma values (e.g.
+  contrast 64 with a 2 ms exposure, gamma 150; contrast therefore stays at its default),
+  and once, 2026-11-11, with the driver's own settings after it was plugged back in.
+  Setting the image settings to their defaults and then to the wanted values brings it
+  back, so the driver always applies them that way, and does it again (and reopens the
+  stream) when no frame comes for 10 s in free run.
 
 Modes
 - Free run (the default): ~20 fps on the camera's own clock. get_frame_bytes() returns a
@@ -84,10 +88,6 @@ class Driver:
         self._exposure_range = self._call(lambda: self._controls.get_range('exposure'))
         self._gain_range = self._call(lambda: self._controls.get_range('gain'))
 
-        # A process that ended in trigger mode leaves the camera in it
-        self._call(lambda: self._controls.set('auto_exposure_priority', 0))
-        for setting, value in IMAGE_SETTINGS.items():
-            self._call(lambda s=setting, v=value: self._controls.set(s, v))
         self._exposure_log2 = None
         self._gain = None
 
@@ -103,6 +103,9 @@ class Driver:
         self._fps = 0.0
         self._stop = False
 
+        # Free run (a process that ended in trigger mode leaves the camera in it), the
+        # image settings from their defaults, then exposure and gain
+        self._call(self._apply_settings)
         self.set_exposure(exposure_us)
         self.set_gain(gain)
 
@@ -131,6 +134,19 @@ class Driver:
     def _open_controls(self):
         self._controls = Controls(self.name)
 
+    def _apply_settings(self):
+        """All settings, starting from the defaults (see the module docstring: this also
+        gets a camera going again that stopped sending frames). Runs on the settings thread."""
+        c = self._controls
+        c.set('auto_exposure_priority', int(self.mode == 'hardware_trigger'))
+        c.reset_image_settings()
+        for setting, value in IMAGE_SETTINGS.items():
+            c.set(setting, value)
+        if self._exposure_log2 is not None:
+            c.set('exposure', self._exposure_log2)
+        if self._gain is not None:
+            c.set('gain', self._gain)
+
     #########################
     # Reading thread        #
     #########################
@@ -158,7 +174,12 @@ class Driver:
                 if not ok:
                     if self.mode == 'hardware_trigger':
                         continue  # no trigger in the last 10 s: normal
-                    self.log.warn(f'No frame from {self.name} for 10 s in free run; reopening it')
+                    self.log.warn(f'No frame from {self.name} for 10 s in free run; resetting its '
+                                  f'settings and reopening it')
+                    try:
+                        self._call(self._apply_settings)
+                    except Exception as e:
+                        self.log.warn(f'{self.name}: could not reset its settings ({e})')
                     break
                 if raw.size != WIDTH * HEIGHT * 2:
                     self.log.error(f'{self.name} sent {raw.size} bytes per frame, not {WIDTH * HEIGHT * 2} '

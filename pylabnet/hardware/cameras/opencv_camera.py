@@ -9,6 +9,12 @@ reopened, which takes seconds for RTSP.
 Frames are converted to grayscale uint8. These cameras free-run on their own clock;
 they can't be hardware-triggered.
 
+A USB index counts every camera Windows has, including the Arducam, which has its own
+driver (arducam_camera.py). With the other USB camera unplugged the Arducam becomes
+camera 0; this driver then leaves it alone (opening it would take it from the Arducam
+server) and checks again at every retry, so the camera it is meant for is picked up
+once it is plugged back in.
+
 Exposure:
 - USB (DirectShow): settable in steps of powers of 2 s (2^-13 s = 122 us up to
   2^-1 s = 0.5 s). set_exposure() rounds to the nearest step and returns the applied
@@ -35,6 +41,21 @@ USB_EXPOSURE_RANGE = (-13, -1)
 FRAMES_TO_SKIP_AFTER_EXPOSURE = 3
 # Wait this long before reopening a stream that failed or dropped, in s
 RECONNECT_DELAY_S = 2
+# USB cameras that have a driver of their own, by their name in Windows; never opened here
+OWN_DRIVER_USB_CAMERAS = ('Arducam OV9281 USB Camera',)
+
+
+def usb_camera_name(index):
+    """Name of DirectShow camera `index` (OpenCV's DirectShow numbering), or None when it
+    can't be told (no such camera, or comtypes missing)."""
+    try:
+        import comtypes
+        from pylabnet.hardware.cameras.uvc_controls import list_cameras
+        comtypes.CoInitialize()  # COM on the calling thread; harmless if already done
+        names = list_cameras()
+        return names[index] if 0 <= index < len(names) else None
+    except Exception:
+        return None
 
 
 class Driver:
@@ -99,7 +120,18 @@ class Driver:
         return cap
 
     def _run(self):
+        skip_reported = False
         while not self._stop:
+            if self.is_usb:
+                name = usb_camera_name(self.source)
+                if name in OWN_DRIVER_USB_CAMERAS:
+                    if not skip_reported:  # once, not every retry
+                        self.log.warn(f'{self.name} is the {name}, which has its own server; not opening it. '
+                                      f'Waiting for the camera this config is meant for.')
+                        skip_reported = True
+                    time.sleep(RECONNECT_DELAY_S)
+                    continue
+                skip_reported = False
             cap = self._open()
             if not cap.isOpened():
                 self.log.warn(f'Could not open {self.name}; retrying in {RECONNECT_DELAY_S} s')

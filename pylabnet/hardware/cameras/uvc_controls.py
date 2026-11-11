@@ -170,3 +170,12 @@ class Controls:
         """(min, max, step, default) of a setting."""
         iface, prop = self._target(setting)
         return iface.GetRange(prop)[:4]
+
+    def reset_image_settings(self):
+        """Every image setting (IMAGE_CONTROLS) to the camera's default. Settings the
+        camera doesn't have are skipped."""
+        for setting in IMAGE_CONTROLS:
+            try:
+                self.set(setting, self.get_range(setting)[3])
+            except comtypes.COMError:
+                pass
