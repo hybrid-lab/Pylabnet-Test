@@ -4,7 +4,7 @@ import numpy as np
 import copy
 import time
 import threading
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore, QtGui
 
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from pylabnet.gui.pyqt.external_gui import Window, ParameterPopup, GraphPopup, Confluence_support_GraphPopup, Confluence_Handler, GraphPopupTabs, Confluence_support_GraphPopupTabs
@@ -1561,6 +1561,12 @@ def _turbo_ticks(n=16):
     return [(float(xi), (int(c[0]), int(c[1]), int(c[2]), 255)) for xi, c in zip(x, rgb)]
 
 
+def _reversed_preset(name):
+    """Gradient ticks of pyqtgraph preset `name`, run the other way."""
+    from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
+    return sorted((1 - x, c) for x, c in Gradients[name]['ticks'])
+
+
 # Colormaps offered in ImageGrid's menus: name shown -> pyqtgraph preset name, or
 # gradient ticks for maps pyqtgraph 0.11 doesn't ship. The sequential maps come first,
 # then the diverging ones, which suit images centred on 0 (differences, with the
@@ -1568,6 +1574,8 @@ def _turbo_ticks(n=16):
 IMAGE_COLORMAPS = {
     'gray': 'grey',
     'viridis': 'viridis',
+    # Reversed viridis: yellow at the low end, for maps where smaller is better
+    'viridis_r': _reversed_preset('viridis'),
     'inferno': 'inferno',
     'magma': 'magma',
     'plasma': 'plasma',
@@ -1584,6 +1592,51 @@ IMAGE_COLORMAPS = {
     # bipolar: pyqtgraph's cyan - blue - black - red - yellow (dark at 0)
     'bipolar': 'bipolar',
 }
+
+
+class _WrappingLabel(pg.LabelItem):
+    """A panel title that the layout gives only the height of its text: its width is
+    the panel's, and a title too long for it wraps onto more lines, centred."""
+
+    def __init__(self, text):
+        self._busy = False
+        super().__init__(text)
+        option = QtGui.QTextOption(QtCore.Qt.AlignCenter)
+        option.setWrapMode(QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere)
+        self.item.document().setDefaultTextOption(option)
+        # As tall as the text, never more: spare height goes to the panels
+        self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        self.updateMin()
+
+    def updateMin(self):
+        # pyqtgraph sets the minimum and preferred width to the text's on every setText;
+        # keep the height (of the wrapped text), drop the width
+        # (the maximum stays unset, so the label takes the panel's full width)
+        super().updateMin()
+        self.setMinimumWidth(0)
+        for k in (QtCore.Qt.MinimumSize, QtCore.Qt.PreferredSize):
+            self._sizeHint[k] = (0, self._sizeHint[k][1])
+        self.updateGeometry()
+
+    def resizeEvent(self, ev):
+        # Wrap at the width the layout gives the label. A new height makes the layout
+        # resize the label again from inside here: that inner call only flags it, and the
+        # wrapping is redone here at the new width (a few rounds at most).
+        if self._busy:
+            self._again = True
+            return
+        self._busy = True
+        try:
+            for _ in range(4):
+                self._again = False
+                width = self.width()
+                if width > 0 and abs(self.item.textWidth() - width) > 1:
+                    self.item.setTextWidth(width)
+                super().resizeEvent(ev)
+                if not self._again:
+                    break
+        finally:
+            self._busy = False
 
 
 def _load_colormap(hist, name):
@@ -1619,6 +1672,15 @@ class ImageGrid(Dataset):
     Line plots: set_curve(name, x, y, row=...) adds a plot panel the same way, e.g. a
     signal against time. Its Autoscale button turns automatic axis ranges back on
     after you zoom. NaN values leave gaps. fit=(x, y) draws a fit over the data in red.
+
+    Placement: a panel goes at the right end of its row, unless the script gives `col`
+    (0, 1, ... in panels from the left). rowspan=2 makes a panel two rows tall, e.g. a
+    plot to the right of a 2 x 2 block of images: give the images col 0 and 1 in rows 0
+    and 1, and the plot row=0, col=2, rowspan=2, width=2 (as wide as the two images).
+
+    Maps: set_image(..., axes=dict(x=(label, values), y=(label, values))) shows a small
+    image (e.g. a 2D parameter scan) with labelled axes, one tick per pixel at its value,
+    y growing upwards, filling the panel (no fixed aspect ratio).
 
     Square regions: set_roi(panel, row, col, size) draws a square on an image panel
     that the user can drag and resize (drag the corner handle). get_roi(panel) gives
@@ -1657,7 +1719,7 @@ class ImageGrid(Dataset):
         self._setting_levels = False
 
     def set_image(self, name, image, title=None, scale='minmax', percentiles=(1, 99), gradient='viridis',
-                  row=0, link=None):
+                  row=0, link=None, col=None, rowspan=1, axes=None, width=1):
         """Show an image in panel `name` (made on first use). Safe to call from the
         experiment thread: drawing happens on the next GUI update.
 
@@ -1671,17 +1733,29 @@ class ImageGrid(Dataset):
             Used only when the panel is made.
         :param row: (int) row of the panel, from 0 at the top; fixed when the panel is made
         :param link: (str) panels with the same link zoom and pan together
+        :param col: (int) column of the panel, in panels from the left; default: the next
+            free one in its row. Fixed when the panel is made.
+        :param rowspan: (int) rows the panel takes, from `row` down
+        :param width: (int) the panel's share of the spare width, against 1 for the
+            others; e.g. 2 for a plot as wide as two images beside it. Fixed when the
+            panel is made.
+        :param axes: dict(x=(label, values), y=(label, values)): show the image as a map
+            with labelled axes, pixel i at values[i]; y grows upwards. Fixed when the
+            panel is made; the tick values are updated with each image.
         """
         if scale not in ('minmax', 'percentile', 'symmetric'):
             raise ValueError(f'Unknown scale {scale}')
         with self._lock:
             self.images[name] = np.asarray(image)
             self.options[name] = dict(title=title or name, scale=scale, percentiles=tuple(percentiles),
-                                      gradient=gradient, row=int(row), link=link)
+                                      gradient=gradient, row=int(row), link=link,
+                                      col=None if col is None else int(col), rowspan=int(rowspan), axes=axes,
+                                      width=int(width))
             if name not in self._pending:
                 self._pending.append(name)
 
-    def set_curve(self, name, x, y, title=None, xlabel='', ylabel='', row=0, fit=None):
+    def set_curve(self, name, x, y, title=None, xlabel='', ylabel='', row=0, fit=None, col=None, rowspan=1,
+                  width=1):
         """Show a line plot in panel `name` (made on first use), replacing its data.
         Safe to call from the experiment thread.
 
@@ -1690,12 +1764,15 @@ class ImageGrid(Dataset):
         :param xlabel, ylabel: (str) axis labels
         :param row: (int) row of the panel; fixed when the panel is made
         :param fit: (x, y) of a fit to draw over the data as a red line, or None for none
+        :param col, rowspan, width: where the panel goes and its width, as for set_image
         """
         if fit is not None:
             fit = (np.asarray(fit[0], dtype=float), np.asarray(fit[1], dtype=float))
         with self._lock:
             self.curves[name] = (np.asarray(x, dtype=float), np.asarray(y, dtype=float),
-                                 dict(title=title or name, xlabel=xlabel, ylabel=ylabel, row=int(row), fit=fit))
+                                 dict(title=title or name, xlabel=xlabel, ylabel=ylabel, row=int(row), fit=fit,
+                                      col=None if col is None else int(col), rowspan=int(rowspan),
+                                      width=int(width)))
             if name not in self._pending_curves:
                 self._pending_curves.append(name)
 
@@ -1748,15 +1825,39 @@ class ImageGrid(Dataset):
             # place, so what is drawn is exactly what get_roi() reports
             self.rois[name] = dict(row=int(round(y)), col=int(round(x)), size=size, version=version, drawn=False)
 
+    def _add_label(self, name, row, col):
+        """Title above a panel. Its width is ignored by the layout, so a long title (e.g.
+        a fit result) doesn't widen its column and push panels out of the window; instead
+        it wraps onto more lines within the panel's width."""
+        label = _WrappingLabel(name)
+        self.glw.addItem(label, row=2 * row, col=col, colspan=2)
+        return label
+
     def _next_col(self, row):
         """First free layout column in an image row: every panel takes two columns."""
         used = [p for p in list(self.panels.values()) + list(self.plots.values()) if p['row'] == row]
         return 2 * len(used)
 
+    def _place(self, options):
+        """Layout cell of a new panel: (row, first layout column, layout rows of its body).
+        Each panel row takes two layout rows (title, body) and each panel two layout
+        columns (body, histogram); a panel rowspan rows tall covers the titles between."""
+        row = options['row']
+        col = self._next_col(row) if options.get('col') is None else 2 * options['col']
+        return row, col, 2 * options.get('rowspan', 1) - 1
+
+    def _stretch(self, col, options):
+        """Share the spare width out: a panel's first layout column gets `width` shares
+        (default 1), the second (an image's histogram) none."""
+        grid = self.glw.ci.layout
+        grid.setColumnStretchFactor(col, options.get('width', 1))
+        grid.setColumnStretchFactor(col + 1, 0)
+
     def _add_plot(self, name, options):
-        row, col = options['row'], self._next_col(options['row'])
-        label = self.glw.addLabel(name, row=2 * row, col=col, colspan=2)
-        plot = self.glw.addPlot(row=2 * row + 1, col=col, colspan=2)
+        row, col, body_rows = self._place(options)
+        label = self._add_label(name, row, col)
+        plot = self.glw.addPlot(row=2 * row + 1, col=col, colspan=2, rowspan=body_rows)
+        self._stretch(col, options)
         plot.showGrid(x=True, y=True, alpha=0.3)
         plot.setLabel('bottom', options['xlabel'])
         plot.setLabel('left', options['ylabel'])
@@ -1781,15 +1882,29 @@ class ImageGrid(Dataset):
     def _add_panel(self, name, options):
         # Each image row takes two layout rows (title, image) and each panel two
         # columns (image, histogram)
-        row = options['row']
-        col = self._next_col(row)
-        label = self.glw.addLabel(name, row=2 * row, col=col, colspan=2)
-        view = self.glw.addViewBox(row=2 * row + 1, col=col, lockAspect=True, invertY=True)
+        row, col, body_rows = self._place(options)
+        label = self._add_label(name, row, col)
         item = pg.ImageItem()
-        view.addItem(item)
+        axes = options.get('axes')
+        if axes:
+            # A map: a plot with labelled axes around the image, y upwards
+            plot = self.glw.addPlot(row=2 * row + 1, col=col, rowspan=body_rows)
+            plot.setLabel('bottom', axes['x'][0])
+            plot.setLabel('left', axes['y'][0])
+            plot.setMouseEnabled(x=False, y=False)
+            plot.hideButtons()
+            plot.addItem(item)
+            view = plot.getViewBox()
+        else:
+            plot = None
+            view = self.glw.addViewBox(row=2 * row + 1, col=col, rowspan=body_rows, lockAspect=True, invertY=True)
+            view.addItem(item)
         hist = pg.HistogramLUTItem(image=item)
+        # Histograms keep their own width; the panels share the rest
+        hist.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Preferred)
         _load_colormap(hist, options['gradient'])
-        self.glw.addItem(hist, row=2 * row + 1, col=col + 1)
+        self.glw.addItem(hist, row=2 * row + 1, col=col + 1, rowspan=body_rows)
+        self._stretch(col, options)
 
         # Zooming or panning with the mouse is copied to the other panels of the same
         # link. Only mouse changes are copied: copying every range change (as
@@ -1819,7 +1934,14 @@ class ImageGrid(Dataset):
         self.buttons.addWidget(cmap_box, 1)
 
         self.panels[name] = dict(label=label, view=view, item=item, hist=hist, button=button,
-                                 cmap_box=cmap_box, auto=True, first=True, row=row, link=link)
+                                 cmap_box=cmap_box, auto=True, first=True, row=row, link=link, plot=plot)
+
+    @staticmethod
+    def _set_map_ticks(plot, axes):
+        """One tick per pixel of a map, at the pixel's centre, labelled with its value."""
+        for side, key in (('bottom', 'x'), ('left', 'y')):
+            values = axes[key][1]
+            plot.getAxis(side).setTicks([[(i + 0.5, f'{v:.3g}') for i, v in enumerate(values)]])
 
     def _sync_range(self, link, source):
         """Copy the range of one panel to the others of its link."""
@@ -1869,6 +1991,8 @@ class ImageGrid(Dataset):
             panel['item'].setImage(image.T, autoLevels=False)
             if panel['auto']:
                 self._set_levels(panel, self._levels(image, options))
+            if panel['plot'] is not None and options.get('axes'):
+                self._set_map_ticks(panel['plot'], options['axes'])
             if panel['first']:
                 panel['view'].autoRange(padding=0)
                 panel['first'] = False
