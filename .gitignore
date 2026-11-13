@@ -107,6 +107,7 @@ celerybeat.pid
 .env
 .venv
 .venv-opx/
+.venv-opx310/
 env/
 venv/
 ENV/
@@ -169,3 +170,10 @@ pylabnet/YOUR_PYRPL_DESTINATION_FOLDER/*
 
 *.ttbin
 *.raw
+
+# Local machine configuration and setup notes
+/OPX1000_SETUP_HANDOFF.md
+/pylabnet/configs/devices/OPX1000/OPX1000.json
+/pylabnet/configs/network_configuration.json
+/pylabnet/configs/scripts/data_taker/data_taker_opx1000_only.json
+/pylabnet/configs/scripts/data_taker/data_taker_xband.json
