@@ -1678,6 +1678,11 @@ class ImageGrid(Dataset):
     plot to the right of a 2 x 2 block of images: give the images col 0 and 1 in rows 0
     and 1, and the plot row=0, col=2, rowspan=2, width=2 (as wide as the two images).
 
+    Sizes: width=N gives a panel N shares of the spare width (default 1) and height=N
+    gives its row N shares of the spare height. Once one row has a height, give every
+    row one: a row without one gets no share of the spare height. Columns are shared
+    by all rows, so a width set in one row also widens that column in the others.
+
     Maps: set_image(..., axes=dict(x=(label, values), y=(label, values))) shows a small
     image (e.g. a 2D parameter scan) with labelled axes, one tick per pixel at its value,
     y growing upwards, filling the panel (no fixed aspect ratio).
@@ -1687,9 +1692,20 @@ class ImageGrid(Dataset):
     its current position in image pixels, with a version number that goes up every
     time the user moves it, so a script can e.g. average the pixels inside it.
 
+    Line cuts: set_linecut(name, images, row=...) adds a plot panel with the intensity
+    profile down one column of each of `images`, one colored curve per image, as in
+    the camera viewer. A dashed vertical line on those images marks the column: drag it
+    on any of them and the lines and curves all follow. The profile's row axis follows
+    the first image's zoom. lines_on=[...] shows the line on more images without a
+    curve. The column stays where it was dragged for later images.
+
     Save writes every image, shown or kept with keep_image(), as .npy (full
-    resolution), every curve as a two-column .csv, plus one PNG of the grid.
+    resolution), every curve as a two-column .csv, every line cut as a .csv (row, then
+    one column per image, the cut column in the file name), plus one PNG of the grid.
     """
+
+    # Curve colors of a line cut, in the order of its images
+    LINECUT_COLORS = ('y', 'c', 'm', 'g', 'r', 'w')
 
     # Percentiles are computed on every SUBSAMPLE-th pixel in each direction: plenty
     # for a color scale, and fast on 5 MP frames
@@ -1715,11 +1731,14 @@ class ImageGrid(Dataset):
         self._pending_curves = []
         self.rois = {}          # panel name -> current square: dict(row, col, size, version)
         self._roi_items = {}    # panel name -> the pyqtgraph ROI drawn on it
+        self.linecuts = {}      # line-cut name -> dict(images, lines_on, options, col)
+        self._linecut_items = {}    # line-cut name -> its plot, curves and lines
+        self._moving_lines = False
         self._lock = threading.Lock()
         self._setting_levels = False
 
     def set_image(self, name, image, title=None, scale='minmax', percentiles=(1, 99), gradient='viridis',
-                  row=0, link=None, col=None, rowspan=1, axes=None, width=1):
+                  row=0, link=None, col=None, rowspan=1, axes=None, width=1, height=None):
         """Show an image in panel `name` (made on first use). Safe to call from the
         experiment thread: drawing happens on the next GUI update.
 
@@ -1739,6 +1758,9 @@ class ImageGrid(Dataset):
         :param width: (int) the panel's share of the spare width, against 1 for the
             others; e.g. 2 for a plot as wide as two images beside it. Fixed when the
             panel is made.
+        :param height: (int) the share of the spare height of the panel's row, against 1
+            for rows without one; e.g. 3 for a row of large images above a row of small
+            ones. None leaves the row as it is. Fixed when the panel is made.
         :param axes: dict(x=(label, values), y=(label, values)): show the image as a map
             with labelled axes, pixel i at values[i]; y grows upwards. Fixed when the
             panel is made; the tick values are updated with each image.
@@ -1750,12 +1772,12 @@ class ImageGrid(Dataset):
             self.options[name] = dict(title=title or name, scale=scale, percentiles=tuple(percentiles),
                                       gradient=gradient, row=int(row), link=link,
                                       col=None if col is None else int(col), rowspan=int(rowspan), axes=axes,
-                                      width=int(width))
+                                      width=int(width), height=None if height is None else int(height))
             if name not in self._pending:
                 self._pending.append(name)
 
     def set_curve(self, name, x, y, title=None, xlabel='', ylabel='', row=0, fit=None, col=None, rowspan=1,
-                  width=1):
+                  width=1, height=None):
         """Show a line plot in panel `name` (made on first use), replacing its data.
         Safe to call from the experiment thread.
 
@@ -1764,7 +1786,7 @@ class ImageGrid(Dataset):
         :param xlabel, ylabel: (str) axis labels
         :param row: (int) row of the panel; fixed when the panel is made
         :param fit: (x, y) of a fit to draw over the data as a red line, or None for none
-        :param col, rowspan, width: where the panel goes and its width, as for set_image
+        :param col, rowspan, width, height: where the panel goes and its size, as for set_image
         """
         if fit is not None:
             fit = (np.asarray(fit[0], dtype=float), np.asarray(fit[1], dtype=float))
@@ -1772,7 +1794,7 @@ class ImageGrid(Dataset):
             self.curves[name] = (np.asarray(x, dtype=float), np.asarray(y, dtype=float),
                                  dict(title=title or name, xlabel=xlabel, ylabel=ylabel, row=int(row), fit=fit,
                                       col=None if col is None else int(col), rowspan=int(rowspan),
-                                      width=int(width)))
+                                      width=int(width), height=None if height is None else int(height)))
             if name not in self._pending_curves:
                 self._pending_curves.append(name)
 
@@ -1792,6 +1814,99 @@ class ImageGrid(Dataset):
         with self._lock:
             roi = self.rois.get(name)
             return None if roi is None else {k: roi[k] for k in ('row', 'col', 'size', 'version')}
+
+    def set_linecut(self, name, images, title=None, lines_on=(), row=0, col=None, rowspan=1, width=1,
+                    height=None):
+        """Show the profile down one column of each of `images` in plot panel `name`
+        (made once all the images have panels). Safe to call from the experiment thread;
+        calling it again (e.g. every run) keeps the column the user dragged the line to.
+
+        :param images: names of image panels; one curve each, all at the same column
+        :param title: (str) text above the panel; default is the name
+        :param lines_on: names of more image panels that show the line, without a curve
+        :param row, col, rowspan, width, height: where the panel goes and its size, as for set_image
+        """
+        with self._lock:
+            old = self.linecuts.get(name, {})
+            self.linecuts[name] = dict(images=list(images), lines_on=list(lines_on), col=old.get('col'),
+                                       options=dict(title=title or name, row=int(row),
+                                                    col=None if col is None else int(col),
+                                                    rowspan=int(rowspan), width=int(width),
+                                                    height=None if height is None else int(height)))
+
+    def _add_linecut(self, name):
+        """Runs in update(): the profile plot, and a line on each of its images."""
+        cut = self.linecuts[name]
+        options = cut['options']
+        row, col, body_rows = self._place(options)
+        label = self._add_label(options['title'], row, col)
+        plot = self.glw.addPlot(row=2 * row + 1, col=col, colspan=2, rowspan=body_rows)
+        self._stretch(row, col, options)
+        plot.showGrid(x=True, y=True, alpha=0.3)
+        plot.setLabel('bottom', 'Intensity')
+        plot.setLabel('left', 'Row (pixel)')
+        # Rows run down as in the image, and follow the first image's zoom; the mouse
+        # zooms the intensity axis only
+        plot.invertY(True)
+        plot.setYLink(self.panels[cut['images'][0]]['view'])
+        plot.setMouseEnabled(x=True, y=False)
+        legend = plot.addLegend(offset=(5, 5))
+        curves = {}
+        for i, image in enumerate(cut['images']):
+            curves[image] = plot.plot(pen=pg.mkPen(self.LINECUT_COLORS[i % len(self.LINECUT_COLORS)]), name=image)
+        lines = []
+        for image in cut['images'] + cut['lines_on']:
+            line = pg.InfiniteLine(angle=90, movable=True, pen=pg.mkPen('w', style=QtCore.Qt.DashLine))
+            line.sigPositionChanged.connect(lambda l, n=name: self._linecut_moved(n, l))
+            self.panels[image]['view'].addItem(line)
+            lines.append(line)
+        button = QtWidgets.QPushButton(f'Autoscale {options["title"]}')
+        button.setToolTip('Turn the automatic intensity range back on')
+        button.clicked.connect(plot.enableAutoRange)
+        self._add_control(button, 2)
+        self._linecut_items[name] = dict(label=label, plot=plot, legend=legend, curves=curves, lines=lines,
+                                         button=button, row=row)
+
+    def _linecut_column(self, name):
+        """Column of line cut `name`, inside its first image (default: the middle)."""
+        cut = self.linecuts[name]
+        image = self.images.get(cut['images'][0])
+        if image is None:
+            return None
+        width = image.shape[1]
+        col = width // 2 if cut['col'] is None else cut['col']
+        return min(max(int(col), 0), width - 1)
+
+    def _linecut_moved(self, name, line):
+        """The user dragged one of the lines: move the others and redraw the curves."""
+        if self._moving_lines:
+            return
+        cut = self.linecuts[name]
+        cut['col'] = int(np.floor(line.value()))
+        self._draw_linecut(name)
+
+    def _draw_linecut(self, name):
+        """Lines at the cut column (pixel centre) and one profile per image."""
+        items = self._linecut_items[name]
+        col = self._linecut_column(name)
+        if col is None:
+            return
+        self.linecuts[name]['col'] = col
+        self._moving_lines = True
+        try:
+            for line in items['lines']:
+                line.setValue(col + 0.5)
+        finally:
+            self._moving_lines = False
+        for image_name, curve in items['curves'].items():
+            image = self.images.get(image_name)
+            if image is None or col >= image.shape[1]:
+                curve.clear()
+                continue
+            profile = np.asarray(image[:, col], dtype=float)
+            # Row i is drawn at its pixel centre, i + 0.5, to line up with the image
+            curve.setData(profile, np.arange(len(profile)) + 0.5)
+        items['label'].setText(f'{self.linecuts[name]["options"]["title"]} (column {col})')
 
     def _draw_roi(self, name):
         """Runs in update(): draw (or move) the square of panel `name`."""
@@ -1825,6 +1940,21 @@ class ImageGrid(Dataset):
             # place, so what is drawn is exactly what get_roi() reports
             self.rois[name] = dict(row=int(round(y)), col=int(round(x)), size=size, version=version, drawn=False)
 
+    def _add_control(self, widget, stretch):
+        """Add a button or menu to the row of controls below the panels. Its text doesn't
+        set its width: with many panels the full texts ("Autoscale <panel name>") would
+        make the row, and with it the window, far wider than the screen. The controls
+        share the row's width instead, cutting off their text if need be; the tooltip
+        and the hover text keep the full name."""
+        widget.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
+        widget.setMinimumWidth(20)
+        if isinstance(widget, QtWidgets.QPushButton):
+            widget.setToolTip(f'{widget.text()}: {widget.toolTip()}')
+        else:
+            widget.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+            widget.setMinimumContentsLength(3)
+        self.buttons.addWidget(widget, stretch)
+
     def _add_label(self, name, row, col):
         """Title above a panel. Its width is ignored by the layout, so a long title (e.g.
         a fit result) doesn't widen its column and push panels out of the window; instead
@@ -1835,7 +1965,8 @@ class ImageGrid(Dataset):
 
     def _next_col(self, row):
         """First free layout column in an image row: every panel takes two columns."""
-        used = [p for p in list(self.panels.values()) + list(self.plots.values()) if p['row'] == row]
+        used = [p for p in list(self.panels.values()) + list(self.plots.values())
+                + list(self._linecut_items.values()) if p['row'] == row]
         return 2 * len(used)
 
     def _place(self, options):
@@ -1846,18 +1977,22 @@ class ImageGrid(Dataset):
         col = self._next_col(row) if options.get('col') is None else 2 * options['col']
         return row, col, 2 * options.get('rowspan', 1) - 1
 
-    def _stretch(self, col, options):
+    def _stretch(self, row, col, options):
         """Share the spare width out: a panel's first layout column gets `width` shares
-        (default 1), the second (an image's histogram) none."""
+        (default 1), the second (an image's histogram) none. With `height`, the row's
+        body gets that many shares of the spare height, its title none."""
         grid = self.glw.ci.layout
         grid.setColumnStretchFactor(col, options.get('width', 1))
         grid.setColumnStretchFactor(col + 1, 0)
+        if options.get('height') is not None:
+            grid.setRowStretchFactor(2 * row, 0)
+            grid.setRowStretchFactor(2 * row + 1, options['height'])
 
     def _add_plot(self, name, options):
         row, col, body_rows = self._place(options)
         label = self._add_label(name, row, col)
         plot = self.glw.addPlot(row=2 * row + 1, col=col, colspan=2, rowspan=body_rows)
-        self._stretch(col, options)
+        self._stretch(row, col, options)
         plot.showGrid(x=True, y=True, alpha=0.3)
         plot.setLabel('bottom', options['xlabel'])
         plot.setLabel('left', options['ylabel'])
@@ -1866,7 +2001,7 @@ class ImageGrid(Dataset):
         button = QtWidgets.QPushButton(f'Autoscale {name}')
         button.setToolTip('Turn automatic axis ranges back on')
         button.clicked.connect(plot.enableAutoRange)
-        self.buttons.addWidget(button, 2)
+        self._add_control(button, 2)
         self.plots[name] = dict(label=label, plot=plot, curve=curve, fit=fit, button=button, row=row)
 
     def keep_image(self, name, image):
@@ -1904,7 +2039,7 @@ class ImageGrid(Dataset):
         hist.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Preferred)
         _load_colormap(hist, options['gradient'])
         self.glw.addItem(hist, row=2 * row + 1, col=col + 1, rowspan=body_rows)
-        self._stretch(col, options)
+        self._stretch(row, col, options)
 
         # Zooming or panning with the mouse is copied to the other panels of the same
         # link. Only mouse changes are copied: copying every range change (as
@@ -1930,8 +2065,8 @@ class ImageGrid(Dataset):
         if options['gradient'] in IMAGE_COLORMAPS:
             cmap_box.setCurrentText(options['gradient'])
         cmap_box.currentTextChanged.connect(lambda cmap: _load_colormap(hist, cmap))
-        self.buttons.addWidget(button, 2)
-        self.buttons.addWidget(cmap_box, 1)
+        self._add_control(button, 2)
+        self._add_control(cmap_box, 1)
 
         self.panels[name] = dict(label=label, view=view, item=item, hist=hist, button=button,
                                  cmap_box=cmap_box, auto=True, first=True, row=row, link=link, plot=plot)
@@ -2003,6 +2138,18 @@ class ImageGrid(Dataset):
         for name in to_draw:
             self._draw_roi(name)
 
+        # Line cuts: made once all their image panels exist, redrawn for new images
+        drawn = {name for name, _, _ in todo}
+        with self._lock:
+            cuts = [(n, c) for n, c in self.linecuts.items()
+                    if all(i in self.panels for i in c['images'] + c['lines_on'])]
+        for name, cut in cuts:
+            if name not in self._linecut_items:
+                self._add_linecut(name)
+                self._draw_linecut(name)
+            elif drawn.intersection(cut['images']):
+                self._draw_linecut(name)
+
         with self._lock:
             pending, self._pending_curves = self._pending_curves, []
             curves = [(name, self.curves[name]) for name in pending]
@@ -2026,6 +2173,9 @@ class ImageGrid(Dataset):
         for plot in self.plots.values():
             plot['curve'].clear()
             plot['fit'].clear()
+        for items in self._linecut_items.values():
+            for curve in items['curves'].values():
+                curve.clear()
 
     def save(self, filename=None, directory=None, date_dir=True, unique_id=None):
         self.update()    # draw pending images so the PNG matches the .npy files
@@ -2038,6 +2188,20 @@ class ImageGrid(Dataset):
             path = generate_filepath(f'{filename}_{self._safe(name)}_{unique_id}', directory, date_dir) + '.csv'
             header = f'{options["xlabel"] or "x"},{options["ylabel"] or "y"}'
             np.savetxt(path, np.column_stack([x, y]), delimiter=',', header=header, comments='')
+        for name in list(self._linecut_items):
+            col = self._linecut_column(name)
+            if col is None:
+                continue
+            names = [i for i in self.linecuts[name]['images'] if i in images and col < images[i].shape[1]]
+            if not names:
+                continue
+            rows = images[names[0]].shape[0]
+            names = [i for i in names if images[i].shape[0] == rows]
+            columns = [np.arange(rows)] + [np.asarray(images[i][:, col], dtype=float) for i in names]
+            path = generate_filepath(f'{filename}_{self._safe(name)}_col{col}_{unique_id}', directory,
+                                     date_dir) + '.csv'
+            np.savetxt(path, np.column_stack(columns), delimiter=',', header=','.join(['row'] + names),
+                       comments='')
         pyqtgraph_save(self.glw.ci, f'{filename}_{self.name}_{unique_id}', directory, date_dir)
         save_metadata(self.log, filename, directory, date_dir, unique_id)
 
