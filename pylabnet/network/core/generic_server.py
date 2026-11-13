@@ -92,6 +92,9 @@ class GenericServer:
     def stop(self):
         self._server.close()
 
+    def join(self):
+        self._server_thread.join()
+
     @staticmethod
     def _start_server(server_obj):
         server_obj.start()

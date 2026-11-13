@@ -567,7 +567,7 @@ class Driver:
         self._last_result_specs = deepcopy(self._result_specs)
         self.stack = []
         self.adding_to_stack = False
-        if wait and not simulate:
+        if wait:
             job.wait_until("Done", timeout=timeout)
         return job
 

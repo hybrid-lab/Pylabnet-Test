@@ -1,4 +1,4 @@
-"""Finite LF analog pulse train for scope verification; simulate first by default."""
+"""Finite LF analog pulse train for scope verification; hardware output by default."""
 
 import numpy as np
 
@@ -12,8 +12,8 @@ INIT_DICT = {
     "amplitude_v": {"High voltage (V into 50 ohms)": "0.1"},
     "width_ns": {"Pulse high time (ns)": "1000"},
     "period_ns": {"Pulse period (ns)": "10000"},
-    "pulse_count": {"Number of pulses": "1000"},
-    "simulate": {"Simulate only: 1=yes, 0=hardware output": "1"},
+    "pulse_count": {"Number of pulses": "1000000"},
+    "simulate": {"Simulate only: 1=yes, 0=hardware output": "0"},
     "preview_ns": {"Waveform preview length (ns)": "16000"},
 }
 

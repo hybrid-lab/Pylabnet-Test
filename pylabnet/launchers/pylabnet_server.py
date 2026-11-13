@@ -24,6 +24,7 @@ import traceback
 
 from pylabnet.utils.helper_methods import parse_args, hide_console
 from pylabnet.utils.logging.logger import LogClient
+from pylabnet.network.core.generic_server import GenericServer
 
 
 def main():
@@ -107,12 +108,18 @@ def main():
 
     tries = 0
     update_flag = False
+    server_instance = None
     while tries < 10:
         if server_port is None:
             server_port = np.random.randint(1024, 49151)
             update_flag = True
         try:
-            mod_inst.launch(logger=server_logger, port=server_port, device_id=device_id, config=config)
+            server_instance = mod_inst.launch(
+                logger=server_logger,
+                port=server_port,
+                device_id=device_id,
+                config=config
+            )
             if update_flag:
                 server_logger.update_data(data=dict(port=server_port))
             tries = 10

@@ -48,7 +48,7 @@ def wait_for_job(opx, thread, timeout_s):
     deadline = time.monotonic() + timeout_s
     while thread.running:
         status = opx.get_status()["status"]
-        if status in ("Done", "Simulated"):
+        if status == "Done":
             return True
         if status in ("Canceled", "Error"):
             raise RuntimeError("OPX1000 job ended with status " + status)

@@ -1,0 +1,7 @@
+{
+    "servers": [],
+    "script": "C:\\Users\\hybri\\Documents\\pylabnet\\pylabnet\\pylabnet\\scripts\\data_center\\take_data.py",
+    "exp_path": "C:\\Users\\hybri\\repos\\atoms-circuits-scripts\\experiments",
+    "save_path": "C:\\Users\\hybri\\pylabnet_data",
+    "auto_save": false
+}

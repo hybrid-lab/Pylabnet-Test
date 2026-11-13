@@ -68,7 +68,7 @@ class Service(ServiceBase):
         simulated = job is not None and job is self._simulated_job
         status = None
         if job is not None:
-            status = "Simulated" if simulated else job.get_status()
+            status = job.get_status()
         return pickle.dumps({
             "job_id": None if job is None else str(job.id),
             "simulated": simulated,

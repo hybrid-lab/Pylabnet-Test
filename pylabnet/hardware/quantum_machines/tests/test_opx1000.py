@@ -199,7 +199,7 @@ class DriverTests(unittest.TestCase):
             job = self.driver.execute(simulate=True, duration=2000)
         simulate.assert_called_once_with(self.program, duration=2000)
         hardware_qm.close.assert_not_called()
-        job.wait_until.assert_not_called()
+        job.wait_until.assert_called_once_with("Done", timeout=None)
         self.assertFalse(self.driver.adding_to_stack)
 
     def test_dummy_and_missing_host_prevent_connection(self):

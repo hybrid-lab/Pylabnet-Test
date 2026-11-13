@@ -87,6 +87,7 @@ class RpcTests(unittest.TestCase):
 
     def test_simulation_samples_are_values_and_have_sampling_rates(self):
         job = Mock(id="simulation-job")
+        job.get_status.side_effect = ["Running", "Done"]
         array = Mock()
         array.tolist.return_value = [0.0, 0.1, 0.0]
         job.get_simulated_samples.return_value = {
@@ -99,13 +100,16 @@ class RpcTests(unittest.TestCase):
         self.driver.job = job
         result = self.client.execute(simulate=True, duration=1000)
         self.assertEqual(result, {"job_id": "simulation-job", "simulated": True})
-        self.assertEqual(self.client.get_status()["status"], "Simulated")
+        self.assertEqual(self.client.get_status(), {
+            "job_id": "simulation-job", "simulated": True, "status": "Running",
+        })
+        self.assertEqual(self.client.get_status()["status"], "Done")
         data = self.client.get_simulated_samples()
         self.assertIs(type(data), dict)
         self.assertIs(type(data["con1"]["analog"]["3-1"]), list)
         self.assertEqual(data["con1"]["analog"]["3-1"], [0.0, 0.1, 0.0])
         self.assertEqual(data["con1"]["analog_sampling_rate"]["3-1"], 1e9)
-        job.get_status.assert_not_called()
+        self.assertEqual(job.get_status.call_count, 2)
         self.driver.execute.assert_called_once_with(
             wait=True, timeout=None, simulate=True, duration=1000
         )
