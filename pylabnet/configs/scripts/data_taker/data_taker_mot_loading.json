@@ -9,6 +9,14 @@
             "config": "ni_daq_1"
         },
         {
+            "type": "nidaqmx",
+            "config": "ni_daq_2"
+        },
+        {
+            "type": "nidaqmx",
+            "config": "ni_daq_3"
+        },
+        {
             "type": "rigol_dp832",
             "config": "mot_coils"
         },
@@ -17,8 +25,8 @@
             "config": "bfs_u3_51s5m"
         },
         {
-            "type": "opencv_camera",
-            "config": "network_camera"
+            "type": "arducam_camera",
+            "config": "ov9281"
         }
     ],
     "script": "C:\\Users\\User\\repos\\Pylabnet-Test\\pylabnet\\scripts\\data_center\\take_data.py",

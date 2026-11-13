@@ -11,6 +11,10 @@
         {
             "type": "opencv_camera",
             "config": "network_camera"
+        },
+        {
+            "type": "arducam_camera",
+            "config": "ov9281"
         }
     ],
     "script": "C:\\Users\\User\\repos\\Pylabnet-Test\\pylabnet\\scripts\\data_center\\take_data.py",

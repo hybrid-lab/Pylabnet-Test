@@ -1,0 +1,7 @@
+{
+    "device_id": "arducam_ov9281",
+    "name": "Arducam OV9281 USB Camera",
+    "exposure_us": 1000,
+    "gain": 0,
+    "port": 15209
+}
