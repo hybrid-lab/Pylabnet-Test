@@ -183,7 +183,7 @@ class Client(ClientBase):
 
     def get_ai_voltage(
         self, ai_channel, length=10000, *, fem_slot=defaults.default_fem_slot,
-        controller=defaults.default_controller, time_of_flight=24, label="raw_adc",
+        controller=defaults.default_controller, time_of_flight=28, label="raw_adc",
     ):
         """Queue an input-only raw ADC capture; length is ns (maximum 16000)."""
         return self._service.exposed_get_ai_voltage(
@@ -194,7 +194,7 @@ class Client(ClientBase):
     def count_ai_pulses(
         self, ai_channel, num_windows, window_ns=1000000, threshold_adc=-500,
         polarity="Below", max_tags=1024, *, fem_slot=defaults.default_fem_slot,
-        controller=defaults.default_controller, time_of_flight=24, label="counts",
+        controller=defaults.default_controller, time_of_flight=28, label="counts",
     ):
         """Queue hardware threshold counting; threshold/polarity use ADC codes."""
         return self._service.exposed_count_ai_pulses(

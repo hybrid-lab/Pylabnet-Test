@@ -261,7 +261,7 @@ class Driver:
         channel = _integer(ai_channel, "ai_channel")
         slot = _integer(fem_slot, "fem_slot")
         length = _duration_ns(length)
-        time_of_flight = _integer(time_of_flight, "time_of_flight", minimum=24)
+        time_of_flight = _integer(time_of_flight, "time_of_flight", minimum=28)  # QOP rejects < 28 ns
         if time_of_flight % 4:
             raise ValueError("time_of_flight must be divisible by 4 ns")
         try:
@@ -319,7 +319,7 @@ class Driver:
 
     def get_ai_voltage(
         self, ai_channel, length=10000, *, fem_slot=opx_cfg.default_fem_slot,
-        controller=opx_cfg.default_controller, time_of_flight=24, label="raw_adc",
+        controller=opx_cfg.default_controller, time_of_flight=28, label="raw_adc",
     ):
         """Queue a short raw ADC capture (16..16000 ns, 4 ns increments).
 
@@ -342,7 +342,7 @@ class Driver:
     def count_ai_pulses(
         self, ai_channel, num_windows, window_ns=1000000, threshold_adc=-500,
         polarity="Below", max_tags=1024, *, fem_slot=opx_cfg.default_fem_slot,
-        controller=opx_cfg.default_controller, time_of_flight=24, label="counts",
+        controller=opx_cfg.default_controller, time_of_flight=28, label="counts",
     ):
         """Queue repeated hardware threshold-counting gates on an LF input.
 
